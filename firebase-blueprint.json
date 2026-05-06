@@ -1,0 +1,113 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "farmDetails": { "type": "string" },
+        "preferredLanguage": { "type": "string", "enum": ["English", "Hindi", "Punjabi", "Marathi", "Tamil", "Telugu", "Kannada", "Bengali", "Gujarati"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid"]
+    },
+    "Advice": {
+      "title": "Advice",
+      "description": "AI-generated farming advice history",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "query": { "type": "string" },
+        "response": { "type": "string" },
+        "type": { "type": "string", "enum": ["chat", "vision"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "query", "response"]
+    },
+    "SoilReport": {
+      "title": "SoilReport",
+      "description": "Structured soil health metrics",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "fieldId": { "type": "string", "description": "ID of the specific field for this soil test" },
+        "testDate": { "type": "string", "format": "date-time" },
+        "ph": { "type": "number" },
+        "nitrogen": { "type": "number", "description": "Nitrogen content" },
+        "phosphorus": { "type": "number", "description": "Phosphorus content" },
+        "potassium": { "type": "number", "description": "Potassium content" },
+        "organicCarbon": { "type": "number", "description": "Organic carbon percentage" },
+        "otherNotes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "testDate", "createdAt"]
+    },
+    "Field": {
+      "title": "Field",
+      "description": "Information about a specific plot or section of the farm",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "area": { "type": "number" },
+        "unit": { "type": "string", "enum": ["Acres", "Hectares", "Guntas", "Bighas"] },
+        "soilType": { "type": "string" },
+        "location": { "type": "string" },
+        "description": { "type": "string" },
+        "currentCrop": { "type": "string" },
+        "variety": { "type": "string" },
+        "plantingDate": { "type": "string", "format": "date" },
+        "previousSprays": { "type": "string" },
+        "irrigationTimings": { "type": "string" },
+        "otherDetails": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "area", "unit"]
+    },
+    "Reminder": {
+      "title": "Reminder",
+      "description": "Task reminders for farming activities",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "type": { "type": "string", "enum": ["irrigation", "fertilizer", "follow-up", "monitoring", "harvest", "other"] },
+        "dueDate": { "type": "string", "format": "date-time" },
+        "isCompleted": { "type": "boolean" },
+        "fieldId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "type", "dueDate", "isCompleted", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/users/{userId}/fields/{fieldId}": {
+      "schema": "Field",
+      "description": "Plots or sections of the farm"
+    },
+    "/users/{userId}/soil_reports/{reportId}": {
+      "schema": "SoilReport",
+      "description": "Soil test records for the farmer"
+    },
+    "/users/{userId}/reminders/{reminderId}": {
+      "schema": "Reminder",
+      "description": "Task reminders for the farmer"
+    },
+    "/advice/{adviceId}": {
+      "schema": "Advice",
+      "description": "History of AI consultations"
+    }
+  }
+}

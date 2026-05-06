@@ -1,0 +1,158 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Connection test rule
+    match /test/connection {
+      allow get: if true;
+    }
+
+    // Reuseable helpers
+    function isSignedIn() { return request.auth != null; }
+    function isVerified() { return isSignedIn(); }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
+    // 1. User Validation logic
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'displayName', 'email', 'createdAt'])
+             && data.keys().size() <= 10
+             && data.uid is string && data.uid.size() <= 128 && data.uid == request.auth.uid
+             && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100
+             && data.email is string && data.email.size() >= 5 && data.email.size() <= 100
+             && (data.photoURL is string && data.photoURL.size() <= 1000 || !data.keys().hasAny(['photoURL']) || data.photoURL == null)
+             && (data.farmDetails is string && data.farmDetails.size() <= 10000 || !data.keys().hasAny(['farmDetails']) || data.farmDetails == null)
+             && (data.preferredLanguage is string && data.preferredLanguage.size() <= 50 || !data.keys().hasAny(['preferredLanguage']) || data.preferredLanguage == null)
+             && (data.fcmToken is string && data.fcmToken.size() <= 1000 || !data.keys().hasAny(['fcmToken']) || data.fcmToken == null)
+             && (data.notificationsEnabled is bool || !data.keys().hasAny(['notificationsEnabled']) || data.notificationsEnabled == null);
+    }
+
+    match /users/{userId} {
+      // PII Protection: Only owner can read their own profile
+      allow get: if isOwner(userId);
+      allow create: if isVerified() && isValidId(userId) && userId == request.auth.uid 
+                    && isValidUser(incoming())
+                    && incoming().createdAt == request.time;
+      allow update: if isVerified() && isOwner(userId)
+                    && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'farmDetails', 'preferredLanguage', 'photoURL', 'updatedAt', 'fcmToken', 'notificationsEnabled'])
+                    && isValidUser(incoming())
+                    && (!incoming().diff(existing()).affectedKeys().hasAny(['updatedAt']) || incoming().updatedAt == request.time)
+                    && incoming().createdAt == existing().createdAt;
+
+      // Subcollection for fields
+      match /fields/{fieldId} {
+        allow list, get: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(fieldId) 
+                      && isValidField(incoming())
+                      && incoming().createdAt == request.time;
+        allow update: if isOwner(userId) 
+                      && isValidField(incoming())
+                      && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'area', 'unit', 'soilType', 'location', 'description', 'currentCrop', 'variety', 'plantingDate', 'previousSprays', 'irrigationTimings', 'otherDetails', 'updatedAt'])
+                      && (!incoming().diff(existing()).affectedKeys().hasAny(['updatedAt']) || incoming().updatedAt == request.time)
+                      && incoming().createdAt == existing().createdAt;
+        allow delete: if isOwner(userId);
+      }
+
+      // Subcollection for soil reports
+      match /soil_reports/{reportId} {
+        allow list, get: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(reportId) 
+                      && isValidSoilReport(incoming())
+                      && incoming().createdAt == request.time;
+        allow update: if isOwner(userId) 
+                      && isValidSoilReport(incoming())
+                      && incoming().diff(existing()).affectedKeys().hasOnly(['ph', 'nitrogen', 'phosphorus', 'potassium', 'organicCarbon', 'otherNotes', 'testDate', 'fieldId', 'updatedAt'])
+                      && (!incoming().diff(existing()).affectedKeys().hasAny(['updatedAt']) || incoming().updatedAt == request.time)
+                      && incoming().createdAt == existing().createdAt;
+        allow delete: if isOwner(userId);
+      }
+      // Subcollection for reminders
+      match /reminders/{reminderId} {
+        allow list, get: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(reminderId) 
+                      && isValidReminder(incoming())
+                      && incoming().createdAt == request.time;
+        allow update: if isOwner(userId) 
+                      && isValidReminder(incoming())
+                      && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'type', 'dueDate', 'isCompleted', 'fieldId', 'updatedAt'])
+                      && (!incoming().diff(existing()).affectedKeys().hasAny(['updatedAt']) || incoming().updatedAt == request.time)
+                      && incoming().createdAt == existing().createdAt;
+        allow delete: if isOwner(userId);
+      }
+    }
+
+    // Reminder Validation
+    function isValidReminder(data) {
+      return data.keys().hasAll(['userId', 'title', 'type', 'dueDate', 'isCompleted', 'createdAt'])
+             && data.keys().size() <= 10
+             && data.userId == request.auth.uid
+             && data.title is string && data.title.size() >= 1 && data.title.size() <= 200
+             && (data.description is string && data.description.size() <= 5000 || !data.keys().hasAny(['description']) || data.description == null)
+             && data.type in ["irrigation", "fertilizer", "follow-up", "monitoring", "harvest", "other"]
+             && data.dueDate is string && data.dueDate.size() <= 50
+             && data.isCompleted is bool
+             && (data.fieldId is string && data.fieldId.size() <= 128 || !data.keys().hasAny(['fieldId']) || data.fieldId == null);
+    }
+
+    // Field Validation
+    function isValidField(data) {
+      return data.keys().hasAll(['name', 'area', 'unit', 'createdAt'])
+             && data.keys().size() <= 15
+             && data.name is string && data.name.size() >= 1 && data.name.size() <= 128
+             && data.area is number && data.area > 0
+             && data.unit in ["Acres", "Hectares", "Guntas", "Bighas"]
+             && (data.soilType is string && data.soilType.size() <= 128 || !data.keys().hasAny(['soilType']) || data.soilType == null)
+             && (data.location is string && data.location.size() <= 600 || !data.keys().hasAny(['location']) || data.location == null)
+             && (data.description is string && data.description.size() <= 5000 || !data.keys().hasAny(['description']) || data.description == null)
+             && (data.currentCrop is string && data.currentCrop.size() <= 200 || !data.keys().hasAny(['currentCrop']) || data.currentCrop == null)
+             && (data.variety is string && data.variety.size() <= 200 || !data.keys().hasAny(['variety']) || data.variety == null)
+             && (data.plantingDate is string || !data.keys().hasAny(['plantingDate']) || data.plantingDate == null)
+             && (data.previousSprays is string && data.previousSprays.size() <= 5000 || !data.keys().hasAny(['previousSprays']) || data.previousSprays == null)
+             && (data.irrigationTimings is string && data.irrigationTimings.size() <= 5000 || !data.keys().hasAny(['irrigationTimings']) || data.irrigationTimings == null)
+             && (data.otherDetails is string && data.otherDetails.size() <= 5000 || !data.keys().hasAny(['otherDetails']) || data.otherDetails == null);
+    }
+
+    // Soil Report Validation
+    function isValidSoilReport(data) {
+      return data.keys().hasAll(['userId', 'createdAt'])
+             && data.keys().size() <= 15
+             && data.userId == request.auth.uid
+             && (data.testDate is string || !data.keys().hasAny(['testDate']) || data.testDate == null)
+             && (data.ph is number || !data.keys().hasAny(['ph']) || data.ph == null)
+             && (data.nitrogen is number || !data.keys().hasAny(['nitrogen']) || data.nitrogen == null)
+             && (data.phosphorus is number || !data.keys().hasAny(['phosphorus']) || data.phosphorus == null)
+             && (data.potassium is number || !data.keys().hasAny(['potassium']) || data.potassium == null)
+             && (data.organicCarbon is number || !data.keys().hasAny(['organicCarbon']) || data.organicCarbon == null)
+             && (data.otherNotes is string && data.otherNotes.size() <= 5000 || !data.keys().hasAny(['otherNotes']) || data.otherNotes == null)
+             && (data.fieldId is string && data.fieldId.size() <= 128 || !data.keys().hasAny(['fieldId']) || data.fieldId == null);
+    }
+
+    // 2. Advice history
+    function isValidAdvice(data) {
+      return data.keys().hasAll(['userId', 'query', 'response', 'type', 'createdAt'])
+             && data.keys().size() <= 10
+             && data.userId == request.auth.uid
+             && data.query is string && data.query.size() <= 10000
+             && data.response is string && data.response.size() <= 60000
+             && data.type in ['chat', 'vision', 'vision_chat', 'vision_direct']
+             && (data.fieldId is string && data.fieldId.size() <= 128 || !data.keys().hasAny(['fieldId']) || data.fieldId == null)
+             && (data.imageUrl is string && data.imageUrl.size() <= 2048 || !data.keys().hasAny(['imageUrl']) || data.imageUrl == null)
+             && (data.imageUrls is list && data.imageUrls.size() <= 5 || !data.keys().hasAny(['imageUrls']) || data.imageUrls == null)
+             && (data.createdAt == request.time || resource != null && data.createdAt == resource.data.createdAt);
+    }
+
+    match /advice/{adviceId} {
+      // List rules must check resource.data to prevent query scraping
+      allow list: if isVerified() && resource.data.userId == request.auth.uid;
+      allow get: if isVerified() && resource.data.userId == request.auth.uid;
+      allow create: if isVerified() && isValidId(adviceId) && isValidAdvice(incoming());
+      allow delete: if isVerified() && isOwner(resource.data.userId);
+    }
+  }
+}

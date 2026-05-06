@@ -1,0 +1,10 @@
+{
+  "name": "Remix: FarmGuide AI",
+  "description": "Smart farming assistant with plot mapping, soil health tracking, crop analysis, disease scanning, and live voice AI support.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation",
+    "microphone"
+  ],
+  "majorCapabilities": []
+}
