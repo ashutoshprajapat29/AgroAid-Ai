@@ -32,7 +32,7 @@ export default function LiveVoiceAdvisor() {
 
       // Connect to Live API
       const sessionPromise = ai.live.connect({
-        model: "gemini-3.1-flash-live-preview",
+        model: "gemini-2.5-flash",
         callbacks: {
           onopen: () => {
             console.log("Live API connected");

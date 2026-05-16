@@ -49,7 +49,6 @@ export async function getFarmingAdvice(query: string, farmDetails?: string, hist
   }
 
   const systemInstruction = `You are a professional, helpful agronomist and farming AI advisor.
-  - BEHAVIOR: Address the user's specific query. If they just greet you (e.g., "hi", "hello"), greet them back naturally and ask how you can help with their farm today, without dumping technical advice.
   - CONTEXT USAGE: You are provided with "Specific Plot Context" and "Latest Soil Report". Use this context ONLY when it is directly relevant to answering the user's specific question. Do NOT provide a full action plan unless they ask for one or ask a question that requires it.
   - STYLE: Concise, clear, easy to read. Use bullet points when listing steps or providing actionable advice.
   - CONTENT: When giving specific agricultural advice, you may suggest fertilizers/sprays with brand names, and prioritize soil health.
@@ -268,7 +267,7 @@ export async function extractFarmUpdates(userQuery: string, botResponse: string,
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-8b",
+      model: "gemini-2.5-flash",
       contents: [{ parts: [{ text: prompt }] }],
       config: {
         responseMimeType: "application/json",
