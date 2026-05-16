@@ -16,7 +16,7 @@ export default function LiveVoiceAdvisor() {
   const workletNodeRef = useRef<AudioWorkletNode | null>(null);
 
   // Initialize AI with current key
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
 
   const startSession = async () => {
     try {

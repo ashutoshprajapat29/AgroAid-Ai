@@ -184,8 +184,9 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
   // Speech Recognition Setup
   useEffect(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    let recognition: any = null;
     if (SpeechRecognition) {
-      const recognition = new SpeechRecognition();
+      recognition = new SpeechRecognition();
       recognition.continuous = true;
       recognition.interimResults = true;
       recognition.lang = profile?.preferredLanguage === 'Hindi' ? 'hi-IN' : 'en-US';
@@ -193,11 +194,15 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
       recognition.onresult = (event: any) => {
         let sessionTranscript = "";
         for (let i = 0; i < event.results.length; i++) {
-          sessionTranscript += event.results[i][0].transcript;
+          const chunk = event.results[i][0].transcript;
+          if (sessionTranscript && !sessionTranscript.endsWith(" ") && !chunk.startsWith(" ")) {
+            sessionTranscript += " ";
+          }
+          sessionTranscript += chunk;
         }
 
         // Append current session transcript to what was already there
-        const space = baselineTextRef.current && !baselineTextRef.current.endsWith(" ") ? " " : "";
+        const space = baselineTextRef.current && !baselineTextRef.current.endsWith(" ") && !sessionTranscript.startsWith(" ") ? " " : "";
         setInput(baselineTextRef.current + space + sessionTranscript);
       };
 
@@ -212,6 +217,12 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
 
       recognitionRef.current = recognition;
     }
+    
+    return () => {
+      if (recognition) {
+        try { recognition.stop(); } catch (e) {}
+      }
+    };
   }, [profile?.preferredLanguage]);
 
   const toggleListening = () => {
@@ -231,93 +242,48 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
   };
 
   const speakMessage = async (index: number, text: string) => {
-    // If speaking or loading THIS specific message, clicking should stop it
     if (isSpeaking === index || speechLoading === index) {
-      if (audioSourceRef.current) {
-        try {
-          audioSourceRef.current.stop();
-        } catch (e) {
-          // ignore
-        }
-      }
+      window.speechSynthesis.cancel();
       setIsSpeaking(null);
       setSpeechLoading(null);
       activeSpeechIndexRef.current = null;
       return;
     }
 
-    try {
-      // Clear any previous audio first
-      if (audioSourceRef.current) {
-        try { audioSourceRef.current.stop(); } catch (e) { }
-      }
+    window.speechSynthesis.cancel();
+    setSpeechLoading(index);
+    activeSpeechIndexRef.current = index;
 
-      setSpeechLoading(index);
-      setIsSpeaking(null);
-      activeSpeechIndexRef.current = index;
-
-      // Truncate text for faster generation (TTS models have limits)
-      const speechText = text.length > 400 ? text.substring(0, 400) + "..." : text;
-
-      const base64Audio = await getTTSAudio(speechText);
-
-      // If user toggled off while loading, or switched to another message, stop
-      if (activeSpeechIndexRef.current !== index) {
-        return;
-      }
-
-      setSpeechLoading(null);
-
-      if (base64Audio) {
+    // Use native web speech synthesis
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = profile?.preferredLanguage === 'Hindi' ? 'hi-IN' : 'en-US';
+    
+    utterance.onstart = () => {
+      if (activeSpeechIndexRef.current === index) {
+        setSpeechLoading(null);
         setIsSpeaking(index);
-        // Initialize AudioContext if not already done
-        if (!audioContextRef.current) {
-          audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-        }
-        const context = audioContextRef.current;
-
-        // Decode PCM
-        const binary = atob(base64Audio);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) {
-          bytes[i] = binary.charCodeAt(i);
-        }
-
-        const pcm16 = new Int16Array(bytes.buffer);
-        const float32 = new Float32Array(pcm16.length);
-        for (let i = 0; i < pcm16.length; i++) {
-          float32[i] = pcm16[i] / 0x7FFF;
-        }
-
-        const buffer = context.createBuffer(1, float32.length, 24000);
-        buffer.getChannelData(0).set(float32);
-
-        // Stop any current playback safely
-        if (audioSourceRef.current) {
-          try {
-            audioSourceRef.current.stop();
-          } catch (e) {
-            // Already stopped or not started
-          }
-        }
-
-        const source = context.createBufferSource();
-        source.buffer = buffer;
-        source.connect(context.destination);
-        source.onended = () => {
-          if (audioSourceRef.current === source) {
-            setIsSpeaking(null);
-          }
-        };
-        source.start();
-        audioSourceRef.current = source;
       } else {
-        setIsSpeaking(null);
+        window.speechSynthesis.cancel();
       }
-    } catch (err) {
-      console.error("Speech playback error:", err);
-      setIsSpeaking(null);
-    }
+    };
+    
+    utterance.onend = () => {
+      if (activeSpeechIndexRef.current === index) {
+        setIsSpeaking(null);
+        activeSpeechIndexRef.current = null;
+      }
+    };
+    
+    utterance.onerror = (e) => {
+      console.error("Speech synthesis error:", e);
+      if (activeSpeechIndexRef.current === index) {
+        setSpeechLoading(null);
+        setIsSpeaking(null);
+        activeSpeechIndexRef.current = null;
+      }
+    };
+
+    window.speechSynthesis.speak(utterance);
   };
 
   const saveNewPlot = async (e: React.FormEvent) => {
