@@ -57,10 +57,10 @@ function SoilMetric({ label, value, max, color, unit = '' }: { label: string, va
   return (
     <div className="space-y-2">
       <div className="flex justify-between items-end">
-        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">{label}</span>
-        <span className="text-xs font-black text-zinc-900">{value || '-'}{unit}</span>
+        <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-subtle)]">{label}</span>
+        <span className="text-xs font-black text-[var(--text-main)]">{value || '-'}{unit}</span>
       </div>
-      <div className="h-1.5 w-full bg-zinc-100 rounded-full overflow-hidden">
+      <div className="h-1.5 w-full bg-[var(--bg-hover)] rounded-full overflow-hidden">
         <motion.div 
           initial={{ width: 0 }}
           animate={{ width: `${percentage}%` }}
@@ -332,13 +332,13 @@ export default function FieldManager() {
 
   return (
     <div className="max-w-7xl mx-auto pb-20 px-4 md:px-0">
-      <header className="mb-10 p-10 bento-card border-none bg-gradient-to-br from-teal-700 via-teal-800 to-emerald-900 text-white shadow-[0_20px_50px_rgba(13,148,136,0.3)] relative overflow-hidden group">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full -mr-48 -mt-48 blur-3xl group-hover:scale-125 transition-transform duration-1000" />
+      <header className="mb-10 p-10 rounded-[1.75rem] border-none bg-gradient-to-br from-teal-700 via-teal-800 to-emerald-900 text-white shadow-[0_20px_50px_rgba(13,148,136,0.3)] relative overflow-hidden group">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-[var(--bg-card)]/5 rounded-full -mr-48 -mt-48 blur-3xl group-hover:scale-125 transition-transform duration-1000" />
         <div className="absolute bottom-0 left-0 w-64 h-64 bg-teal-400/10 rounded-full -ml-32 -mb-32 blur-2xl" />
         
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-8">
           <div className="flex items-center gap-6">
-            <div className="p-5 bg-white/10 rounded-[32px] backdrop-blur-xl border border-white/20 shadow-inner">
+            <div className="p-5 bg-[var(--bg-card)]/10 rounded-[32px] backdrop-blur-xl border border-white/20 shadow-inner">
               <Layers size={40} className="text-teal-50" />
             </div>
             <div>
@@ -367,13 +367,13 @@ export default function FieldManager() {
         {isAddingField && (
           <motion.div 
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-zinc-900/40 backdrop-blur-sm z-[100] flex items-start justify-center p-4 overflow-y-auto"
+            className="fixed inset-0 bg-[var(--bg-nav)] backdrop-blur-sm z-[100] flex items-start justify-center p-4 overflow-y-auto"
           >
             <motion.div 
               initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              className="bg-white rounded-3xl p-6 md:p-8 w-full max-w-2xl shadow-2xl my-8 relative"
+              className="bg-[var(--bg-card)] rounded-3xl p-6 md:p-8 w-full max-w-2xl shadow-2xl my-8 relative"
             >
-              <button onClick={() => setIsAddingField(false)} className="absolute top-6 right-6 p-2 text-zinc-400 hover:text-zinc-800 bg-zinc-100 rounded-full transition-colors">
+              <button onClick={() => setIsAddingField(false)} className="absolute top-6 right-6 p-2 text-[var(--text-subtle)] hover:text-[var(--text-main)] bg-[var(--bg-hover)] rounded-full transition-colors">
                 <X size={20} />
               </button>
               
@@ -382,37 +382,37 @@ export default function FieldManager() {
                   <MapPin size={24} />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-black text-zinc-800">{editingFieldId ? 'Update Plot Details' : 'Map New Plot'}</h2>
-                  <p className="text-zinc-500 font-medium text-sm">Define boundaries for targeted soil tracking.</p>
+                  <h2 className="text-2xl font-black text-[var(--text-main)]">{editingFieldId ? 'Update Plot Details' : 'Map New Plot'}</h2>
+                  <p className="text-[var(--text-muted)] font-medium text-sm">Define boundaries for targeted soil tracking.</p>
                 </div>
               </div>
 
               <form onSubmit={handleFieldSubmit} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-bold text-zinc-700 mb-2">Plot Name / Identifier*</label>
-                    <input type="text" required value={fieldFormData.name} onChange={e => setFieldFormData({...fieldFormData, name: e.target.value})} className="w-full bg-zinc-50 border-2 border-zinc-200 rounded-xl px-4 py-3 focus:outline-none focus:border-teal-500 font-medium" placeholder="e.g. North Field" />
+                    <label className="block text-sm font-bold text-[var(--text-muted)] mb-2">Plot Name / Identifier*</label>
+                    <input type="text" required value={fieldFormData.name} onChange={e => setFieldFormData({...fieldFormData, name: e.target.value})} className="w-full bg-[var(--bg-input)] border-2 border-[var(--border-strong)] rounded-xl px-4 py-3 focus:outline-none focus:border-teal-500 font-medium" placeholder="e.g. North Field" />
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-zinc-700 mb-2">Area Size*</label>
-                    <input type="number" step="0.01" required value={fieldFormData.area} onChange={e => setFieldFormData({...fieldFormData, area: e.target.value})} className="w-full bg-zinc-50 border-2 border-zinc-200 rounded-xl px-4 py-3 focus:outline-none focus:border-teal-500 font-medium" placeholder="e.g. 5.5" />
+                    <label className="block text-sm font-bold text-[var(--text-muted)] mb-2">Area Size*</label>
+                    <input type="number" step="0.01" required value={fieldFormData.area} onChange={e => setFieldFormData({...fieldFormData, area: e.target.value})} className="w-full bg-[var(--bg-input)] border-2 border-[var(--border-strong)] rounded-xl px-4 py-3 focus:outline-none focus:border-teal-500 font-medium" placeholder="e.g. 5.5" />
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-zinc-700 mb-2">Unit*</label>
-                    <select required value={fieldFormData.unit} onChange={e => setFieldFormData({...fieldFormData, unit: e.target.value})} className="w-full bg-zinc-50 border-2 border-zinc-200 rounded-xl px-4 py-3 focus:outline-none focus:border-teal-500 font-medium">
+                    <label className="block text-sm font-bold text-[var(--text-muted)] mb-2">Unit*</label>
+                    <select required value={fieldFormData.unit} onChange={e => setFieldFormData({...fieldFormData, unit: e.target.value})} className="w-full bg-[var(--bg-input)] border-2 border-[var(--border-strong)] rounded-xl px-4 py-3 focus:outline-none focus:border-teal-500 font-medium">
                       <option value="Acres">Acres</option><option value="Hectares">Hectares</option><option value="Guntas">Guntas</option><option value="Bighas">Bighas</option>
                     </select>
                   </div>
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-bold text-zinc-700 mb-2">Soil Type Baseline</label>
-                    <input type="text" value={fieldFormData.soilType} onChange={e => setFieldFormData({...fieldFormData, soilType: e.target.value})} className="w-full bg-zinc-50 border-2 border-zinc-200 rounded-xl px-4 py-3 focus:outline-none focus:border-teal-500 font-medium" placeholder="e.g. Black Cotton, Red Loamy" />
+                    <label className="block text-sm font-bold text-[var(--text-muted)] mb-2">Soil Type Baseline</label>
+                    <input type="text" value={fieldFormData.soilType} onChange={e => setFieldFormData({...fieldFormData, soilType: e.target.value})} className="w-full bg-[var(--bg-input)] border-2 border-[var(--border-strong)] rounded-xl px-4 py-3 focus:outline-none focus:border-teal-500 font-medium" placeholder="e.g. Black Cotton, Red Loamy" />
                   </div>
                   <div className="md:col-span-2 pt-2 pb-4">
-                    <label className="block text-sm font-bold text-zinc-700 mb-4 flex flex-col gap-1">
+                    <label className="block text-sm font-bold text-[var(--text-muted)] mb-4 flex flex-col gap-1">
                       <span className="flex items-center justify-between">
                         Interactive Plot Map
                       </span>
-                      <span className="text-xs text-zinc-500 font-medium"><b>Easy Mode:</b> Just tap anywhere on the map to drop a pin at your farm's location.<br/><b>Advanced:</b> Use the polygon tool (right side) to draw the exact boundaries and auto-calculate acreage.</span>
+                      <span className="text-xs text-[var(--text-muted)] font-medium"><b>Easy Mode:</b> Just tap anywhere on the map to drop a pin at your farm's location.<br/><b>Advanced:</b> Use the polygon tool (right side) to draw the exact boundaries and auto-calculate acreage.</span>
                     </label>
                     <div className="relative z-10 isolate">
                       <PlotMap 
@@ -428,33 +428,33 @@ export default function FieldManager() {
                       />
                     </div>
                   </div>
-                  <div className="md:col-span-2 pt-4 border-t border-zinc-100">
-                    <h3 className="font-black text-zinc-800 flex items-center gap-2 mb-4"><Sprout className="text-teal-600" size={20}/> Crop & Activity Details</h3>
+                  <div className="md:col-span-2 pt-4 border-t border-[var(--border-input)]">
+                    <h3 className="font-black text-[var(--text-main)] flex items-center gap-2 mb-4"><Sprout className="text-teal-600" size={20}/> Crop & Activity Details</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-bold text-zinc-700 mb-2">Current Crop</label>
-                        <input type="text" value={fieldFormData.currentCrop} onChange={e => setFieldFormData({...fieldFormData, currentCrop: e.target.value})} className="w-full bg-zinc-50 border-2 border-zinc-200 rounded-xl px-4 py-3 focus:outline-none focus:border-teal-500 font-medium" placeholder="e.g. Tomato" />
+                        <label className="block text-sm font-bold text-[var(--text-muted)] mb-2">Current Crop</label>
+                        <input type="text" value={fieldFormData.currentCrop} onChange={e => setFieldFormData({...fieldFormData, currentCrop: e.target.value})} className="w-full bg-[var(--bg-input)] border-2 border-[var(--border-strong)] rounded-xl px-4 py-3 focus:outline-none focus:border-teal-500 font-medium" placeholder="e.g. Tomato" />
                       </div>
                       <div>
-                        <label className="block text-sm font-bold text-zinc-700 mb-2">Variety / Seed Type</label>
-                        <input type="text" value={fieldFormData.variety} onChange={e => setFieldFormData({...fieldFormData, variety: e.target.value})} className="w-full bg-zinc-50 border-2 border-zinc-200 rounded-xl px-4 py-3 focus:outline-none focus:border-teal-500 font-medium" placeholder="e.g. Roma" />
+                        <label className="block text-sm font-bold text-[var(--text-muted)] mb-2">Variety / Seed Type</label>
+                        <input type="text" value={fieldFormData.variety} onChange={e => setFieldFormData({...fieldFormData, variety: e.target.value})} className="w-full bg-[var(--bg-input)] border-2 border-[var(--border-strong)] rounded-xl px-4 py-3 focus:outline-none focus:border-teal-500 font-medium" placeholder="e.g. Roma" />
                       </div>
                       <div>
-                        <label className="block text-sm font-bold text-zinc-700 mb-2">Planting Date</label>
-                        <input type="date" value={fieldFormData.plantingDate} onChange={e => setFieldFormData({...fieldFormData, plantingDate: e.target.value})} className="w-full bg-zinc-50 border-2 border-zinc-200 rounded-xl px-4 py-3 focus:outline-none focus:border-teal-500 font-medium text-zinc-500" />
+                        <label className="block text-sm font-bold text-[var(--text-muted)] mb-2">Planting Date</label>
+                        <input type="date" value={fieldFormData.plantingDate} onChange={e => setFieldFormData({...fieldFormData, plantingDate: e.target.value})} className="w-full bg-[var(--bg-input)] border-2 border-[var(--border-strong)] rounded-xl px-4 py-3 focus:outline-none focus:border-teal-500 font-medium text-[var(--text-muted)]" />
                       </div>
                       <div>
-                        <label className="block text-sm font-bold text-zinc-700 mb-2">Irrigation Schedule</label>
-                        <input type="text" value={fieldFormData.irrigationTimings} onChange={e => setFieldFormData({...fieldFormData, irrigationTimings: e.target.value})} className="w-full bg-zinc-50 border-2 border-zinc-200 rounded-xl px-4 py-3 focus:outline-none focus:border-teal-500 font-medium" placeholder="e.g. Every 3 days" />
+                        <label className="block text-sm font-bold text-[var(--text-muted)] mb-2">Irrigation Schedule</label>
+                        <input type="text" value={fieldFormData.irrigationTimings} onChange={e => setFieldFormData({...fieldFormData, irrigationTimings: e.target.value})} className="w-full bg-[var(--bg-input)] border-2 border-[var(--border-strong)] rounded-xl px-4 py-3 focus:outline-none focus:border-teal-500 font-medium" placeholder="e.g. Every 3 days" />
                       </div>
                       <div className="md:col-span-2">
-                        <label className="block text-sm font-bold text-zinc-700 mb-2">Sprays / Chemicals Applied</label>
-                        <textarea value={fieldFormData.previousSprays} onChange={e => setFieldFormData({...fieldFormData, previousSprays: e.target.value})} className="w-full bg-zinc-50 border-2 border-zinc-200 rounded-xl px-4 py-3 focus:outline-none focus:border-teal-500 font-medium" rows={2} placeholder="Logs recorded by AI or manually"></textarea>
+                        <label className="block text-sm font-bold text-[var(--text-muted)] mb-2">Sprays / Chemicals Applied</label>
+                        <textarea value={fieldFormData.previousSprays} onChange={e => setFieldFormData({...fieldFormData, previousSprays: e.target.value})} className="w-full bg-[var(--bg-input)] border-2 border-[var(--border-strong)] rounded-xl px-4 py-3 focus:outline-none focus:border-teal-500 font-medium" rows={2} placeholder="Logs recorded by AI or manually"></textarea>
                       </div>
                     </div>
                   </div>
                 </div>
-                <button type="submit" className="w-full bg-zinc-900 text-white font-black py-4 rounded-xl hover:bg-teal-600 transition-colors shadow-lg active:scale-[0.98]">
+                <button type="submit" className="w-full text-[var(--text-main)] text-white font-black py-4 rounded-xl hover:bg-teal-600 transition-colors shadow-lg active:scale-[0.98]">
                   {editingFieldId ? 'Update Plot Data' : 'Save Plot Profile'}
                 </button>
               </form>
@@ -468,13 +468,13 @@ export default function FieldManager() {
         {isAddingSoil && (
           <motion.div 
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-zinc-900/40 backdrop-blur-sm z-[100] flex items-start justify-center p-4 overflow-y-auto"
+            className="fixed inset-0 bg-[var(--bg-nav)] backdrop-blur-sm z-[100] flex items-start justify-center p-4 overflow-y-auto"
           >
             <motion.div 
               initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              className="bg-white rounded-3xl p-6 md:p-8 w-full max-w-3xl shadow-2xl my-8 relative"
+              className="bg-[var(--bg-card)] rounded-3xl p-6 md:p-8 w-full max-w-3xl shadow-2xl my-8 relative"
             >
-              <button onClick={() => setIsAddingSoil(false)} className="absolute top-6 right-6 p-2 text-zinc-400 hover:text-zinc-800 bg-zinc-100 rounded-full transition-colors">
+              <button onClick={() => setIsAddingSoil(false)} className="absolute top-6 right-6 p-2 text-[var(--text-subtle)] hover:text-[var(--text-main)] bg-[var(--bg-hover)] rounded-full transition-colors">
                 <X size={20} />
               </button>
               
@@ -483,7 +483,7 @@ export default function FieldManager() {
                   <FlaskConical size={24} />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-black text-zinc-800">{editingSoilId ? 'Update Soil Report' : 'Log Soil Test Results'}</h2>
+                  <h2 className="text-2xl font-black text-[var(--text-main)]">{editingSoilId ? 'Update Soil Report' : 'Log Soil Test Results'}</h2>
                   {activeFieldForSoil && <p className="text-indigo-600 font-bold text-sm bg-indigo-50 inline-block px-2 py-1 rounded mt-1">Plot Link: {fields.find(f => f.id === activeFieldForSoil)?.name}</p>}
                 </div>
               </div>
@@ -498,40 +498,40 @@ export default function FieldManager() {
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
-                    <label className="block text-sm font-bold text-zinc-700 mb-2">pH Level</label>
-                    <input type="number" step="0.1" value={soilFormData.ph} onChange={e => setSoilFormData({...soilFormData, ph: e.target.value})} className="w-full bg-zinc-50 border-2 border-zinc-200 rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500 font-medium" placeholder="e.g. 6.5" />
+                    <label className="block text-sm font-bold text-[var(--text-muted)] mb-2">pH Level</label>
+                    <input type="number" step="0.1" value={soilFormData.ph} onChange={e => setSoilFormData({...soilFormData, ph: e.target.value})} className="w-full bg-[var(--bg-input)] border-2 border-[var(--border-strong)] rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500 font-medium" placeholder="e.g. 6.5" />
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-zinc-700 mb-2">Nitrogen (N)</label>
-                    <input type="number" value={soilFormData.nitrogen} onChange={e => setSoilFormData({...soilFormData, nitrogen: e.target.value})} className="w-full bg-zinc-50 border-2 border-zinc-200 rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500 font-medium" placeholder="mg/kg" />
+                    <label className="block text-sm font-bold text-[var(--text-muted)] mb-2">Nitrogen (N)</label>
+                    <input type="number" value={soilFormData.nitrogen} onChange={e => setSoilFormData({...soilFormData, nitrogen: e.target.value})} className="w-full bg-[var(--bg-input)] border-2 border-[var(--border-strong)] rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500 font-medium" placeholder="mg/kg" />
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-zinc-700 mb-2">Phosphorus (P)</label>
-                    <input type="number" value={soilFormData.phosphorus} onChange={e => setSoilFormData({...soilFormData, phosphorus: e.target.value})} className="w-full bg-zinc-50 border-2 border-zinc-200 rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500 font-medium" placeholder="mg/kg" />
+                    <label className="block text-sm font-bold text-[var(--text-muted)] mb-2">Phosphorus (P)</label>
+                    <input type="number" value={soilFormData.phosphorus} onChange={e => setSoilFormData({...soilFormData, phosphorus: e.target.value})} className="w-full bg-[var(--bg-input)] border-2 border-[var(--border-strong)] rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500 font-medium" placeholder="mg/kg" />
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-zinc-700 mb-2">Potassium (K)</label>
-                    <input type="number" value={soilFormData.potassium} onChange={e => setSoilFormData({...soilFormData, potassium: e.target.value})} className="w-full bg-zinc-50 border-2 border-zinc-200 rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500 font-medium" placeholder="mg/kg" />
+                    <label className="block text-sm font-bold text-[var(--text-muted)] mb-2">Potassium (K)</label>
+                    <input type="number" value={soilFormData.potassium} onChange={e => setSoilFormData({...soilFormData, potassium: e.target.value})} className="w-full bg-[var(--bg-input)] border-2 border-[var(--border-strong)] rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500 font-medium" placeholder="mg/kg" />
                   </div>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-bold text-zinc-700 mb-2">Organic Carbon (%)</label>
-                    <input type="number" step="0.01" value={soilFormData.organicCarbon} onChange={e => setSoilFormData({...soilFormData, organicCarbon: e.target.value})} className="w-full bg-zinc-50 border-2 border-zinc-200 rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500 font-medium" placeholder="e.g. 1.2" />
+                    <label className="block text-sm font-bold text-[var(--text-muted)] mb-2">Organic Carbon (%)</label>
+                    <input type="number" step="0.01" value={soilFormData.organicCarbon} onChange={e => setSoilFormData({...soilFormData, organicCarbon: e.target.value})} className="w-full bg-[var(--bg-input)] border-2 border-[var(--border-strong)] rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500 font-medium" placeholder="e.g. 1.2" />
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-zinc-700 mb-2">Test Date*</label>
-                    <input type="date" required value={soilFormData.testDate} onChange={e => setSoilFormData({...soilFormData, testDate: e.target.value})} className="w-full bg-zinc-50 border-2 border-zinc-200 rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500 font-medium text-zinc-500" />
+                    <label className="block text-sm font-bold text-[var(--text-muted)] mb-2">Test Date*</label>
+                    <input type="date" required value={soilFormData.testDate} onChange={e => setSoilFormData({...soilFormData, testDate: e.target.value})} className="w-full bg-[var(--bg-input)] border-2 border-[var(--border-strong)] rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500 font-medium text-[var(--text-muted)]" />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-bold text-zinc-700 mb-2">Additional Notes / Deficiencies</label>
-                  <textarea value={soilFormData.otherNotes} onChange={e => setSoilFormData({...soilFormData, otherNotes: e.target.value})} className="w-full bg-zinc-50 border-2 border-zinc-200 rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500 font-medium" rows={3} placeholder="Any specific issues (e.g. Zinc deficiency) or recommendations?"></textarea>
+                  <label className="block text-sm font-bold text-[var(--text-muted)] mb-2">Additional Notes / Deficiencies</label>
+                  <textarea value={soilFormData.otherNotes} onChange={e => setSoilFormData({...soilFormData, otherNotes: e.target.value})} className="w-full bg-[var(--bg-input)] border-2 border-[var(--border-strong)] rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500 font-medium" rows={3} placeholder="Any specific issues (e.g. Zinc deficiency) or recommendations?"></textarea>
                 </div>
 
-                <button type="submit" className="w-full bg-zinc-900 text-white font-black py-4 rounded-xl hover:bg-indigo-600 transition-colors shadow-lg active:scale-[0.98]">
+                <button type="submit" className="w-full text-[var(--text-main)] text-white font-black py-4 rounded-xl hover:bg-indigo-600 transition-colors shadow-lg active:scale-[0.98]">
                   {editingSoilId ? 'Update Report' : 'Save Report'}
                 </button>
               </form>
@@ -541,12 +541,12 @@ export default function FieldManager() {
       </AnimatePresence>
 
       {!loading && fields.length === 0 && (
-        <div className="bento-card bg-white p-20 flex flex-col items-center justify-center text-center shadow-xl border-2 border-dashed border-zinc-100">
+        <div className="bento-card bg-[var(--bg-card)] p-20 flex flex-col items-center justify-center text-center shadow-xl border-2 border-dashed border-[var(--border-input)]">
           <div className="p-6 bg-teal-50 text-teal-400 rounded-full mb-6">
              <Layers size={64} />
           </div>
-          <h3 className="text-2xl font-black text-zinc-800">No Farm Plots Mapped</h3>
-          <p className="text-zinc-400 mt-2 max-w-md font-medium">Divide your farm into plots to easily manage soil health history per land segment.</p>
+          <h3 className="text-2xl font-black text-[var(--text-main)]">No Farm Plots Mapped</h3>
+          <p className="text-[var(--text-subtle)] mt-2 max-w-md font-medium">Divide your farm into plots to easily manage soil health history per land segment.</p>
           <button onClick={() => setIsAddingField(true)} className="mt-8 bg-teal-600 text-white px-8 py-4 rounded-[28px] font-black hover:scale-105 transition-all shadow-lg shadow-teal-600/20">
             Start Mapping Now
           </button>
@@ -566,14 +566,14 @@ export default function FieldManager() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="bento-card bg-white shadow-2xl relative border-l-8 border-teal-600 overflow-hidden flex flex-col"
+                className="bento-card bg-[var(--bg-card)] shadow-2xl relative border-l-8 border-teal-600 overflow-hidden flex flex-col"
               >
                 {/* Field Details */}
                 <div className="p-6 md:p-8 flex-1">
                   <div className="flex justify-between items-start mb-6">
                     <div>
-                      <h3 className="text-2xl font-black text-zinc-800 tracking-tight">{field.name}</h3>
-                      <div className="flex items-center gap-2 text-zinc-500 mt-1">
+                      <h3 className="text-2xl font-black text-[var(--text-main)] tracking-tight">{field.name}</h3>
+                      <div className="flex items-center gap-2 text-[var(--text-muted)] mt-1">
                         <Maximize2 size={16} className="text-teal-600" />
                         <span className="font-bold tracking-tight capitalize">{field.area} {field.unit}</span>
                       </div>
@@ -597,16 +597,16 @@ export default function FieldManager() {
                           otherDetails: field.otherDetails||''
                         }); 
                         setIsAddingField(true); 
-                      }} className="p-2 text-zinc-400 hover:text-emerald-600 transition-colors" title="Edit Plot">
+                      }} className="p-2 text-[var(--text-subtle)] hover:text-emerald-600 transition-colors" title="Edit Plot">
                         <Edit2 size={18} />
                       </button>
                       {deletingFieldId === field.id ? (
                         <div className="flex items-center gap-1 bg-red-50 p-1 rounded-lg border border-red-200 ml-1">
                           <button onClick={(e) => handleFieldDelete(e, field.id)} className="px-2 py-1 text-xs font-bold text-white bg-red-500 hover:bg-red-600 rounded">Delete</button>
-                          <button onClick={(e) => { e.stopPropagation(); setDeletingFieldId(null); }} className="px-2 py-1 text-xs font-bold text-zinc-600 hover:text-zinc-800 bg-white border border-zinc-200 rounded">Cancel</button>
+                          <button onClick={(e) => { e.stopPropagation(); setDeletingFieldId(null); }} className="px-2 py-1 text-xs font-bold text-[var(--text-muted)] hover:text-[var(--text-main)] bg-[var(--bg-card)] border border-[var(--border-strong)] rounded">Cancel</button>
                         </div>
                       ) : (
-                        <button onClick={(e) => { e.stopPropagation(); setDeletingFieldId(field.id); }} className="p-2 text-zinc-400 hover:text-red-500 transition-colors" title="Delete Plot">
+                        <button onClick={(e) => { e.stopPropagation(); setDeletingFieldId(field.id); }} className="p-2 text-[var(--text-subtle)] hover:text-red-500 transition-colors" title="Delete Plot">
                           <Trash2 size={18} />
                         </button>
                       )}
@@ -615,16 +615,16 @@ export default function FieldManager() {
 
                   <div className="space-y-3 mb-6">
                     {field.soilType && (
-                      <div className="flex items-start gap-3 text-zinc-600">
+                      <div className="flex items-start gap-3 text-[var(--text-muted)]">
                         <Layers className="text-amber-500 shrink-0 mt-0.5" size={18} />
-                        <div><p className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Soil Baseline</p>
+                        <div><p className="text-[10px] font-black uppercase tracking-widest text-[var(--text-subtle)]">Soil Baseline</p>
                         <p className="font-bold text-sm">{field.soilType}</p></div>
                       </div>
                     )}
                     {field.description && (
-                      <div className="flex items-start gap-3 text-zinc-600">
+                      <div className="flex items-start gap-3 text-[var(--text-muted)]">
                         <MapPin className="text-blue-500 shrink-0 mt-0.5" size={18} />
-                        <div><p className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Notes / Location</p>
+                        <div><p className="text-[10px] font-black uppercase tracking-widest text-[var(--text-subtle)]">Notes / Location</p>
                         <p className="font-medium text-sm leading-relaxed">{field.description}</p></div>
                       </div>
                     )}
@@ -649,9 +649,9 @@ export default function FieldManager() {
                 </div>
 
                 {/* Integrated Soil Health Panel */}
-                <div className="bg-zinc-50 p-6 md:p-8 border-t border-zinc-100">
+                <div className="bg-[var(--bg-input)] p-6 md:p-8 border-t border-[var(--border-input)]">
                   <div className="flex justify-between items-center mb-4">
-                    <h4 className="font-black text-zinc-800 flex items-center gap-2 text-lg">
+                    <h4 className="font-black text-[var(--text-main)] flex items-center gap-2 text-lg">
                       <FlaskConical className="text-indigo-600" size={20} /> Soil Health
                     </h4>
                     <button 
@@ -666,16 +666,16 @@ export default function FieldManager() {
                   {latestReport ? (
                      <div className="space-y-4">
                         {/* Display Latest Data Card */}
-                        <div className="bg-white rounded-3xl p-8 shadow-sm border border-zinc-200/50 relative group/soil">
+                        <div className="bg-[var(--bg-card)] rounded-3xl p-8 shadow-sm border border-[var(--border-strong)]/50 relative group/soil">
                            <div className="absolute top-6 right-6 flex gap-2 z-30 opacity-0 group-hover/soil:opacity-100 transition-opacity">
-                              <button onClick={(e) => { e.stopPropagation(); openSoilModal(field.id, latestReport); }} className="p-2.5 bg-zinc-50 text-zinc-400 hover:text-indigo-600 rounded-xl transition-colors"><Edit2 size={16} /></button>
+                              <button onClick={(e) => { e.stopPropagation(); openSoilModal(field.id, latestReport); }} className="p-2.5 bg-[var(--bg-input)] text-[var(--text-subtle)] hover:text-indigo-600 rounded-xl transition-colors"><Edit2 size={16} /></button>
                               {deletingSoilId === latestReport.id ? (
                                 <div className="flex items-center gap-1 bg-red-50 p-1.5 rounded-xl border border-red-100">
                                   <button onClick={(e) => handleSoilDelete(e, latestReport.id)} className="px-3 py-1.5 text-[10px] font-black text-white bg-red-500 rounded-lg uppercase tracking-tight">Delete</button>
-                                  <button onClick={(e) => { e.stopPropagation(); setDeletingSoilId(null); }} className="px-3 py-1.5 text-[10px] font-black text-zinc-500 bg-white border border-zinc-200 rounded-lg uppercase tracking-tight">Cancel</button>
+                                  <button onClick={(e) => { e.stopPropagation(); setDeletingSoilId(null); }} className="px-3 py-1.5 text-[10px] font-black text-[var(--text-muted)] bg-[var(--bg-card)] border border-[var(--border-strong)] rounded-lg uppercase tracking-tight">Cancel</button>
                                 </div>
                               ) : (
-                                <button onClick={(e) => { e.stopPropagation(); setDeletingSoilId(latestReport.id); }} className="p-2.5 bg-zinc-50 text-zinc-400 hover:text-red-500 rounded-xl transition-colors"><Trash2 size={16} /></button>
+                                <button onClick={(e) => { e.stopPropagation(); setDeletingSoilId(latestReport.id); }} className="p-2.5 bg-[var(--bg-input)] text-[var(--text-subtle)] hover:text-red-500 rounded-xl transition-colors"><Trash2 size={16} /></button>
                               )}
                            </div>
                            <div className="flex items-center gap-3 mb-8">
@@ -683,8 +683,8 @@ export default function FieldManager() {
                                <Calendar size={18} />
                              </div>
                              <div>
-                               <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Analysis Date</p>
-                               <p className="text-sm font-black text-zinc-800">{new Date(latestReport.testDate).toLocaleDateString()}</p>
+                               <p className="text-[10px] font-black uppercase tracking-widest text-[var(--text-subtle)]">Analysis Date</p>
+                               <p className="text-sm font-black text-[var(--text-main)]">{new Date(latestReport.testDate).toLocaleDateString()}</p>
                              </div>
                            </div>
                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-6 pt-4">
@@ -694,10 +694,10 @@ export default function FieldManager() {
                              <SoilMetric label="Potassium (K)" value={latestReport.potassium} max={100} color="bg-amber-500" unit="mg" />
                            </div>
                            {latestReport.otherNotes && (
-                             <div className="mt-8 pt-6 border-t border-zinc-50">
+                             <div className="mt-8 pt-6 border-t border-[var(--border-input)]">
                                <div className="flex items-start gap-3">
-                                 <Info size={16} className="text-zinc-300 mt-0.5" />
-                                 <p className="text-sm font-medium text-zinc-500 leading-relaxed italic">“{latestReport.otherNotes}”</p>
+                                 <Info size={16} className="text-[var(--text-subtle)] mt-0.5" />
+                                 <p className="text-sm font-medium text-[var(--text-muted)] leading-relaxed italic">“{latestReport.otherNotes}”</p>
                                </div>
                              </div>
                            )}
@@ -709,9 +709,9 @@ export default function FieldManager() {
                         )}
                      </div>
                   ) : (
-                    <div className="bg-white/60 border border-dashed border-zinc-300 rounded-2xl p-6 text-center">
-                      <p className="text-sm font-medium text-zinc-500 mb-3">No soil lab tests recorded for this plot.</p>
-                      <button onClick={() => openSoilModal(field.id)} className="text-xs font-black uppercase tracking-widest text-zinc-800 bg-zinc-200 hover:bg-zinc-300 px-4 py-2 rounded-full transition-colors">
+                    <div className="bg-[var(--bg-card)]/60 border border-dashed border-[var(--border-strong)] rounded-2xl p-6 text-center">
+                      <p className="text-sm font-medium text-[var(--text-muted)] mb-3">No soil lab tests recorded for this plot.</p>
+                      <button onClick={() => openSoilModal(field.id)} className="text-xs font-black uppercase tracking-widest text-[var(--text-main)] border-[var(--border-input)] hover:bg-zinc-300 px-4 py-2 rounded-full transition-colors">
                         Add First Record
                       </button>
                     </div>
@@ -725,13 +725,13 @@ export default function FieldManager() {
       </div>
 
       {unassignedReports.length > 0 && (
-         <div className="mt-20 border-t border-zinc-200 pt-10">
+         <div className="mt-20 border-t border-[var(--border-strong)] pt-10">
             <div className="flex items-center justify-between mb-8">
                <div>
-                  <h3 className="text-3xl font-black text-zinc-900 tracking-tight flex items-center gap-3">
+                  <h3 className="text-3xl font-black text-[var(--text-main)] tracking-tight flex items-center gap-3">
                     <FlaskConical className="text-orange-500" size={32} /> Soil Analytics Intake
                   </h3>
-                  <p className="text-zinc-500 font-medium">Reports captured via AI conversation. Please link these to their respective plots.</p>
+                  <p className="text-[var(--text-muted)] font-medium">Reports captured via AI conversation. Please link these to their respective plots.</p>
                </div>
                <div className="bg-orange-100 text-orange-700 px-4 py-2 rounded-2xl font-black text-sm border border-orange-200">
                  {unassignedReports.length} Pending
@@ -739,36 +739,36 @@ export default function FieldManager() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {unassignedReports.map(report => (
-                <div key={report.id} className="bg-white rounded-2xl p-6 shadow-xl border border-zinc-100 relative group">
+                <div key={report.id} className="bg-[var(--bg-card)] rounded-2xl p-6 shadow-xl border border-[var(--border-input)] relative group">
                    <div className="absolute top-4 right-4 flex gap-1 z-30 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={(e) => { e.stopPropagation(); openSoilModal(null, report); }} className="p-2 text-zinc-400 hover:text-indigo-600 transition-colors"><Edit2 size={16} /></button>
+                      <button onClick={(e) => { e.stopPropagation(); openSoilModal(null, report); }} className="p-2 text-[var(--text-subtle)] hover:text-indigo-600 transition-colors"><Edit2 size={16} /></button>
                       {deletingSoilId === report.id ? (
                         <div className="flex items-center gap-1 bg-red-50 p-1 rounded-lg">
                           <button onClick={(e) => handleSoilDelete(e, report.id)} className="px-2 py-1 text-xs font-bold text-white bg-red-500 rounded">Delete</button>
-                          <button onClick={(e) => { e.stopPropagation(); setDeletingSoilId(null); }} className="px-2 py-1 text-xs font-bold text-zinc-600 bg-white rounded">Cancel</button>
+                          <button onClick={(e) => { e.stopPropagation(); setDeletingSoilId(null); }} className="px-2 py-1 text-xs font-bold text-[var(--text-muted)] bg-[var(--bg-card)] rounded">Cancel</button>
                         </div>
                       ) : (
-                        <button onClick={(e) => { e.stopPropagation(); setDeletingSoilId(report.id); }} className="p-2 text-zinc-400 hover:text-red-500 transition-colors"><Trash2 size={16} /></button>
+                        <button onClick={(e) => { e.stopPropagation(); setDeletingSoilId(report.id); }} className="p-2 text-[var(--text-subtle)] hover:text-red-500 transition-colors"><Trash2 size={16} /></button>
                       )}
                    </div>
                    <div className="flex items-center gap-2 mb-4">
                      <Calendar size={16} className="text-indigo-500"/>
-                     <span className="text-sm font-black text-zinc-800">{new Date(report.testDate).toLocaleDateString()}</span>
+                     <span className="text-sm font-black text-[var(--text-main)]">{new Date(report.testDate).toLocaleDateString()}</span>
                    </div>
                    <div className="grid grid-cols-4 gap-2 mb-4">
-                      <div className="flex flex-col"><span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">pH</span><span className="font-black text-rose-500">{report.ph || '-'}</span></div>
-                      <div className="flex flex-col"><span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">N</span><span className="font-black text-emerald-600">{report.nitrogen || '-'}</span></div>
-                      <div className="flex flex-col"><span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">P</span><span className="font-black text-blue-600">{report.phosphorus || '-'}</span></div>
-                      <div className="flex flex-col"><span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">K</span><span className="font-black text-amber-600">{report.potassium || '-'}</span></div>
+                      <div className="flex flex-col"><span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-subtle)]">pH</span><span className="font-black text-rose-500">{report.ph || '-'}</span></div>
+                      <div className="flex flex-col"><span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-subtle)]">N</span><span className="font-black text-emerald-600">{report.nitrogen || '-'}</span></div>
+                      <div className="flex flex-col"><span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-subtle)]">P</span><span className="font-black text-blue-600">{report.phosphorus || '-'}</span></div>
+                      <div className="flex flex-col"><span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-subtle)]">K</span><span className="font-black text-amber-600">{report.potassium || '-'}</span></div>
                    </div>
-                   {report.otherNotes && <p className="text-xs text-zinc-500 mb-4">{report.otherNotes}</p>}
+                   {report.otherNotes && <p className="text-xs text-[var(--text-muted)] mb-4">{report.otherNotes}</p>}
 
-                   <div className="pt-4 border-t border-zinc-100 flex items-center justify-between">
+                   <div className="pt-4 border-t border-[var(--border-input)] flex items-center justify-between">
                      {assigningReportId === report.id ? (
                         <div className="flex-1 animate-in slide-in-from-bottom-2 duration-300">
                           <select 
                             onChange={(e) => handleAssignReport(report.id, e.target.value)}
-                            className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:border-teal-500"
+                            className="w-full bg-[var(--bg-input)] border border-[var(--border-strong)] rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:border-teal-500"
                             defaultValue=""
                           >
                             <option value="" disabled>Link to Plot...</option>
@@ -778,17 +778,17 @@ export default function FieldManager() {
                           </select>
                           <button 
                             onClick={() => setAssigningReportId(null)}
-                            className="w-full mt-2 text-[10px] font-black uppercase tracking-widest text-zinc-400"
+                            className="w-full mt-2 text-[10px] font-black uppercase tracking-widest text-[var(--text-subtle)]"
                           >
                             Cancel
                           </button>
                         </div>
                      ) : (
                         <>
-                          <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Action Required</span>
+                          <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-subtle)]">Action Required</span>
                           <button 
                             onClick={() => setAssigningReportId(report.id)}
-                            className="bg-zinc-900 text-white px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest hover:bg-teal-600 transition-colors flex items-center gap-1 shadow-lg shadow-zinc-900/10"
+                            className="text-[var(--text-main)] text-white px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest hover:bg-teal-600 transition-colors flex items-center gap-1 shadow-lg shadow-zinc-900/10"
                           >
                             Assign to Plot
                           </button>

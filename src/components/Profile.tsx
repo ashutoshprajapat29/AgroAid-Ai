@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../lib/AuthContext";
-import { User, Mail, ShieldCheck, Map, Sprout, Save, Loader2, LogOut, Globe, Info, Layout, Layers, Wind } from "lucide-react";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { User, Mail, ShieldCheck, Sprout, Save, Loader2, LogOut, Globe, Layers, Wind, Palette } from "lucide-react";
+import { collection, getDocs } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { handleFirestoreError, OperationType } from "../lib/firebaseUtils";
 import { motion } from "motion/react";
+import ThemeToggle from "./ThemeToggle";
 
 export default function Profile() {
   const { user, profile, updateProfile, logout } = useAuth();
@@ -15,210 +16,206 @@ export default function Profile() {
   });
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [stats, setStats] = useState({ plots: 0, reports: 0 });
+  const [stats, setStats]     = useState({ plots: 0, reports: 0 });
 
   useEffect(() => {
     async function fetchStats() {
       if (!user) return;
-      const fieldsPath = `users/${user.uid}/fields`;
       try {
-        const fieldsSnap = await getDocs(collection(db, "users", user.uid, "fields"));
+        const fieldsSnap  = await getDocs(collection(db, "users", user.uid, "fields"));
         const reportsSnap = await getDocs(collection(db, "users", user.uid, "soil_reports"));
-        setStats({
-          plots: fieldsSnap.size,
-          reports: reportsSnap.size
-        });
-      } catch (err) {
-        handleFirestoreError(err, OperationType.GET, fieldsPath);
-      }
+        setStats({ plots: fieldsSnap.size, reports: reportsSnap.size });
+      } catch (err) { handleFirestoreError(err, OperationType.GET, `users/${user.uid}/fields`); }
     }
     fetchStats();
   }, [user]);
 
-  const languages = [
-    "English", "Hindi", "Punjabi", "Marathi", "Tamil", "Telugu", "Kannada", "Bengali", "Gujarati"
-  ];
+  const languages = ["English", "Hindi", "Punjabi", "Marathi", "Tamil", "Telugu", "Kannada", "Bengali", "Gujarati"];
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setSuccess(false);
-    try {
-      await updateProfile(formData);
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
+    setLoading(true); setSuccess(false);
+    try { await updateProfile(formData); setSuccess(true); setTimeout(() => setSuccess(false), 3000); }
+    catch { /* handled */ }
+    finally { setLoading(false); }
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 md:px-8 pb-24 md:pb-12 pt-4">
-      {/* Bento Header Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
-        {/* Profile Identity Card */}
-        <div className="lg:col-span-2 bento-card bg-zinc-900 text-white p-8 md:p-10 relative overflow-hidden flex flex-col md:flex-row items-center md:items-start gap-8">
-           <div className="absolute top-0 right-0 w-64 h-64 bg-teal-500/10 rounded-full -mr-32 -mt-32 blur-3xl"></div>
-           
-           <div className="relative z-10">
-              {profile?.photoURL ? (
-                <img src={profile.photoURL} alt={profile.displayName} referrerPolicy="no-referrer" className="w-24 h-24 md:w-32 md:h-32 rounded-3xl border-4 border-white/10 shadow-2xl object-cover" />
-              ) : (
-                <div className="w-24 h-24 md:w-32 md:h-32 rounded-3xl bg-teal-600 flex items-center justify-center border-4 border-white/10 shadow-2xl">
-                  <User size={48} />
-                </div>
-              )}
-           </div>
+    <div className="max-w-6xl mx-auto px-0 pb-24 md:pb-12">
 
-           <div className="relative z-10 flex-1 text-center md:text-left">
-              <div className="flex flex-wrap justify-center md:justify-start items-center gap-2 mb-2">
-                <span className="text-[10px] font-black uppercase tracking-[0.2em] bg-teal-500/20 text-teal-400 px-3 py-1 rounded-full">Validated User</span>
-                <span className="text-[10px] font-black uppercase tracking-[0.2em] bg-white/5 text-white/50 px-3 py-1 rounded-full flex items-center gap-1">
-                  <Globe size={10} /> {formData.preferredLanguage}
-                </span>
+      {/* Hero identity card */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
+
+        {/* Profile hero */}
+        <div className="lg:col-span-2 rounded-[1.75rem] p-8 md:p-10 relative overflow-hidden flex flex-col md:flex-row items-center md:items-start gap-7
+          bg-gradient-to-br from-[#071409] via-[#091b0d] to-[#0c2411] border border-emerald-500/18">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/7 rounded-full -mr-32 -mt-32 blur-3xl pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-40 h-40 bg-amber-500/4 rounded-full -ml-20 -mb-20 blur-2xl pointer-events-none" />
+
+          {/* Avatar */}
+          <div className="relative z-10 shrink-0">
+            {profile?.photoURL ? (
+              <img src={profile.photoURL} alt={profile.displayName} referrerPolicy="no-referrer"
+                className="w-24 h-24 md:w-28 md:h-28 rounded-2xl border-2 border-emerald-500/20 shadow-2xl object-cover" />
+            ) : (
+              <div className="w-24 h-24 md:w-28 md:h-28 rounded-2xl bg-emerald-500/15 border-2 border-emerald-500/20 flex items-center justify-center">
+                <User size={40} className="text-emerald-400" />
               </div>
-              <h1 className="text-3xl md:text-5xl font-black tracking-tight mb-2 leading-tight">
-                {profile?.displayName || "Guardian of Land"}
-              </h1>
-              <p className="text-zinc-400 font-bold flex items-center justify-center md:justify-start gap-2">
-                <Mail size={16} /> {profile?.email}
-              </p>
-           </div>
+            )}
+            <div className="absolute -bottom-1.5 -right-1.5 w-6 h-6 bg-emerald-500 rounded-lg flex items-center justify-center shadow-lg shadow-emerald-500/40">
+              <ShieldCheck size={13} className="text-white" />
+            </div>
+          </div>
+
+          {/* Info */}
+          <div className="relative z-10 flex-1 text-center md:text-left">
+            <div className="flex flex-wrap justify-center md:justify-start items-center gap-2 mb-3">
+              <span className="text-[10px] font-bold uppercase tracking-widest bg-emerald-500/15 text-emerald-400 px-3 py-1 rounded-full border border-emerald-500/20">
+                Verified Farmer
+              </span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-bento-text-muted px-3 py-1 rounded-full border flex items-center gap-1" style={{ background: 'var(--bg-input)', borderColor: 'var(--border-input)' }}>
+                <Globe size={9} /> {formData.preferredLanguage}
+              </span>
+            </div>
+            <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-bento-text-main mb-2">
+              {profile?.displayName || "Guardian of Land"}
+            </h1>
+            <p className="text-bento-text-muted font-medium flex items-center justify-center md:justify-start gap-2 text-sm">
+              <Mail size={14} className="text-emerald-400/60" />
+              {profile?.email}
+            </p>
+          </div>
         </div>
 
-        {/* Stats Bento */}
-        <div className="bento-card bg-white p-8 flex flex-col justify-between overflow-hidden relative">
-           <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-zinc-50 rounded-full -z-0"></div>
-           
-           <div className="relative z-10">
-              <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-6">Agriculture Impact</h3>
-              <div className="space-y-6">
-                 <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-teal-50 text-teal-600 rounded-2xl flex items-center justify-center">
-                       <Layers size={24} />
-                    </div>
-                    <div>
-                       <p className="text-2xl font-black text-zinc-900">{stats.plots}</p>
-                       <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Mapped Plots</p>
-                    </div>
-                 </div>
-                 <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center">
-                       <ShieldCheck size={24} />
-                    </div>
-                    <div>
-                       <p className="text-2xl font-black text-zinc-900">{stats.reports}</p>
-                       <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Health Audits</p>
-                    </div>
-                 </div>
+        {/* Stats */}
+        <div className="glass-panel rounded-[1.75rem] p-7 flex flex-col justify-between">
+          <h3 className="text-[10px] font-bold uppercase tracking-widest text-bento-text-muted mb-6">Agriculture Impact</h3>
+          <div className="space-y-5">
+            {[
+              { label: "Mapped Plots", value: stats.plots, icon: Layers, color: "emerald" },
+              { label: "Health Audits", value: stats.reports, icon: ShieldCheck, color: "indigo" },
+            ].map(stat => (
+              <div key={stat.label} className="flex items-center gap-4">
+                <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${stat.color === 'emerald' ? 'bg-emerald-500/12 text-emerald-400 border border-emerald-500/20' : 'bg-indigo-500/12 text-indigo-400 border border-indigo-500/20'}`}>
+                  <stat.icon size={20} />
+                </div>
+                <div>
+                  <p className="text-2xl font-extrabold text-bento-text-main">{stat.value}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-bento-text-muted">{stat.label}</p>
+                </div>
               </div>
-           </div>
-           
-           <div className="mt-8 relative z-10 p-4 bg-zinc-50 rounded-2xl border border-zinc-100 italic text-[11px] font-medium text-zinc-500">
-             "The best fertilizer is the farmer's shadow."
-           </div>
+            ))}
+          </div>
+          <div className="mt-6 p-3.5 bg-emerald-500/5 border border-emerald-500/10 rounded-xl italic text-[11px] font-medium text-bento-text-muted leading-relaxed">
+            "The best fertilizer is the farmer's shadow."
+          </div>
         </div>
       </div>
 
+      {/* Settings form */}
       <form onSubmit={handleSave} className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-         {/* Identity Section */}
-         <div className="bento-card bg-white p-8 md:p-10 flex flex-col h-full">
-            <div className="flex items-center gap-3 mb-8">
-               <div className="w-10 h-10 bg-zinc-100 rounded-xl flex items-center justify-center">
-                  <User className="text-zinc-500" size={20} />
-               </div>
-               <h2 className="text-xl font-black text-zinc-900">Vault Configuration</h2>
+
+        {/* Identity */}
+        <div className="glass-panel rounded-[1.75rem] p-7 md:p-9 flex flex-col">
+          <div className="flex items-center gap-3 mb-7">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center border" style={{ background: 'var(--bg-input)', borderColor: 'var(--border-input)' }}>
+              <User size={18} style={{ color: 'var(--text-muted)' }} />
+            </div>
+            <h2 className="text-lg font-bold" style={{ color: 'var(--text-main)' }}>Profile Settings</h2>
+          </div>
+
+          <div className="space-y-5 flex-1">
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--text-muted)' }}>Display Name</label>
+              <input
+                type="text"
+                value={formData.displayName}
+                onChange={e => setFormData({ ...formData, displayName: e.target.value })}
+                className="w-full theme-input rounded-2xl px-5 py-3.5 font-semibold"
+                placeholder="Your display name…"
+              />
             </div>
 
-            <div className="space-y-6 flex-1">
-               <div className="space-y-2">
-                 <label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 ml-2">Public Alias</label>
-                 <input 
-                   type="text" 
-                   value={formData.displayName}
-                   onChange={e => setFormData({...formData, displayName: e.target.value})}
-                   className="w-full bg-zinc-50 border-2 border-zinc-100 rounded-2xl px-6 py-4 focus:border-teal-500 outline-none font-black text-zinc-800 transition-all"
-                   placeholder="Your public name..."
-                 />
-               </div>
-
-               <div className="space-y-2">
-                 <label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 ml-2">Native Communication</label>
-                 <div className="relative">
-                   <select 
-                     value={formData.preferredLanguage}
-                     onChange={e => setFormData({...formData, preferredLanguage: e.target.value})}
-                     className="w-full bg-zinc-50 border-2 border-zinc-100 rounded-2xl px-6 py-4 focus:border-teal-500 outline-none font-black text-zinc-800 appearance-none transition-all cursor-pointer"
-                   >
-                     {languages.map(lang => (
-                       <option key={lang} value={lang}>{lang}</option>
-                     ))}
-                   </select>
-                   <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400">
-                     <Globe size={18} />
-                   </div>
-                 </div>
-               </div>
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--text-muted)' }}>Preferred Language</label>
+              <div className="relative">
+                <select
+                  value={formData.preferredLanguage}
+                  onChange={e => setFormData({ ...formData, preferredLanguage: e.target.value })}
+                  className="w-full theme-input rounded-2xl px-5 py-3.5 font-semibold appearance-none cursor-pointer"
+                >
+                  {languages.map(l => <option key={l} value={l}>{l}</option>)}
+                </select>
+                <Globe size={16} className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
+              </div>
             </div>
 
-            <div className="mt-10 pt-8 border-t border-zinc-50 flex flex-wrap gap-4">
-               <button 
-                 type="submit"
-                 disabled={loading}
-                 className="flex-1 min-w-[200px] px-8 py-5 bg-teal-600 text-white rounded-[24px] font-black uppercase tracking-widest hover:bg-zinc-900 transition-all flex items-center justify-center gap-3 shadow-xl shadow-teal-600/20 active:scale-95 disabled:opacity-50"
-               >
-                 {loading ? <Loader2 className="animate-spin" /> : <Save size={20} />}
-                 {loading ? "Syncing..." : "Update Vault"}
-               </button>
-               
-               {success && (
-                <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="flex items-center gap-2 text-teal-600 font-black text-[10px] uppercase tracking-widest bg-teal-50 px-6 py-4 rounded-[24px]">
-                  <ShieldCheck size={16} />
-                  Done
-                </motion.div>
-              )}
+            {/* Appearance row */}
+            <div className="pt-4 border-t border-[var(--border-input)]">
+              <label className="block text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--text-muted)' }}>Appearance</label>
+              <div className="flex items-center justify-between bg-[var(--bg-input)] border border-[var(--border-input)] rounded-2xl px-5 py-3.5">
+                <div className="flex items-center gap-2.5">
+                  <Palette size={16} className="text-emerald-400" />
+                  <span className="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>Color Theme</span>
+                </div>
+                <ThemeToggle variant="pill" />
+              </div>
             </div>
-         </div>
+          </div>
 
-         {/* Agricultural Context Bento */}
-         <div className="bento-card bg-white p-8 md:p-10 flex flex-col h-full group">
-            <div className="flex items-center gap-3 mb-8">
-               <div className="w-10 h-10 bg-teal-50 text-teal-600 rounded-xl flex items-center justify-center transition-transform group-hover:rotate-12">
-                  <Sprout size={20} />
-               </div>
-               <h2 className="text-xl font-black text-zinc-900">Environmental Context</h2>
-            </div>
-            
-            <p className="text-zinc-400 font-bold mb-6 text-sm leading-relaxed">
-              Define your local environment parameters. This enables the AI to provide surgically accurate localized suggestions.
-            </p>
-
-            <div className="space-y-6 flex-1">
-               <div className="relative">
-                  <div className="absolute top-4 left-6 text-teal-500/20 pointer-events-none -z-0">
-                    <Wind size={64} />
-                  </div>
-                  <textarea 
-                    rows={8}
-                    value={formData.farmDetails}
-                    onChange={e => setFormData({...formData, farmDetails: e.target.value})}
-                    placeholder="Describe your soil (Sandy, Clay, Loamy), typical climate (Arid, Tropical), and general terrain layout..."
-                    className="relative z-10 w-full bg-zinc-50/50 border-2 border-zinc-100 rounded-3xl px-8 py-8 focus:border-teal-500 outline-none resize-none font-bold text-zinc-700 leading-safe transition-all h-[300px]"
-                  />
-               </div>
-            </div>
-
-            <button 
-              type="button"
-              onClick={() => logout()}
-              className="mt-8 w-full px-8 py-5 text-zinc-400 font-bold uppercase tracking-widest hover:text-red-500 hover:bg-red-50 rounded-[24px] transition-all flex items-center justify-center gap-2"
+          <div className="mt-8 pt-6 flex items-center gap-3 flex-wrap border-t" style={{ borderColor: 'var(--border-input)' }}>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 min-w-[180px] px-6 py-4 bg-emerald-500 hover:bg-emerald-400 text-white rounded-2xl font-bold transition-all flex items-center justify-center gap-2.5 shadow-xl shadow-emerald-500/20 hover:-translate-y-0.5 active:scale-95 disabled:opacity-50"
             >
-              <LogOut size={20} />
-              Terminate Session
+              {loading ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+              {loading ? "Saving…" : "Save Profile"}
             </button>
-         </div>
+
+            {success && (
+              <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+                className="flex items-center gap-2 text-emerald-400 font-bold text-xs uppercase tracking-widest bg-emerald-500/12 border border-emerald-500/20 px-5 py-4 rounded-2xl">
+                <ShieldCheck size={15} /> Saved!
+              </motion.div>
+            )}
+          </div>
+        </div>
+
+        {/* Farm context */}
+        <div className="glass-panel rounded-[1.75rem] p-7 md:p-9 flex flex-col group">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-9 h-9 bg-emerald-500/10 border border-emerald-500/18 rounded-xl flex items-center justify-center transition-transform group-hover:rotate-12">
+              <Sprout size={18} className="text-emerald-400" />
+            </div>
+            <h2 className="text-lg font-bold" style={{ color: 'var(--text-main)' }}>Farm Context</h2>
+          </div>
+          <p className="text-sm font-medium mb-5 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+            Describe your environment. This enables the AI to provide surgically accurate, localized suggestions.
+          </p>
+
+          <div className="relative flex-1">
+            <div className="absolute top-4 left-5 text-emerald-500/10 pointer-events-none">
+              <Wind size={56} />
+            </div>
+            <textarea
+              rows={9}
+              value={formData.farmDetails}
+              onChange={e => setFormData({ ...formData, farmDetails: e.target.value })}
+              placeholder="Describe your soil (Sandy, Clay, Loamy), typical climate (Arid, Tropical), terrain, and any existing crops…"
+              className="relative z-10 w-full theme-input rounded-2xl px-6 py-5 resize-none font-medium leading-relaxed transition-all h-full focus:border-emerald-500/30"
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={() => logout()}
+            className="mt-6 w-full px-6 py-4 font-semibold hover:text-rose-400 hover:bg-rose-500/8 border border-transparent hover:border-rose-500/15 rounded-2xl transition-all flex items-center justify-center gap-2 text-sm"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            <LogOut size={16} /> Sign Out
+          </button>
+        </div>
       </form>
     </div>
   );

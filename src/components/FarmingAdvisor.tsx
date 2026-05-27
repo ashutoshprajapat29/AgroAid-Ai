@@ -554,8 +554,8 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
   };
 
   return (
-    <div className="flex flex-col h-full bento-card border-none bg-transparent shadow-none px-2 pb-0 md:px-4 md:pb-0 relative overflow-hidden">
-      <div className="sticky top-0 z-[40] bg-[#fbfbf8]/95 backdrop-blur-md pb-2 -mx-2 md:-mx-4 px-2 md:px-4">
+    <div className="flex flex-col h-full border-none bg-transparent shadow-none px-2 pb-0 md:px-4 md:pb-0 relative overflow-hidden">
+      <div className="sticky top-0 z-[40] backdrop-blur-xl pb-2 -mx-2 md:-mx-4 px-2 md:px-4" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-base) 95%, transparent)' }}>
         <AnimatePresence>
           {lastSaved && (
             <motion.div
@@ -564,29 +564,34 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
               exit={{ opacity: 0, y: -20 }}
               className="absolute top-0 left-0 right-0 z-50 flex justify-center pointer-events-none"
             >
-              <div className="bg-green-600/90 backdrop-blur-md text-white px-6 py-2 rounded-full flex items-center gap-2 shadow-xl border border-green-400/30 text-[10px] md:text-xs font-black uppercase tracking-widest mt-2 transform -translate-y-4">
+              <div className="bg-emerald-500/90 backdrop-blur-md text-white px-6 py-2 rounded-full flex items-center gap-2 shadow-xl border border-emerald-400/30 text-[10px] md:text-xs font-bold uppercase tracking-widest mt-2 transform -translate-y-4">
                 <CheckCircle2 size={14} />
-                Records Synced Automatically
+                Records Synced
               </div>
             </motion.div>
           )}
         </AnimatePresence>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 shrink-0">
-            <div className="w-6 h-6 bg-bento-primary rounded flex items-center justify-center text-white shadow-md shadow-bento-primary/20 shrink-0">
+            <div className="w-6 h-6 bg-emerald-500/15 border border-emerald-500/25 rounded-lg flex items-center justify-center text-emerald-400 shrink-0">
               <MessageSquare size={12} />
             </div>
             <div className="min-w-0">
-              <h2 className="text-[11px] md:text-sm font-black text-bento-text-main tracking-tight leading-none truncate">Advisor AI</h2>
+              <h2 className="text-[11px] md:text-sm font-bold tracking-tight leading-none truncate" style={{ color: 'var(--text-main)' }}>Advisor AI</h2>
             </div>
           </div>
 
           <div className="flex items-center gap-2 w-full min-w-0">
             <div className="flex-1 overflow-x-auto scrollbar-hide py-0.5">
-              <div className="flex bg-zinc-100 p-0.5 rounded-lg w-max">
+              <div className="flex p-0.5 rounded-xl w-max gap-0.5 border" style={{ background: 'var(--bg-input)', borderColor: 'var(--border-input)' }}>
                 <button
                   onClick={() => setSelectedFieldId("")}
-                  className={`whitespace-nowrap px-2.5 py-1 ${!selectedFieldId ? 'bg-white text-bento-primary shadow-sm rounded-md' : 'text-zinc-500'} text-[9px] font-black uppercase tracking-widest transition-all`}
+                  style={!selectedFieldId ? {} : { color: 'var(--text-muted)' }}
+                  className={`whitespace-nowrap px-3 py-1.5 ${
+                    !selectedFieldId
+                      ? 'bg-emerald-500/15 border border-emerald-500/25 text-emerald-400 rounded-lg'
+                      : 'hover:text-emerald-500'
+                  } text-[9px] font-bold uppercase tracking-widest transition-all`}
                 >
                   General
                 </button>
@@ -594,9 +599,14 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
                   <button
                     key={f.id}
                     onClick={() => setSelectedFieldId(f.id)}
-                    className={`flex items-center gap-1 whitespace-nowrap px-2.5 py-1 ${selectedFieldId === f.id ? 'bg-teal-600 text-white shadow-sm rounded-md' : 'text-zinc-500'} text-[9px] font-black uppercase tracking-widest transition-all`}
+                    style={selectedFieldId !== f.id ? { color: 'var(--text-muted)' } : {}}
+                    className={`flex items-center gap-1 whitespace-nowrap px-3 py-1.5 ${
+                      selectedFieldId === f.id
+                        ? 'bg-teal-500/15 border border-teal-500/25 text-teal-400 rounded-lg'
+                        : 'hover:text-teal-500'
+                    } text-[9px] font-bold uppercase tracking-widest transition-all`}
                   >
-                    <Compass size={10} /> {f.name}
+                    <Compass size={9} /> {f.name}
                   </button>
                 ))}
               </div>
@@ -605,21 +615,22 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
             <div className="flex items-center gap-1 shrink-0">
               <button
                 onClick={() => setShowAddPlot(true)}
-                className="w-7 h-7 bg-teal-50 text-teal-600 border border-teal-100 rounded-lg transition-colors font-black flex items-center justify-center shadow-sm"
-                title="Add New Plot Context"
+                className="w-7 h-7 bg-teal-500/10 text-teal-400 border border-teal-500/20 rounded-lg transition-all font-bold flex items-center justify-center hover:bg-teal-500/20"
+                title="Add New Plot"
               >
                 +
               </button>
 
               {showConfirmReset ? (
-                <div className="flex items-center gap-1 bg-red-50 p-0.5 rounded-lg border border-red-100">
-                  <button onClick={resetChat} className="text-white bg-red-500 font-bold text-[9px] px-2 py-1 rounded-md">Clear</button>
-                  <button onClick={() => setShowConfirmReset(false)} className="text-zinc-500 bg-white border border-zinc-200 font-bold text-[9px] px-2 py-1 rounded-md">X</button>
+                <div className="flex items-center gap-1 bg-rose-500/10 p-0.5 rounded-lg border border-rose-500/20">
+                  <button onClick={resetChat} className="text-white bg-rose-500 font-bold text-[9px] px-2 py-1 rounded-md">Clear</button>
+                  <button onClick={() => setShowConfirmReset(false)} style={{ color: 'var(--text-muted)', borderColor: 'var(--border-input)', background: 'var(--bg-input)' }} className="font-bold text-[9px] px-2 py-1 rounded-md border">X</button>
                 </div>
               ) : (
                 <button
                   onClick={() => setShowConfirmReset(true)}
-                  className="w-7 h-7 bg-white border border-bento-border rounded-lg text-zinc-400 hover:text-red-500 transition-all flex items-center justify-center shadow-sm"
+                  className="w-7 h-7 rounded-lg hover:text-rose-400 hover:border-rose-500/20 transition-all flex items-center justify-center border"
+                  style={{ background: 'var(--bg-input)', borderColor: 'var(--border-input)', color: 'var(--text-muted)' }}
                   title="Reset Chat"
                 >
                   <X size={12} />
@@ -632,12 +643,13 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
 
       <AnimatePresence>
         {showAddPlot && (
-          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="absolute z-40 top-20 left-0 right-0 bg-white shadow-2xl p-4 border border-zinc-200 rounded-3xl mx-4 md:mx-8">
-            <h3 className="font-black text-zinc-800 mb-2 border-b border-zinc-100 pb-2">Quick Map Field</h3>
+          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="absolute z-40 top-20 left-0 right-0 glass-panel shadow-2xl p-4 border border-emerald-500/15 rounded-2xl mx-4 md:mx-8">
+            <h3 className="font-bold mb-3 text-sm pb-2 border-b" style={{ color: 'var(--text-main)', borderColor: 'var(--border-input)' }}>Quick Map Field</h3>
             <form onSubmit={saveNewPlot} className="flex gap-2">
-              <input type="text" placeholder="e.g. North Plot" value={newPlotName} onChange={e => setNewPlotName(e.target.value)} required className="flex-1 bg-zinc-50 border border-zinc-200 rounded-xl px-4 focus:outline-none focus:border-teal-500 font-bold text-sm" />
-              <button type="submit" disabled={loading} className="bg-teal-600 text-white font-black text-sm px-6 py-2 rounded-xl hover:bg-teal-700">{loading ? 'Saving...' : 'Add'}</button>
-              <button type="button" onClick={() => setShowAddPlot(false)} className="text-zinc-400 p-2 hover:text-red-500 rounded-xl bg-zinc-50 border border-zinc-200"><X size={18} /></button>
+              <input type="text" placeholder="e.g. North Plot" value={newPlotName} onChange={e => setNewPlotName(e.target.value)} required
+                className="flex-1 theme-input rounded-xl px-4 py-2 font-semibold text-sm" />
+              <button type="submit" disabled={loading} className="bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-sm px-5 py-2 rounded-xl transition-colors">{loading ? 'Saving…' : 'Add'}</button>
+              <button type="button" onClick={() => setShowAddPlot(false)} className="p-2 hover:text-rose-400 rounded-xl border transition-colors" style={{ color: 'var(--text-muted)', background: 'var(--bg-input)', borderColor: 'var(--border-input)' }}><X size={16} /></button>
             </form>
           </motion.div>
         )}
@@ -645,7 +657,8 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
 
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto space-y-2 mb-0 pr-1 md:pr-2 scrollbar-hide bg-white/40 backdrop-blur-sm relative py-2 px-2 md:py-4 md:px-6 rounded-2xl md:rounded-[32px] border-2 border-white/60 shadow-inner"
+        className="flex-1 overflow-y-auto space-y-2 mb-0 pr-1 md:pr-2 scrollbar-hide relative py-2 px-2 md:py-4 md:px-6 rounded-2xl md:rounded-[28px] border border-emerald-500/10"
+        style={{ background: 'color-mix(in srgb, var(--bg-base) 60%, transparent)' }}
       >
         {messages.length === 1 && (
           <div className="min-h-full flex flex-col items-center justify-center py-4">
@@ -694,16 +707,16 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
                 <p className="text-[8px] md:text-[9px] mt-1 font-bold opacity-60">Improve Growth</p>
               </button>
             </div>
-            <p className="mt-4 text-[9px] md:text-xs font-black text-zinc-400 uppercase tracking-[0.2em]">Or just type below</p>
+            <p className="mt-4 text-[9px] md:text-xs font-semibold text-bento-text-muted uppercase tracking-[0.2em]">Or just type below</p>
           </div>
         )}
 
         {messages.map((m, i) => (
           <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
-            <div className={`group relative max-w-[90%] md:max-w-[80%] p-4 md:p-6 rounded-[2rem] ${
+            <div className={`group relative max-w-[90%] md:max-w-[80%] p-4 md:p-5 rounded-[1.5rem] ${
               m.role === 'user' 
-                ? 'bg-gradient-to-br from-[#123524] to-[#255239] text-white ml-4 md:ml-8 shadow-[0_12px_30px_rgba(18,53,36,0.15)] rounded-tr-sm border border-[#3e7b27]/30' 
-                : 'glass-panel text-bento-text-main mr-4 md:mr-8 rounded-tl-sm shadow-[0_8px_30px_rgba(18,53,36,0.06)]'
+                ? 'bg-gradient-to-br from-emerald-700 to-green-900 text-white ml-4 md:ml-8 shadow-[0_8px_24px_rgba(34,197,94,0.18)] rounded-tr-sm border border-emerald-500/25' 
+                : 'glass-panel text-bento-text-main mr-4 md:mr-8 rounded-tl-sm border-emerald-500/12'
             }`}>
               {m.imageUrls && m.imageUrls.length > 0 && (
                 <div className={`grid ${m.imageUrls.length === 1 ? 'grid-cols-1' : 'grid-cols-2'} gap-2 mb-3`}>
@@ -715,7 +728,7 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
                   ))}
                 </div>
               )}
-              <div className={`markdown-body ${m.role === 'user' ? 'text-white' : ''} text-[14px] md:text-[16px] font-sans leading-relaxed`}>
+              <div className={`markdown-body ${m.role === 'user' ? 'user-msg' : ''} text-[14px] md:text-[15px] font-sans leading-relaxed`}>
                 <Markdown>{m.content}</Markdown>
               </div>
 
@@ -723,9 +736,9 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
                 <div className="absolute -right-3 md:-right-12 bottom-2 flex flex-col gap-2">
                   <button
                     onClick={() => speakMessage(i, m.content)}
-                    className={`p-2.5 bg-white/90 backdrop-blur-md border border-white/50 rounded-xl md:rounded-2xl transition-all duration-300 shadow-lg flex items-center justify-center ${(isSpeaking === i || speechLoading === i)
-                        ? 'text-rose-500 border-rose-200 scale-110 opacity-100 shadow-rose-500/20'
-                        : 'opacity-0 group-hover:opacity-100 text-[#5e7264] hover:bg-[#123524] hover:border-[#123524] hover:text-white hover:-translate-y-1'
+                    className={`p-2 bg-white/5 backdrop-blur-md border border-white/8 rounded-xl transition-all duration-300 shadow-lg flex items-center justify-center ${(isSpeaking === i || speechLoading === i)
+                        ? 'text-rose-400 border-rose-500/30 scale-110 opacity-100'
+                        : 'opacity-0 group-hover:opacity-100 text-bento-text-muted hover:bg-emerald-500/15 hover:border-emerald-500/25 hover:text-emerald-400 hover:-translate-y-0.5'
                       }`}
                     title={isSpeaking === i || speechLoading === i ? "Stop Speech" : "Speak Message"}
                   >
@@ -745,8 +758,9 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
 
         {loading && (
           <div className="flex justify-start">
-            <div className="bg-white border-2 border-bento-border p-3 rounded-[20px] shadow-xl mr-12">
-              <Loader2 className="animate-spin text-bento-primary" size={20} />
+            <div className="glass-panel border border-emerald-500/15 p-3.5 rounded-2xl mr-12 flex items-center gap-2">
+              <Loader2 className="animate-spin text-emerald-400" size={18} />
+              <span className="text-xs font-medium text-bento-text-muted">Thinking…</span>
             </div>
           </div>
         )}
@@ -755,24 +769,24 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
       </div>
       <div className="flex flex-col gap-1 pb-0">
         {selectedImages.length > 0 && (
-          <div className="flex flex-wrap gap-2 bg-white p-2 rounded-2xl border border-bento-border shadow-lg animate-in fade-in slide-in-from-bottom-2">
+          <div className="flex flex-wrap gap-2 bg-black/30 backdrop-blur-md p-2.5 rounded-2xl border border-emerald-500/15 animate-in fade-in slide-in-from-bottom-2">
             {selectedImages.map((img, idx) => (
-              <div key={idx} className="relative w-12 h-12 md:w-16 md:h-16 rounded-xl overflow-hidden border border-bento-border shadow-inner shrink-0">
+              <div key={idx} className="relative w-12 h-12 md:w-16 md:h-16 rounded-xl overflow-hidden border border-emerald-500/20 shrink-0">
                 <img src={img} alt={`Preview ${idx}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 <button
                   onClick={() => removeImage(idx)}
-                  className="absolute top-0.5 right-0.5 p-1 bg-black/60 text-white rounded-full hover:bg-red-500 transition-colors"
+                  className="absolute top-0.5 right-0.5 p-1 bg-black/70 text-white rounded-full hover:bg-rose-500 transition-colors"
                 >
-                  <X size={10} />
+                  <X size={9} />
                 </button>
               </div>
             ))}
             <div className="flex flex-col justify-center px-1">
               <div className="flex items-center gap-1.5">
-                <p className="text-[10px] md:text-xs font-black text-bento-text-main uppercase tracking-widest">{selectedImages.length} Photo{selectedImages.length > 1 ? 's' : ''}</p>
-                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shrink-0" />
+                <p className="text-[10px] font-bold text-bento-text-main uppercase tracking-widest">{selectedImages.length} Photo{selectedImages.length > 1 ? 's' : ''}</p>
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" style={{ boxShadow: '0 0 4px rgba(34,197,94,0.8)' }} />
               </div>
-              <p className="text-[8px] md:text-[9px] text-zinc-400 font-bold uppercase tracking-widest mt-0.5">Multi-Image Mode</p>
+              <p className="text-[9px] text-bento-text-muted font-semibold uppercase tracking-widest mt-0.5">Multi-Image</p>
             </div>
           </div>
         )}
@@ -789,7 +803,11 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className={`p-2 md:p-3 rounded-xl border-2 transition-all shadow-lg flex items-center justify-center shrink-0 ${selectedImages.length > 0 ? 'bg-bento-accent border-bento-accent text-white scale-105' : 'bg-white border-bento-border text-zinc-400 hover:text-bento-primary active:scale-95'}`}
+            className={`p-2.5 md:p-3 rounded-xl border transition-all flex items-center justify-center shrink-0 ${
+              selectedImages.length > 0
+                ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400 scale-105 shadow-lg shadow-emerald-500/15'
+                : 'bg-white/5 border-white/8 text-bento-text-muted hover:text-emerald-400 hover:border-emerald-500/25 active:scale-95'
+            }`}
           >
             <Camera size={18} />
           </button>
@@ -797,7 +815,11 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
           <button
             type="button"
             onClick={toggleListening}
-            className={`p-2 md:p-3 rounded-xl border-2 transition-all shadow-lg flex items-center justify-center shrink-0 ${isListening ? 'bg-red-500 border-red-500 text-white animate-pulse scale-105' : 'bg-white border-bento-border text-zinc-400 hover:text-bento-primary active:scale-95'}`}
+            className={`p-2.5 md:p-3 rounded-xl border transition-all flex items-center justify-center shrink-0 ${
+              isListening
+                ? 'bg-rose-500/15 border-rose-500/30 text-rose-400 animate-pulse scale-105'
+                : 'bg-white/5 border-white/8 text-bento-text-muted hover:text-emerald-400 hover:border-emerald-500/25 active:scale-95'
+            }`}
             title={isListening ? "Stop Listening" : "Voice Typing"}
           >
             <Mic size={18} />
@@ -809,15 +831,15 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => (e.key === 'Enter' && !e.shiftKey) && handleSend()}
-              placeholder="Ask your query..."
-              className="w-full bg-white border border-bento-border rounded-xl px-4 py-2.5 md:py-3 focus:outline-none focus:ring-4 focus:ring-bento-primary/5 focus:border-bento-primary transition-all shadow-lg font-bold text-sm md:text-base placeholder:text-zinc-300"
+              placeholder="Ask anything about your farm…"
+              className="w-full bg-white/5 border border-white/8 rounded-xl px-4 py-3 md:py-3.5 focus:outline-none focus:border-emerald-500/35 focus:bg-white/7 transition-all font-medium text-sm text-bento-text-main placeholder:text-bento-text-muted/40"
             />
           </div>
 
           <button
             onClick={handleSend}
             disabled={loading || (!input.trim() && selectedImages.length === 0)}
-            className="p-2.5 md:px-4 md:py-3 bg-bento-primary text-white rounded-xl font-black hover:bg-black transition-all disabled:opacity-20 shadow-lg flex items-center justify-center shrink-0 active:scale-95"
+            className="p-2.5 md:px-5 md:py-3 bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl font-bold transition-all disabled:opacity-25 shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 shrink-0 active:scale-95 hover:-translate-y-0.5"
           >
             {loading ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
           </button>

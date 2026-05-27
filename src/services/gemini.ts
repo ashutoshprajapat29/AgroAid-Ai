@@ -10,15 +10,24 @@ export interface MarketPrice {
 }
 
 const GEN_AI_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+const GEN_AI_KEY2 = import.meta.env.VITE_GEMINI_API_KEY2;
 
-if (!GEN_AI_KEY) {
+if (!GEN_AI_KEY && !GEN_AI_KEY2) {
   console.warn("GEMINI_API_KEY is missing in environment variables. AI features may not work.");
 }
 
-const ai = new GoogleGenAI({ apiKey: GEN_AI_KEY || "" });
+const aiClients: GoogleGenAI[] = [];
+if (GEN_AI_KEY) aiClients.push(new GoogleGenAI({ apiKey: GEN_AI_KEY }));
+if (GEN_AI_KEY2) aiClients.push(new GoogleGenAI({ apiKey: GEN_AI_KEY2 }));
+if (aiClients.length === 0) aiClients.push(new GoogleGenAI({ apiKey: "" }));
+
+function getAIClient() {
+  const randomIndex = Math.floor(Math.random() * aiClients.length);
+  return aiClients[randomIndex];
+}
 
 export async function getFarmingAdvice(query: string, farmDetails?: string, history: any[] = [], preferredLanguage: string = "English", fieldContext?: any, latestSoilReport?: any) {
-  if (!GEN_AI_KEY) return "The AI advisor is currently unavailable due to configuration issues. Please contact support.";
+  if (!GEN_AI_KEY && !GEN_AI_KEY2) return "The AI advisor is currently unavailable due to configuration issues. Please contact support.";
   
   let context = farmDetails ? `General farm context: ${farmDetails}\n` : "";
   
@@ -62,7 +71,7 @@ export async function getFarmingAdvice(query: string, farmDetails?: string, hist
   const contents = [...historyToSent, { role: 'user', parts: [{ text: query }] }];
 
   try {
-    const apiCall = ai.models.generateContent({
+    const apiCall = getAIClient().models.generateContent({
       model: "gemini-2.5-flash",
       contents,
       config: {
@@ -135,7 +144,7 @@ export async function analyzeFarmingImage(images: { data: string, mimeType: stri
   }));
 
   try {
-    const apiCall = ai.models.generateContent({
+    const apiCall = getAIClient().models.generateContent({
       model: "gemini-2.5-flash",
       contents: { parts: [...imageParts, { text: userQuery }] },
       config: {
@@ -175,7 +184,7 @@ export async function detectPlantDisease(base64Image: string, mimeType: string) 
   };
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await getAIClient().models.generateContent({
       model: "gemini-2.5-flash",
       contents: { parts: [imagePart, { text: prompt }] },
     });
@@ -189,7 +198,7 @@ export async function detectPlantDisease(base64Image: string, mimeType: string) 
 
 export async function getTTSAudio(text: string) {
   try {
-    const response = await ai.models.generateContent({
+    const response = await getAIClient().models.generateContent({
       model: "gemini-3.1-flash-tts-preview",
       contents: [{ parts: [{ text: `Say clearly and helpfully: ${text}` }] }],
       config: {
@@ -210,7 +219,7 @@ export async function getTTSAudio(text: string) {
 }
 
 export async function extractFarmUpdates(userQuery: string, botResponse: string, currentFieldData?: any) {
-  if (!GEN_AI_KEY) return { fieldUpdates: {}, soilUpdates: {} };
+  if (!GEN_AI_KEY && !GEN_AI_KEY2) return { fieldUpdates: {}, soilUpdates: {} };
 
     // Trim field data to save tokens
     const trimmedFieldData = currentFieldData ? {
@@ -266,7 +275,7 @@ export async function extractFarmUpdates(userQuery: string, botResponse: string,
   `;
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await getAIClient().models.generateContent({
       model: "gemini-2.5-flash",
       contents: [{ parts: [{ text: prompt }] }],
       config: {
@@ -338,13 +347,13 @@ export async function extractFarmUpdates(userQuery: string, botResponse: string,
 }
 
 export async function getMarketPrices(location: string = "India"): Promise<MarketPrice[]> {
-  if (!GEN_AI_KEY) return [];
+  if (!GEN_AI_KEY && !GEN_AI_KEY2) return [];
 
   const prompt = `You are a live commodity market API. Return realistic, current wholesale market (Mandi) prices for 6 common crops (like Wheat, Rice, Tomato, Onion, Potato, Cotton, etc.) in ${location}.
   Return ONLY a valid JSON array of objects. Make the data realistic for the current season.`;
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await getAIClient().models.generateContent({
       model: "gemini-2.5-flash",
       contents: [{ parts: [{ text: prompt }] }],
       config: {

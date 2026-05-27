@@ -1,148 +1,175 @@
 import { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, Minus, Activity, MapPin, Loader2, IndianRupee } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Activity, MapPin, IndianRupee, RefreshCw } from 'lucide-react';
 import { getMarketPrices, MarketPrice } from '../services/gemini';
 import { motion } from 'motion/react';
 
-// Simple session cache to prevent redundant API calls
-const marketCache: Record<string, { data: MarketPrice[], timestamp: number }> = {};
-const CACHE_DURATION_MS = 1000 * 60 * 60; // 1 hour
+const marketCache: Record<string, { data: MarketPrice[]; timestamp: number }> = {};
+const CACHE_DURATION_MS = 1000 * 60 * 60;
+
+function SkeletonCard() {
+  return (
+    <div className="glass-panel rounded-[1.75rem] p-6">
+      <div className="flex justify-between items-start mb-5">
+        <div>
+          <div className="w-24 h-5 skeleton rounded mb-2" />
+          <div className="w-16 h-3 skeleton rounded" />
+        </div>
+        <div className="w-10 h-10 skeleton rounded-xl" />
+      </div>
+      <div className="w-36 h-10 skeleton rounded mb-5" />
+      <div className="border-t border-emerald-500/8 pt-4 grid grid-cols-2 gap-4">
+        <div className="w-16 h-8 skeleton rounded" />
+        <div className="w-16 h-8 skeleton rounded" />
+      </div>
+    </div>
+  );
+}
 
 export default function MarketDashboard() {
-  const [prices, setPrices] = useState<MarketPrice[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [prices, setPrices]     = useState<MarketPrice[]>([]);
+  const [loading, setLoading]   = useState(true);
   const [location, setLocation] = useState('Maharashtra, India');
   const [searchLoc, setSearchLoc] = useState('Maharashtra, India');
 
-  useEffect(() => {
-    fetchPrices(location);
-  }, [location]);
+  useEffect(() => { fetchPrices(location); }, [location]);
 
   const fetchPrices = async (loc: string) => {
     setLoading(true);
-    
-    // Check cache first
-    const normalizedLoc = loc.toLowerCase().trim();
-    if (marketCache[normalizedLoc] && Date.now() - marketCache[normalizedLoc].timestamp < CACHE_DURATION_MS) {
-      setPrices(marketCache[normalizedLoc].data);
+    const key = loc.toLowerCase().trim();
+    if (marketCache[key] && Date.now() - marketCache[key].timestamp < CACHE_DURATION_MS) {
+      setPrices(marketCache[key].data);
       setLoading(false);
       return;
     }
-
     const data = await getMarketPrices(loc);
-    
-    // Save to cache
-    if (data && data.length > 0) {
-      marketCache[normalizedLoc] = { data, timestamp: Date.now() };
-    }
-    
+    if (data?.length) marketCache[key] = { data, timestamp: Date.now() };
     setPrices(data);
     setLoading(false);
   };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (searchLoc.trim()) {
-      setLocation(searchLoc);
-    }
+    if (searchLoc.trim()) setLocation(searchLoc);
   };
 
-  const renderTrendIcon = (trend: string) => {
-    switch(trend) {
-      case 'up': return <TrendingUp size={20} className="text-rose-500" />;
-      case 'down': return <TrendingDown size={20} className="text-emerald-500" />;
-      default: return <Minus size={20} className="text-zinc-400" />;
-    }
+  const trendIcon = (trend: string) => {
+    if (trend === 'up')   return <TrendingUp  size={18} className="text-rose-400"    />;
+    if (trend === 'down') return <TrendingDown size={18} className="text-emerald-400" />;
+    return <Minus size={18} className="text-slate-400" />;
   };
+
+  const trendBg = (trend: string) =>
+    trend === 'up'   ? 'bg-rose-500/12 border-rose-500/20 text-rose-400'    :
+    trend === 'down' ? 'bg-emerald-500/12 border-emerald-500/20 text-emerald-400' :
+                       'bg-[var(--bg-card)] border-[var(--border-color)] text-slate-400';
+
+  const demandBadge = (demand: string) =>
+    demand === 'high' ? 'bg-rose-500/15 text-rose-300 border border-rose-500/20'     :
+    demand === 'low'  ? 'bg-blue-500/15 text-blue-300 border border-blue-500/20'     :
+                        'bg-amber-500/15 text-amber-300 border border-amber-500/20';
 
   return (
-    <div className="max-w-7xl mx-auto pb-20 px-4 md:px-0">
-      <header className="mb-10 p-10 bento-card border-none bg-gradient-to-br from-[#123524] via-[#255239] to-[#3e7b27] text-white shadow-[0_20px_50px_rgba(18,53,36,0.2)] relative overflow-hidden group">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full -mr-48 -mt-48 blur-3xl group-hover:scale-125 transition-transform duration-1000" />
-        
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-8">
-          <div className="flex items-center gap-6">
-            <div className="p-5 bg-white/10 rounded-[32px] backdrop-blur-xl border border-white/20 shadow-inner">
-              <Activity size={40} className="text-emerald-50" />
+    <div className="max-w-7xl mx-auto pb-20">
+
+      {/* Hero header */}
+      <header className="mb-8 p-7 md:p-10 rounded-[2rem] relative overflow-hidden bg-gradient-to-br from-[#061a0e] via-[#082012] to-[#0a2a16] border border-emerald-500/18">
+        {/* decorative blobs */}
+        <div className="absolute top-0 right-0 w-72 h-72 bg-emerald-500/8 rounded-full -mr-36 -mt-36 blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-amber-500/5 rounded-full -ml-24 -mb-24 blur-2xl pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+          <div className="flex items-center gap-5">
+            <div className="p-4 bg-emerald-500/12 rounded-2xl border border-emerald-500/20 backdrop-blur-md">
+              <Activity size={36} className="text-emerald-400" />
             </div>
             <div>
-              <h1 className="text-4xl md:text-5xl font-serif font-bold tracking-tight mb-2 leading-tight">Market & Economics</h1>
-              <p className="text-emerald-50/80 font-bold tracking-wide flex items-center gap-2">
-                Real-time wholesale Mandi prices to plan your harvest and maximize profit.
-              </p>
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse shadow-[0_0_4px_rgba(34,197,94,0.8)]" />
+                <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/70">Live Mandi Prices</span>
+              </div>
+              <h1 className="text-3xl md:text-4xl font-serif font-extrabold text-bento-text-main tracking-tight">Market &amp; Economics</h1>
+              <p className="text-sm text-emerald-100/50 mt-1 font-medium">Real-time wholesale data · Plan your harvest</p>
             </div>
           </div>
 
-          <form onSubmit={handleSearch} className="flex items-center bg-white/10 backdrop-blur-md p-2 rounded-2xl border border-white/20">
-            <MapPin className="text-emerald-200 ml-3 mr-2" size={20} />
-            <input 
-              type="text" 
+          <form onSubmit={handleSearch} className="flex items-center bg-[var(--bg-input)] backdrop-blur-md p-2 rounded-2xl border border-[var(--border-input)] gap-2">
+            <MapPin className="text-emerald-400 ml-2 shrink-0" size={18} />
+            <input
+              type="text"
               value={searchLoc}
-              onChange={(e) => setSearchLoc(e.target.value)}
-              className="bg-transparent border-none outline-none text-white placeholder-emerald-100/50 font-bold w-48 md:w-64"
-              placeholder="Enter District/State..."
+              onChange={e => setSearchLoc(e.target.value)}
+              className="bg-transparent border-none outline-none text-bento-text-main placeholder-emerald-100/30 font-semibold w-44 md:w-56 text-sm"
+              placeholder="District / State…"
             />
-            <button type="submit" className="bg-white text-[#123524] px-6 py-2.5 rounded-xl font-bold hover:bg-emerald-50 transition-colors shadow-lg">
-              Check
+            <button
+              type="submit"
+              className="bg-emerald-500 hover:bg-emerald-400 text-white px-5 py-2 rounded-xl font-bold text-sm transition-colors shadow-lg shadow-emerald-500/20 flex items-center gap-1.5"
+            >
+              <RefreshCw size={14} /> Check
             </button>
           </form>
         </div>
       </header>
 
+      {/* Content */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-32 text-emerald-800">
-          <Loader2 size={48} className="animate-spin mb-4 text-[#3e7b27]" />
-          <p className="font-bold text-lg animate-pulse">Fetching live prices for {location}...</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+          {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
         </div>
       ) : prices.length === 0 ? (
-        <div className="text-center py-20 glass-panel rounded-3xl">
-          <p className="text-zinc-500 font-bold">Could not retrieve market data. Please try another location.</p>
+        <div className="glass-panel rounded-3xl p-20 text-center">
+          <Activity size={40} className="mx-auto text-bento-text-muted mb-4" />
+          <p className="text-bento-text-muted font-semibold">Could not retrieve market data.</p>
+          <p className="text-sm text-bento-text-muted/60 mt-1">Please try another location.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {prices.map((item, idx) => (
-            <motion.div 
+            <motion.div
               key={idx}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.1 }}
-              className="glass-panel p-8 rounded-[2rem] hover:shadow-[0_12px_40px_rgba(18,53,36,0.08)] transition-all duration-300 hover:-translate-y-1 relative overflow-hidden"
+              transition={{ delay: idx * 0.07, duration: 0.35 }}
+              className="glass-panel rounded-[1.75rem] p-6 hover:-translate-y-1 transition-all duration-300 group relative overflow-hidden"
             >
-              <div className="flex justify-between items-start mb-6">
+              {/* Accent glow on hot items */}
+              {item.trend === 'up' && item.demand === 'high' && (
+                <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/8 rounded-bl-[3rem] pointer-events-none -mr-8 -mt-8" />
+              )}
+
+              <div className="flex justify-between items-start mb-5 relative z-10">
                 <div>
-                  <h3 className="text-2xl font-black text-zinc-800 tracking-tight">{item.crop}</h3>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">{location}</span>
+                  <h3 className="text-xl font-bold text-bento-text-main tracking-tight">{item.crop}</h3>
+                  <div className="flex items-center gap-1 mt-1">
+                    <MapPin size={10} className="text-bento-text-muted" />
+                    <span className="text-[10px] font-semibold text-bento-text-muted uppercase tracking-wider">{location}</span>
                   </div>
                 </div>
-                <div className={`p-3 rounded-2xl ${item.trend === 'up' ? 'bg-rose-50 text-rose-500' : item.trend === 'down' ? 'bg-emerald-50 text-emerald-500' : 'bg-zinc-50 text-zinc-500'}`}>
-                  {renderTrendIcon(item.trend)}
+                <div className={`p-2.5 rounded-xl border ${trendBg(item.trend)}`}>
+                  {trendIcon(item.trend)}
                 </div>
               </div>
 
-              <div className="flex items-baseline gap-2 mb-6">
-                <IndianRupee size={28} className="text-[#123524] font-black" />
-                <span className="text-5xl font-black text-[#123524] tracking-tighter">{item.price.toLocaleString('en-IN')}</span>
-                <span className="text-sm font-bold text-zinc-400 uppercase tracking-widest ml-1">/ {item.unit}</span>
+              <div className="flex items-baseline gap-1.5 mb-5 relative z-10">
+                <IndianRupee size={22} className="text-emerald-400 mb-0.5" />
+                <span className="text-4xl font-extrabold text-emerald-400 tracking-tighter">{item.price.toLocaleString('en-IN')}</span>
+                <span className="text-xs font-bold text-bento-text-muted uppercase tracking-wide ml-0.5">/ {item.unit}</span>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 pt-6 border-t border-zinc-100">
+              <div className="grid grid-cols-2 gap-3 pt-4 border-t border-emerald-500/10 relative z-10">
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1">Market Demand</p>
-                  <span className={`text-sm font-bold px-3 py-1 rounded-full ${item.demand === 'high' ? 'bg-rose-100 text-rose-700' : item.demand === 'low' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-bento-text-muted mb-1.5">Market Demand</p>
+                  <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${demandBadge(item.demand)}`}>
                     {item.demand.charAt(0).toUpperCase() + item.demand.slice(1)}
                   </span>
                 </div>
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1">Status</p>
-                  <p className="text-sm font-bold text-zinc-700">
-                    {item.trend === 'up' ? 'Prices Rising' : item.trend === 'down' ? 'Prices Dropping' : 'Stable'}
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-bento-text-muted mb-1.5">Status</p>
+                  <p className={`text-sm font-bold ${item.trend === 'up' ? 'text-rose-400' : item.trend === 'down' ? 'text-emerald-400' : 'text-slate-400'}`}>
+                    {item.trend === 'up' ? '↑ Rising' : item.trend === 'down' ? '↓ Dropping' : '— Stable'}
                   </p>
                 </div>
               </div>
-
-              {item.trend === 'up' && item.demand === 'high' && (
-                <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/10 rounded-bl-full -mr-16 -mt-16 pointer-events-none" />
-              )}
             </motion.div>
           ))}
         </div>
