@@ -313,3 +313,4 @@ Return valid JSON: { "sentiment": "Bullish"|"Bearish"|"Stable", "confidence": nu
       };
     }
   });
+
