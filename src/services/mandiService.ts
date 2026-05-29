@@ -93,10 +93,8 @@ async function callDataGovAPI(params: Record<string, string>): Promise<DataGovRe
   if (params.commodity) qp.set("filters[commodity]", params.commodity);
 
   const targetUrl = `https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070?${qp.toString()}`;
-  // Using corsproxy.io since it works seamlessly in production without blocking origins
-  const fullUrl = `https://corsproxy.io/?url=${encodeURIComponent(targetUrl)}`;
   
-  const resp = await fetch(fullUrl);
+  const resp = await fetch(targetUrl);
   if (!resp.ok) throw new Error(`data.gov.in API error: ${resp.status}`);
   const json = await resp.json();
   return (json.records ?? []) as DataGovRecord[];
