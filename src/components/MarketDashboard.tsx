@@ -376,6 +376,10 @@ export default function MarketDashboard() {
     setLoadingPrices(true);
     setSentiment(null);
     try {
+      if (forceRefresh) {
+        // Clear old potentially poisoned caches so it fetches fresh data
+        localStorage.removeItem(`agroaid_cache_mandi_v2_${selectedState}_${selectedDistrict}`.replace(/\s+/g, "_").toLowerCase());
+      }
       const data = await fetchLatestPrices(selectedState, selectedDistrict, language);
       setPrices(data);
       setLastFetched(new Date());

@@ -139,7 +139,7 @@ export async function fetchLatestPrices(
   district: string,
   _language = "English"
 ): Promise<MandiPrice[]> {
-  const cacheKey = `mandi_prices_${state}_${district}`.replace(/\s+/g, "_").toLowerCase();
+  const cacheKey = `mandi_v2_${state}_${district}`.replace(/\s+/g, "_").toLowerCase();
 
   return cachedApiCall(
     cacheKey,
