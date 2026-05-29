@@ -80,11 +80,11 @@ interface DataGovRecord {
   modal_price: string;
 }
 
-async function callDataGovAPI(params: Record<string, string>): Promise<DataGovRecord[]> {
+async function callDataGovAPI(params: Record<string, string>, retries = 1): Promise<DataGovRecord[]> {
   const qp = new URLSearchParams();
   qp.set("api-key", DATA_GOV_API_KEY);
   qp.set("format", "json");
-  qp.set("limit", params.limit ?? "50");
+  qp.set("limit", params.limit ?? "30"); // reduced default limit for speed
 
   if (params.offset) qp.set("offset", params.offset);
   if (params.state) qp.set("filters[state.keyword]", params.state);
@@ -94,10 +94,28 @@ async function callDataGovAPI(params: Record<string, string>): Promise<DataGovRe
 
   const targetUrl = `https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070?${qp.toString()}`;
   
-  const resp = await fetch(targetUrl);
-  if (!resp.ok) throw new Error(`data.gov.in API error: ${resp.status}`);
-  const json = await resp.json();
-  return (json.records ?? []) as DataGovRecord[];
+  for (let i = 0; i <= retries; i++) {
+    try {
+      // Abort controller to timeout long requests (8s)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      
+      const resp = await fetch(targetUrl, { signal: controller.signal });
+      clearTimeout(timeoutId);
+
+      if (!resp.ok) throw new Error(`data.gov.in API error: ${resp.status}`);
+      const json = await resp.json();
+      return (json.records ?? []) as DataGovRecord[];
+    } catch (error) {
+      if (i === retries) {
+        console.error("data.gov.in final attempt failed:", error);
+        throw error;
+      }
+      console.warn(`data.gov.in attempt ${i + 1} failed, retrying...`);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+  }
+  return [];
 }
 
 function recordToMandiPrice(r: DataGovRecord): MandiPrice {
@@ -127,7 +145,7 @@ export async function fetchLatestPrices(
     TTL.MANDI_API,
     async () => {
       try {
-        const records = await callDataGovAPI({ state, district, limit: "50" });
+        const records = await callDataGovAPI({ state, district, limit: "30" });
         if (records.length > 0) {
           return records.map(recordToMandiPrice);
         }
@@ -136,7 +154,7 @@ export async function fetchLatestPrices(
       }
       // Fallback: try without district filter
       try {
-        const records = await callDataGovAPI({ state, limit: "30" });
+        const records = await callDataGovAPI({ state, limit: "20" });
         if (records.length > 0) {
           return records.map(recordToMandiPrice);
         }
@@ -210,7 +228,7 @@ export async function fetchCommodityComparison(
     TTL.MANDI_API,
     async () => {
       try {
-        const records = await callDataGovAPI({ state, district, limit: "100" });
+        const records = await callDataGovAPI({ state, district, limit: "50" });
         // Group by commodity and pick the latest record for each
         const commodityMap = new Map<string, CommodityCompare>();
         for (const r of records) {

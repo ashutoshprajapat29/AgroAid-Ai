@@ -282,8 +282,12 @@ export default function MarketDashboard() {
   const { isHindi, language } = useLanguage();
 
   // Filters
-  const [selectedState, setSelectedState] = useState("Maharashtra");
-  const [selectedDistrict, setSelectedDistrict] = useState("Nashik");
+  const [selectedState, setSelectedState] = useState(() => {
+    return localStorage.getItem("farmguide_state") || "Madhya Pradesh";
+  });
+  const [selectedDistrict, setSelectedDistrict] = useState(() => {
+    return localStorage.getItem("farmguide_district") || "Indore";
+  });
   const [selectedCommodity, setSelectedCommodity] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchType, setSearchType] = useState<"commodity" | "market">("commodity");
@@ -407,6 +411,17 @@ export default function MarketDashboard() {
   useEffect(() => { loadPrices(); }, [loadPrices]);
   useEffect(() => { loadNews(); },   [loadNews]);
   useEffect(() => { loadComparison(); }, [loadComparison]);
+
+  // ── Persist to localStorage & Auto-detect location ────────────────────────
+  useEffect(() => {
+    const hasVisited = localStorage.getItem("farmguide_state");
+    if (!hasVisited) {
+      // First visit: try to get real location automatically
+      detectLocation();
+    }
+    localStorage.setItem("farmguide_state", selectedState);
+    localStorage.setItem("farmguide_district", selectedDistrict);
+  }, [selectedState, selectedDistrict, detectLocation]);
 
   // ── Load price history when commodity changes ─────────────────────────────
   useEffect(() => {
