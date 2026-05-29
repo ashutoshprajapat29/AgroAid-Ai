@@ -1,23 +1,25 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, ReferenceLine,
+  ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell,
 } from "recharts";
 import { motion, AnimatePresence } from "motion/react";
 import {
-  TrendingUp, TrendingDown, Minus, Activity, MapPin,
+  TrendingUp, TrendingDown, Minus, MapPin,
   IndianRupee, RefreshCw, ChevronDown, Newspaper,
   Brain, Loader2, AlertCircle, BarChart2, Search,
-  ArrowUpRight, ArrowDownRight, Zap, ShieldAlert,
+  ArrowUpRight, ArrowDownRight, Navigation,
+  Store, Filter, X,
 } from "lucide-react";
 import {
   fetchLatestPrices, fetchPriceHistory, fetchMarketNews,
-  fetchMarketSentiment, INDIA_STATES_DISTRICTS,
+  fetchMarketSentiment, fetchNearbyPrices, searchMandiPrices,
+  fetchCommodityComparison,
+  INDIA_STATES_DISTRICTS,
   COMMON_COMMODITIES, COMMON_COMMODITIES_HI,
-  MandiPrice, PriceHistory, NewsItem, SentimentResult,
+  MandiPrice, PriceHistory, NewsItem, SentimentResult, CommodityCompare,
 } from "../services/mandiService";
 import { useLanguage } from "../lib/LanguageContext";
-import { getQuotaUsage, cacheInvalidate } from "../lib/apiCache";
 
 // ─── Custom Tooltip for Chart ─────────────────────────────────────────────────
 function PriceTooltip({ active, payload, label }: any) {
@@ -44,6 +46,43 @@ function PriceTooltip({ active, payload, label }: any) {
             </span>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Bar Chart Tooltip ────────────────────────────────────────────────────────
+function BarTooltip({ active, payload }: any) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0].payload;
+  return (
+    <div
+      className="rounded-2xl p-4 border text-sm shadow-2xl"
+      style={{
+        background: "var(--bg-card)",
+        borderColor: "var(--border-card)",
+        backdropFilter: "blur(12px)",
+      }}
+    >
+      <p className="font-black text-xs uppercase tracking-widest mb-2" style={{ color: "var(--text-main)" }}>
+        {d.commodity}
+      </p>
+      <div className="space-y-1">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-emerald-400" />
+          <span className="text-xs" style={{ color: "var(--text-muted)" }}>Modal:</span>
+          <span className="text-xs font-bold text-emerald-400">₹{d.modal_price?.toLocaleString("en-IN")}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-blue-400" />
+          <span className="text-xs" style={{ color: "var(--text-muted)" }}>Min:</span>
+          <span className="text-xs font-bold text-blue-400">₹{d.min_price?.toLocaleString("en-IN")}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-rose-400" />
+          <span className="text-xs" style={{ color: "var(--text-muted)" }}>Max:</span>
+          <span className="text-xs font-bold text-rose-400">₹{d.max_price?.toLocaleString("en-IN")}</span>
+        </div>
       </div>
     </div>
   );
@@ -114,6 +153,9 @@ function PriceCard({ item, selected, onClick, sentiment }: {
   const change = item.max_price - item.min_price;
   const changePercent = item.min_price > 0 ? ((change / item.min_price) * 100).toFixed(1) : "0";
 
+  // Format commodity name to title case
+  const formatName = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+
   return (
     <motion.button
       layout
@@ -135,10 +177,10 @@ function PriceCard({ item, selected, onClick, sentiment }: {
         <div className="flex justify-between items-start mb-3">
           <div>
             <h3 className="font-black text-base tracking-tight" style={{ color: "var(--text-main)" }}>
-              {item.commodity}
+              {formatName(item.commodity)}
             </h3>
             <p className="text-[10px] font-semibold uppercase tracking-wider mt-0.5" style={{ color: "var(--text-muted)" }}>
-              {item.variety || item.market_name}
+              {item.market_name || item.variety || item.district}
             </p>
           </div>
           {sentiment && <SentimentBadge s={sentiment} isHindi={false} />}
@@ -228,79 +270,135 @@ function Dropdown({ label, value, options, onChange, icon: Icon }: {
   );
 }
 
+// ─── BAR CHART COLORS ─────────────────────────────────────────────────────────
+const BAR_COLORS = [
+  "#22c55e", "#10b981", "#14b8a6", "#06b6d4",
+  "#0ea5e9", "#3b82f6", "#6366f1", "#8b5cf6",
+  "#a855f7", "#d946ef", "#ec4899", "#f43f5e",
+];
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function MarketDashboard() {
   const { isHindi, language } = useLanguage();
 
-  // Filters — track prev location to avoid redundant refetch
+  // Filters
   const [selectedState, setSelectedState] = useState("Maharashtra");
   const [selectedDistrict, setSelectedDistrict] = useState("Nashik");
   const [selectedCommodity, setSelectedCommodity] = useState("");
-  const [commoditySearch, setCommoditySearch] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchType, setSearchType] = useState<"commodity" | "market">("commodity");
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<MandiPrice[]>([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
   const prevLocation = useRef("");
+
+  // Geolocation
+  const [locating, setLocating] = useState(false);
+  const [locationName, setLocationName] = useState("");
 
   // Data
   const [prices, setPrices]             = useState<MandiPrice[]>([]);
   const [priceHistory, setPriceHistory] = useState<PriceHistory[]>([]);
   const [news, setNews]                 = useState<NewsItem[]>([]);
   const [sentiment, setSentiment]       = useState<SentimentResult | null>(null);
+  const [comparison, setComparison]     = useState<CommodityCompare[]>([]);
 
   // Loading states
   const [loadingPrices,    setLoadingPrices]    = useState(true);
   const [loadingHistory,   setLoadingHistory]   = useState(false);
   const [loadingNews,      setLoadingNews]       = useState(true);
   const [loadingSentiment, setLoadingSentiment] = useState(false);
+  const [loadingComparison, setLoadingComparison] = useState(false);
   const [lastFetched, setLastFetched]           = useState<Date | null>(null);
-
-  // Quota
-  const [quota, setQuota] = useState(getQuotaUsage());
-  const refreshQuota = () => setQuota(getQuotaUsage());
 
   const districts = INDIA_STATES_DISTRICTS[selectedState] ?? [];
   const states    = Object.keys(INDIA_STATES_DISTRICTS);
 
-  const filteredCommodities = useMemo(
-    () => COMMON_COMMODITIES.filter((c) =>
-      c.toLowerCase().includes(commoditySearch.toLowerCase()) ||
-      (COMMON_COMMODITIES_HI[c] ?? "").includes(commoditySearch)
-    ),
-    [commoditySearch]
-  );
+  // ── Geolocation: detect nearby mandis ─────────────────────────────────────
+  const detectLocation = useCallback(async () => {
+    if (!navigator.geolocation) return;
+    setLocating(true);
+    try {
+      const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
+        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 })
+      );
+      const result = await fetchNearbyPrices(pos.coords.latitude, pos.coords.longitude);
+      setSelectedState(result.state);
+      setSelectedDistrict(result.district);
+      setLocationName(`${result.district}, ${result.state}`);
+      if (result.prices.length > 0) {
+        setPrices(result.prices);
+        setLastFetched(new Date());
+        if (result.prices.length > 0 && !selectedCommodity) {
+          setSelectedCommodity(result.prices[0].commodity);
+        }
+      }
+    } catch (e) {
+      console.warn("Location detection failed:", e);
+    } finally {
+      setLocating(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // ── Load prices: only when state/district changes (not language) ─────────────
-  // Language is baked into the cache key so switching language hits cache or
-  // makes ONE new call — subsequent switches hit cache immediately.
+  // ── Search ────────────────────────────────────────────────────────────────
+  const handleSearch = useCallback(async () => {
+    if (!searchQuery.trim()) return;
+    setIsSearching(true);
+    setShowSearchResults(true);
+    try {
+      const results = await searchMandiPrices(searchQuery.trim(), searchType);
+      setSearchResults(results);
+    } catch (e) {
+      console.error("Search failed:", e);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  }, [searchQuery, searchType]);
+
+  const clearSearch = () => {
+    setSearchQuery("");
+    setSearchResults([]);
+    setShowSearchResults(false);
+  };
+
+  // ── Load prices ─────────────────────────────────────────────────────────────
   const loadPrices = useCallback(async (forceRefresh = false) => {
     const locationKey = `${selectedState}_${selectedDistrict}`;
-    // Don't refetch if same location (cache handles it) unless forced
     if (!forceRefresh && prevLocation.current === locationKey && prices.length > 0) return;
     prevLocation.current = locationKey;
 
     setLoadingPrices(true);
     setSentiment(null);
-    if (forceRefresh) {
-      // Bust the cache for this location so we get fresh data
-      cacheInvalidate(`prices_${selectedState}_${selectedDistrict}`);
-    }
     try {
       const data = await fetchLatestPrices(selectedState, selectedDistrict, language);
       setPrices(data);
       setLastFetched(new Date());
       if (data.length > 0 && !selectedCommodity) setSelectedCommodity(data[0].commodity);
-      refreshQuota();
     } finally {
       setLoadingPrices(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedState, selectedDistrict, language]);
 
-  // ── Load news: only once per language, then cached for 12h ────────────────
+  // ── Load comparison data for bar chart ────────────────────────────────────
+  const loadComparison = useCallback(async () => {
+    setLoadingComparison(true);
+    try {
+      const data = await fetchCommodityComparison(selectedState, selectedDistrict);
+      setComparison(data);
+    } finally {
+      setLoadingComparison(false);
+    }
+  }, [selectedState, selectedDistrict]);
+
+  // ── Load news ─────────────────────────────────────────────────────────────
   const loadNews = useCallback(async () => {
     setLoadingNews(true);
     try {
       const data = await fetchMarketNews(language);
       setNews(data);
-      refreshQuota();
     } finally {
       setLoadingNews(false);
     }
@@ -308,12 +406,12 @@ export default function MarketDashboard() {
 
   useEffect(() => { loadPrices(); }, [loadPrices]);
   useEffect(() => { loadNews(); },   [loadNews]);
+  useEffect(() => { loadComparison(); }, [loadComparison]);
 
-  // ── Load price history when commodity changes (auto, 24h cached) ──────────
-  // Sentiment is NOT auto-fetched — it's user-triggered (saves ~1 call/click)
+  // ── Load price history when commodity changes ─────────────────────────────
   useEffect(() => {
     if (!selectedCommodity) return;
-    setSentiment(null); // clear old sentiment when commodity changes
+    setSentiment(null);
 
     async function loadHistory() {
       setLoadingHistory(true);
@@ -321,7 +419,6 @@ export default function MarketDashboard() {
       try {
         const hist = await fetchPriceHistory(selectedCommodity, selectedState, selectedDistrict);
         setPriceHistory(hist);
-        refreshQuota();
       } catch (e) {
         console.error(e);
       } finally {
@@ -332,7 +429,7 @@ export default function MarketDashboard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCommodity, selectedState, selectedDistrict]);
 
-  // ── Manual sentiment trigger (user clicks "Analyse") ─────────────────────
+  // ── Manual sentiment trigger ──────────────────────────────────────────────
   const runSentimentAnalysis = async () => {
     if (!selectedCommodity || loadingSentiment) return;
     setLoadingSentiment(true);
@@ -340,7 +437,6 @@ export default function MarketDashboard() {
     try {
       const s = await fetchMarketSentiment(selectedCommodity, priceHistory, news, language);
       setSentiment(s);
-      refreshQuota();
     } catch (e) {
       console.error(e);
     } finally {
@@ -348,8 +444,7 @@ export default function MarketDashboard() {
     }
   };
 
-
-  // ── Chart data formatting ────────────────────────────────────────────────────
+  // ── Chart data ────────────────────────────────────────────────────────────
   const chartData = priceHistory.map((p) => ({
     date: new Date(p.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }),
     fullDate: p.date,
@@ -357,6 +452,11 @@ export default function MarketDashboard() {
     Min: p.min_price,
     Max: p.max_price,
   }));
+
+  const formatCommodityName = (s: string) => {
+    if (!s) return s;
+    return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+  };
 
   const selectedPrice = prices.find((p) => p.commodity === selectedCommodity);
   const avgModal = priceHistory.length > 0
@@ -369,6 +469,18 @@ export default function MarketDashboard() {
   const priceChangePct = priceHistory.length >= 2 && priceHistory[0].modal_price > 0
     ? ((priceChange30d / priceHistory[0].modal_price) * 100).toFixed(1)
     : "0";
+
+  // Display prices — show search results or regular prices
+  const displayPrices = showSearchResults ? searchResults : prices;
+  const displayTitle = showSearchResults
+    ? (isHindi ? `"${searchQuery}" के परिणाम` : `Results for "${searchQuery}"`)
+    : (isHindi ? "आज के मंडी भाव" : "Today's Mandi Rates");
+
+  const barChartData = comparison.map((c) => ({
+    ...c,
+    commodity: formatCommodityName(c.commodity),
+    shortName: formatCommodityName(c.commodity).slice(0, 10),
+  }));
 
   return (
     <div className="max-w-[1400px] mx-auto pb-20 space-y-5">
@@ -387,164 +499,231 @@ export default function MarketDashboard() {
               <div className="flex items-center gap-2 mb-1">
                 <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse shadow-[0_0_4px_rgba(34,197,94,0.8)]" />
                 <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/70">
-                  {isHindi ? "लाइव अग्रमार्केट डेटा" : "Live Agmarknet · Data.gov.in"}
+                  {isHindi ? "लाइव सरकारी डेटा" : "Live Government Data · Agmarknet"}
                 </span>
               </div>
               <h1 className="text-3xl md:text-4xl font-serif font-extrabold text-white tracking-tight">
-                {isHindi ? "मंडी बाज़ार भाव" : "Mandi Market Intelligence"}
+                {isHindi ? "मंडी बाज़ार भाव" : "Mandi Market Prices"}
               </h1>
               <p className="text-sm text-emerald-100/50 mt-1 font-medium">
                 {isHindi
-                  ? "सरकारी मंडी भाव · AI विश्लेषण · ऐतिहासिक रुझान"
-                  : "Live government Mandi prices · AI sentiment · 30-day history"}
+                  ? "सरकारी मंडी भाव · फसल तुलना · ऐतिहासिक रुझान"
+                  : "Real-time wholesale prices · Crop comparison · Price trends"}
               </p>
             </div>
           </div>
 
-          <div className="flex flex-col items-end gap-2">
-            {/* API Quota Meter */}
-            <div
-              className="flex items-center gap-3 px-3 py-2 rounded-xl border"
-              style={{ background: "rgba(0,0,0,0.3)", borderColor: "rgba(34,197,94,0.15)" }}
-            >
-              <Zap size={12} className={quota.remaining < 10 ? "text-rose-400" : "text-amber-400"} />
-              <div>
-                <p className="text-[8px] font-black uppercase tracking-widest text-emerald-400/60">
-                  {isHindi ? "AI कोटा" : "API Quota"}
-                </p>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-20 h-1 rounded-full bg-white/10">
-                    <div
-                      className={`h-full rounded-full transition-all ${
-                        quota.remaining < 10 ? "bg-rose-400" : quota.remaining < 30 ? "bg-amber-400" : "bg-emerald-400"
-                      }`}
-                      style={{ width: `${Math.min(100, (quota.remaining / quota.limit) * 100)}%` }}
-                    />
-                  </div>
-                  <span className="text-[9px] font-bold text-white/60">{quota.remaining}/{quota.limit}</span>
-                </div>
+          <div className="flex items-center gap-3">
+            {/* Location pill */}
+            {locationName && (
+              <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl border bg-emerald-500/10 border-emerald-500/20">
+                <Navigation size={12} className="text-emerald-400" />
+                <span className="text-xs font-bold text-emerald-400">{locationName}</span>
               </div>
-              {quota.remaining < 10 && (
-                <ShieldAlert size={12} className="text-rose-400" />
-              )}
-            </div>
-
-            <div className="flex items-center gap-2">
-              {lastFetched && (
-                <span className="text-[10px] font-semibold text-emerald-400/60 hidden md:block">
-                  {isHindi ? "अपडेट:" : "Updated:"} {lastFetched.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
-                </span>
-              )}
-              <button
-                onClick={() => loadPrices(true)}
-                disabled={loadingPrices}
-                className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition-all shadow-lg shadow-emerald-500/25 active:scale-95"
-              >
-                <RefreshCw size={14} className={loadingPrices ? "animate-spin" : ""} />
-                {isHindi ? "ताज़ा करें" : "Refresh"}
-              </button>
-            </div>
+            )}
+            {lastFetched && (
+              <span className="text-[10px] font-semibold text-emerald-400/60 hidden md:block">
+                {isHindi ? "अपडेट:" : "Updated:"} {lastFetched.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+              </span>
+            )}
+            <button
+              onClick={() => loadPrices(true)}
+              disabled={loadingPrices}
+              className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition-all shadow-lg shadow-emerald-500/25 active:scale-95"
+            >
+              <RefreshCw size={14} className={loadingPrices ? "animate-spin" : ""} />
+              {isHindi ? "ताज़ा करें" : "Refresh"}
+            </button>
           </div>
         </div>
       </header>
 
-      {/* ── FILTER BAR ───────────────────────────────────────────────────────── */}
+      {/* ── FILTER & SEARCH BAR ───────────────────────────────────────────── */}
       <div
-        className="rounded-2xl p-4 border grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3"
+        className="rounded-2xl p-4 border space-y-3"
         style={{ background: "var(--bg-card)", borderColor: "var(--border-card)" }}
       >
-        <Dropdown
-          label={isHindi ? "राज्य" : "State"}
-          value={selectedState}
-          options={states}
-          icon={MapPin}
-          onChange={(v) => {
-            setSelectedState(v);
-            const firstDist = INDIA_STATES_DISTRICTS[v]?.[0] ?? "";
-            setSelectedDistrict(firstDist);
-          }}
-        />
-        <Dropdown
-          label={isHindi ? "जिला" : "District"}
-          value={selectedDistrict}
-          options={districts}
-          icon={MapPin}
-          onChange={setSelectedDistrict}
-        />
-
-        {/* Commodity search */}
-        <div className="sm:col-span-2">
-          <div className="flex items-center gap-1.5 mb-1">
-            <Search size={11} style={{ color: "var(--text-subtle)" }} />
-            <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: "var(--text-subtle)" }}>
-              {isHindi ? "फसल खोजें" : "Search Commodity"}
-            </span>
+        {/* Location row */}
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3">
+          <Dropdown
+            label={isHindi ? "राज्य" : "State"}
+            value={selectedState}
+            options={states}
+            icon={MapPin}
+            onChange={(v) => {
+              setSelectedState(v);
+              const firstDist = INDIA_STATES_DISTRICTS[v]?.[0] ?? "";
+              setSelectedDistrict(firstDist);
+              setLocationName("");
+            }}
+          />
+          <Dropdown
+            label={isHindi ? "जिला" : "District"}
+            value={selectedDistrict}
+            options={districts}
+            icon={MapPin}
+            onChange={(v) => { setSelectedDistrict(v); setLocationName(""); }}
+          />
+          <div className="flex items-end">
+            <button
+              onClick={detectLocation}
+              disabled={locating}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl border font-bold text-sm transition-all hover:border-emerald-500/40 active:scale-95 disabled:opacity-50"
+              style={{ background: "var(--bg-input)", borderColor: "var(--border-input)", color: "var(--text-main)" }}
+            >
+              {locating ? (
+                <Loader2 size={14} className="animate-spin text-emerald-400" />
+              ) : (
+                <Navigation size={14} className="text-emerald-400" />
+              )}
+              {isHindi ? "मेरा स्थान" : "My Location"}
+            </button>
           </div>
-          <div className="flex gap-2">
-            <div className="relative flex-1">
+        </div>
+
+        {/* Search row */}
+        <div className="flex gap-2 items-end flex-wrap">
+          <div className="flex-1 min-w-[200px]">
+            <div className="flex items-center gap-1.5 mb-1">
+              <Search size={11} style={{ color: "var(--text-subtle)" }} />
+              <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: "var(--text-subtle)" }}>
+                {isHindi ? "खोजें" : "Search"}
+              </span>
+            </div>
+            <div className="relative">
               <input
                 type="text"
-                value={commoditySearch}
-                onChange={(e) => setCommoditySearch(e.target.value)}
-                placeholder={isHindi ? "गेहूं, टमाटर…" : "Wheat, Tomato…"}
-                className="w-full rounded-xl px-3 py-2.5 text-sm font-semibold border focus:outline-none focus:border-emerald-500/50 transition-colors"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                placeholder={isHindi ? "फसल या मंडी का नाम…" : "Search commodity or market name…"}
+                className="w-full rounded-xl px-3 py-2.5 pr-10 text-sm font-semibold border focus:outline-none focus:border-emerald-500/50 transition-colors"
                 style={{ background: "var(--bg-input)", borderColor: "var(--border-input)", color: "var(--text-main)" }}
               />
+              {searchQuery && (
+                <button onClick={clearSearch} className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <X size={14} style={{ color: "var(--text-subtle)" }} />
+                </button>
+              )}
             </div>
-            <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
-              {filteredCommodities.slice(0, 5).map((c) => (
+          </div>
+
+          {/* Search type toggle */}
+          <div>
+            <div className="flex items-center gap-1.5 mb-1">
+              <Filter size={11} style={{ color: "var(--text-subtle)" }} />
+              <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: "var(--text-subtle)" }}>
+                {isHindi ? "प्रकार" : "Type"}
+              </span>
+            </div>
+            <div className="flex rounded-xl border overflow-hidden" style={{ borderColor: "var(--border-input)" }}>
+              {([
+                { key: "commodity" as const, label: isHindi ? "फसल" : "Crop", icon: Store },
+                { key: "market" as const, label: isHindi ? "मंडी" : "Mandi", icon: MapPin },
+              ]).map((t) => (
                 <button
-                  key={c}
-                  onClick={() => { setSelectedCommodity(c); setCommoditySearch(""); }}
-                  className={`shrink-0 px-3 py-2 rounded-xl text-xs font-bold border transition-all ${
-                    selectedCommodity === c
-                      ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400"
-                      : "hover:border-emerald-500/30 hover:text-emerald-400"
+                  key={t.key}
+                  onClick={() => setSearchType(t.key)}
+                  className={`flex items-center gap-1.5 px-3 py-2.5 text-xs font-bold transition-all ${
+                    searchType === t.key
+                      ? "bg-emerald-500/20 text-emerald-400"
+                      : ""
                   }`}
-                  style={selectedCommodity !== c ? { background: "var(--bg-input)", borderColor: "var(--border-input)", color: "var(--text-muted)" } : undefined}
+                  style={searchType !== t.key ? { background: "var(--bg-input)", color: "var(--text-muted)" } : undefined}
                 >
-                  {isHindi ? (COMMON_COMMODITIES_HI[c] ?? c) : c}
+                  <t.icon size={12} />
+                  {t.label}
                 </button>
               ))}
             </div>
           </div>
+
+          <button
+            onClick={handleSearch}
+            disabled={!searchQuery.trim() || isSearching}
+            className="flex items-center gap-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-emerald-500/25 active:scale-95"
+          >
+            {isSearching ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+            {isHindi ? "खोजें" : "Search"}
+          </button>
+        </div>
+
+        {/* Quick commodity pills */}
+        <div className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-1">
+          {COMMON_COMMODITIES.slice(0, 8).map((c) => (
+            <button
+              key={c}
+              onClick={() => { setSearchQuery(c); setSearchType("commodity"); }}
+              className={`shrink-0 px-3 py-1.5 rounded-xl text-[11px] font-bold border transition-all hover:border-emerald-500/30 hover:text-emerald-400`}
+              style={{ background: "var(--bg-input)", borderColor: "var(--border-input)", color: "var(--text-muted)" }}
+            >
+              {isHindi ? (COMMON_COMMODITIES_HI[c] ?? c) : c}
+            </button>
+          ))}
         </div>
       </div>
+
+      {/* ── SEARCH RESULTS BANNER ─────────────────────────────────────────── */}
+      {showSearchResults && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center justify-between px-4 py-3 rounded-xl border bg-emerald-500/8 border-emerald-500/20"
+        >
+          <div className="flex items-center gap-2">
+            <Search size={14} className="text-emerald-400" />
+            <span className="text-sm font-bold" style={{ color: "var(--text-main)" }}>
+              {isSearching
+                ? (isHindi ? "खोज रहे हैं…" : "Searching…")
+                : (isHindi ? `${searchResults.length} परिणाम मिले` : `${searchResults.length} results found`)}
+            </span>
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              "{searchQuery}" · {searchType === "commodity" ? (isHindi ? "फसल" : "Crop") : (isHindi ? "मंडी" : "Market")}
+            </span>
+          </div>
+          <button onClick={clearSearch} className="flex items-center gap-1 text-xs font-bold text-emerald-400 hover:text-emerald-300 transition-colors">
+            <X size={12} />
+            {isHindi ? "बंद करें" : "Clear"}
+          </button>
+        </motion.div>
+      )}
 
       {/* ── MAIN LAYOUT ──────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-5">
 
-        {/* LEFT: Prices + Chart + Sentiment */}
+        {/* LEFT: Prices + Charts + Sentiment */}
         <div className="space-y-5">
 
           {/* ── Price Cards Grid ──────────────────────────────────────────────── */}
           <div>
             <h2 className="text-xs font-black uppercase tracking-widest mb-3" style={{ color: "var(--text-subtle)" }}>
-              {isHindi ? "आज के मंडी भाव" : "Today's Mandi Rates"} · {selectedDistrict}, {selectedState}
+              {displayTitle} {!showSearchResults && `· ${selectedDistrict}, ${selectedState}`}
             </h2>
-            {loadingPrices ? (
+            {loadingPrices && !showSearchResults ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {Array.from({ length: 6 }).map((_, i) => <SkeletonPriceCard key={i} />)}
               </div>
-            ) : prices.length === 0 ? (
+            ) : displayPrices.length === 0 ? (
               <div className="rounded-2xl p-12 text-center border" style={{ background: "var(--bg-card)", borderColor: "var(--border-card)" }}>
                 <AlertCircle size={32} className="mx-auto mb-3" style={{ color: "var(--text-muted)" }} />
                 <p className="font-semibold" style={{ color: "var(--text-muted)" }}>
                   {isHindi ? "कोई डेटा नहीं मिला।" : "No market data found."}
                 </p>
                 <p className="text-sm mt-1" style={{ color: "var(--text-subtle)" }}>
-                  {isHindi ? "दूसरा जिला आज़माएं।" : "Try another district."}
+                  {showSearchResults
+                    ? (isHindi ? "दूसरा नाम आज़माएं।" : "Try a different search term.")
+                    : (isHindi ? "दूसरा जिला आज़माएं।" : "Try another district.")}
                 </p>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 <AnimatePresence>
-                  {prices.map((item, idx) => (
+                  {displayPrices.slice(0, 12).map((item, idx) => (
                     <motion.div
-                      key={item.commodity + idx}
+                      key={item.commodity + item.market_name + idx}
                       initial={{ opacity: 0, y: 16 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: idx * 0.06 }}
+                      transition={{ delay: idx * 0.04 }}
                     >
                       <PriceCard
                         item={item}
@@ -558,6 +737,71 @@ export default function MarketDashboard() {
               </div>
             )}
           </div>
+
+          {/* ── Commodity Comparison Bar Chart ──────────────────────────────── */}
+          {!showSearchResults && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="rounded-2xl p-6 border"
+              style={{ background: "var(--bg-card)", borderColor: "var(--border-card)" }}
+            >
+              <div className="flex items-center gap-3 mb-5">
+                <div className="p-2 rounded-xl bg-teal-500/12 border border-teal-500/20">
+                  <BarChart2 size={16} className="text-teal-400" />
+                </div>
+                <div>
+                  <h3 className="font-black text-sm" style={{ color: "var(--text-main)" }}>
+                    {isHindi ? "फसल मूल्य तुलना" : "Crop Price Comparison"}
+                  </h3>
+                  <p className="text-[10px] font-semibold" style={{ color: "var(--text-muted)" }}>
+                    {isHindi
+                      ? `${selectedDistrict}, ${selectedState} · मोडल मूल्य (₹/क्विंटल)`
+                      : `${selectedDistrict}, ${selectedState} · Modal Price (₹/quintal)`}
+                  </p>
+                </div>
+              </div>
+
+              {loadingComparison ? (
+                <div className="h-64 flex items-center justify-center">
+                  <Loader2 className="animate-spin text-teal-400" size={24} />
+                </div>
+              ) : barChartData.length === 0 ? (
+                <div className="h-64 flex items-center justify-center">
+                  <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                    {isHindi ? "तुलना डेटा उपलब्ध नहीं है।" : "No comparison data available."}
+                  </p>
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={Math.max(260, barChartData.length * 38)}>
+                  <BarChart data={barChartData} layout="vertical" margin={{ top: 0, right: 40, left: 10, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(34,197,94,0.06)" horizontal={false} />
+                    <XAxis
+                      type="number"
+                      tick={{ fontSize: 9, fill: "var(--text-subtle)", fontWeight: 600 }}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(v) => `₹${(v / 1000).toFixed(1)}k`}
+                    />
+                    <YAxis
+                      type="category"
+                      dataKey="shortName"
+                      tick={{ fontSize: 10, fill: "var(--text-main)", fontWeight: 700 }}
+                      tickLine={false}
+                      axisLine={false}
+                      width={90}
+                    />
+                    <Tooltip content={<BarTooltip />} cursor={{ fill: "rgba(34,197,94,0.04)" }} />
+                    <Bar dataKey="modal_price" radius={[0, 8, 8, 0]} barSize={22}>
+                      {barChartData.map((_, idx) => (
+                        <Cell key={idx} fill={BAR_COLORS[idx % BAR_COLORS.length]} fillOpacity={0.85} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </motion.div>
+          )}
 
           {/* ── 30-Day Price Chart ──────────────────────────────────────────── */}
           {selectedCommodity && (
@@ -579,7 +823,7 @@ export default function MarketDashboard() {
                       </span>
                     </div>
                     <h3 className="text-xl font-black" style={{ color: "var(--text-main)" }}>
-                      {isHindi ? (COMMON_COMMODITIES_HI[selectedCommodity] ?? selectedCommodity) : selectedCommodity}
+                      {isHindi ? (COMMON_COMMODITIES_HI[selectedCommodity] ?? formatCommodityName(selectedCommodity)) : formatCommodityName(selectedCommodity)}
                       <span className="font-normal text-sm ml-2" style={{ color: "var(--text-muted)" }}>
                         · {selectedDistrict}, {selectedState}
                       </span>
@@ -718,23 +962,20 @@ export default function MarketDashboard() {
                       {isHindi ? "AI बाज़ार भावना" : "AI Market Sentiment"}
                     </h3>
                     <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
-                      {isHindi ? "Gemini द्वारा · 1 API कॉल उपयोग" : "Powered by Gemini · uses 1 API call"}
+                      {isHindi ? "AI द्वारा संचालित विश्लेषण" : "AI-powered market analysis"}
                     </p>
                   </div>
                   {sentiment && !loadingSentiment && <SentimentBadge s={sentiment} isHindi={isHindi} />}
                 </div>
 
-                {/* Manual trigger button — saves 1 call per commodity switch */}
                 {!sentiment && !loadingSentiment && (
                   <button
                     onClick={runSentimentAnalysis}
-                    disabled={loadingHistory || quota.remaining <= 0}
+                    disabled={loadingHistory}
                     className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm border border-violet-500/30 bg-violet-500/15 text-violet-400 hover:bg-violet-500/25 disabled:opacity-50 transition-all active:scale-95"
                   >
                     <Brain size={14} />
-                    {quota.remaining <= 0
-                      ? (isHindi ? "कोटा समाप्त" : "Quota Exhausted")
-                      : (isHindi ? "विश्लेषण करें" : "Analyse")}
+                    {isHindi ? "विश्लेषण करें" : "Analyse"}
                   </button>
                 )}
               </div>
@@ -786,7 +1027,7 @@ export default function MarketDashboard() {
                   {/* Re-analyse button */}
                   <button
                     onClick={runSentimentAnalysis}
-                    disabled={loadingSentiment || quota.remaining <= 0}
+                    disabled={loadingSentiment}
                     className="flex items-center gap-1.5 text-[10px] font-bold text-violet-400/60 hover:text-violet-400 transition-colors disabled:opacity-40"
                   >
                     <RefreshCw size={10} />
@@ -801,13 +1042,13 @@ export default function MarketDashboard() {
                   </div>
                   <p className="text-sm font-medium" style={{ color: "var(--text-muted)" }}>
                     {isHindi
-                      ? "\"विश्लेषण करें\" पर क्लिक करें — 1 API कॉल का उपयोग होगा"
-                      : "Click \"Analyse\" above — uses 1 API call, cached for 4 hours"}
+                      ? "\"विश्लेषण करें\" पर क्लिक करके AI भावना रिपोर्ट देखें"
+                      : "Click \"Analyse\" to get AI-powered sentiment report"}
                   </p>
                   <p className="text-[10px]" style={{ color: "var(--text-subtle)" }}>
                     {isHindi
-                      ? "बाज़ार भावना 4 घंटे के लिए कैश होती है"
-                      : "Results are cached — same crop won't re-fetch for 4 hours"}
+                      ? "बाज़ार डेटा और समाचारों के आधार पर"
+                      : "Based on market data and news analysis"}
                   </p>
                 </div>
               )}
@@ -828,10 +1069,10 @@ export default function MarketDashboard() {
               </div>
               <div>
                 <h3 className="font-black text-sm" style={{ color: "var(--text-main)" }}>
-                  {isHindi ? "AI कृषि समाचार" : "AI Agri News Feed"}
+                  {isHindi ? "कृषि समाचार" : "Agri News Feed"}
                 </h3>
                 <p className="text-[9px] font-semibold uppercase tracking-widest mt-0.5" style={{ color: "var(--text-subtle)" }}>
-                  {isHindi ? "Gemini फ़िल्टर किया गया" : "Gemini-curated · Market impact"}
+                  {isHindi ? "बाज़ार प्रभाव समाचार" : "Market impact news"}
                 </p>
               </div>
             </div>
@@ -874,11 +1115,11 @@ export default function MarketDashboard() {
               ))}
             </div>
 
-            {/* Disclaimer */}
+            {/* Data source */}
             <p className="text-[8px] mt-4 leading-relaxed" style={{ color: "var(--text-subtle)" }}>
               {isHindi
-                ? "* AI-जनित विश्लेषण। निर्णय लेने से पहले अपने स्थानीय मंडी से पुष्टि करें।"
-                : "* AI-generated analysis. Verify with your local Mandi before making decisions."}
+                ? "* मंडी भाव: data.gov.in (Agmarknet)। AI विश्लेषण सलाहकार उद्देश्य के लिए है।"
+                : "* Mandi prices sourced from data.gov.in (Agmarknet). AI analysis is advisory."}
             </p>
           </div>
         </div>

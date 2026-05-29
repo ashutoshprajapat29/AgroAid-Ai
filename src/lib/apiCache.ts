@@ -16,6 +16,7 @@ export const TTL = {
   HISTORY:   24 * 60 * 60 * 1000, // 24 hours — historical data is immutable
   SENTIMENT: 4  * 60 * 60 * 1000, // 4 hours  — sentiment can shift with news
   NEWS:      12 * 60 * 60 * 1000, // 12 hours — news refreshes twice daily
+  MANDI_API: 2  * 60 * 60 * 1000, // 2 hours  — real mandi data updates few times/day
   CHAT:      0,                    // no cache — conversational AI is stateful
 } as const;
 
