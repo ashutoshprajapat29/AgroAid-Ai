@@ -92,13 +92,14 @@ async function callDataGovAPI(params: Record<string, string>, retries = 1): Prom
   if (params.market) qp.set("filters[market]", params.market);
   if (params.commodity) qp.set("filters[commodity]", params.commodity);
 
-  const targetUrl = `https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070?${qp.toString()}`;
+  const queryString = qp.toString().replace(/\+/g, "%20");
+  const targetUrl = `https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070?${queryString}`;
   
   for (let i = 0; i <= retries; i++) {
     try {
-      // Abort controller to timeout long requests (8s)
+      // Abort controller to timeout long requests (15s)
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
       
       const resp = await fetch(targetUrl, { signal: controller.signal });
       clearTimeout(timeoutId);

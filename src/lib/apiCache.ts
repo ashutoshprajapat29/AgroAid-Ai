@@ -185,7 +185,13 @@ export async function cachedApiCall<T>(
     try {
       const result = await fn();
       recordRequest(); // Only count successful calls against quota
-      if (ttl > 0) cacheSet(cacheKey, result, ttl);
+      
+      if (ttl > 0) {
+        // If result is an empty array (meaning API failed/timeout), cache for only 1 minute to retry soon
+        const isList = Array.isArray(result);
+        const actualTtl = (isList && result.length === 0) ? 60 * 1000 : ttl;
+        cacheSet(cacheKey, result, actualTtl);
+      }
       return result;
     } catch (err) {
       if (fallback !== undefined) return fallback;
