@@ -1,12 +1,14 @@
 import React from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { SoilReport } from './FieldManager';
+import { useLanguage } from '../lib/LanguageContext';
 
 interface SoilHealthChartProps {
   data: SoilReport[];
 }
 
 export default function SoilHealthChart({ data }: SoilHealthChartProps) {
+  const { t } = useLanguage();
   // Sort data chronologically for the chart (oldest first)
   const chartData = [...data]
     .sort((a, b) => new Date(a.testDate).getTime() - new Date(b.testDate).getTime())
@@ -22,10 +24,10 @@ export default function SoilHealthChart({ data }: SoilHealthChartProps) {
   if (chartData.length < 2) return null;
 
   return (
-    <div className="bg-white rounded-3xl p-6 shadow-sm border border-zinc-200/50 mt-6 overflow-hidden">
+    <div className="bg-[var(--bg-card)] rounded-3xl p-6 shadow-sm border border-[var(--border-card)] mt-6 overflow-hidden">
       <div className="mb-6">
-        <h4 className="font-black text-lg text-zinc-800 tracking-tight">Soil Health Trends</h4>
-        <p className="text-xs font-semibold text-zinc-500 uppercase tracking-widest mt-1">Historical NPK & pH Levels</p>
+        <h4 className="font-black text-lg text-[var(--text-main)] tracking-tight">{t("soilchart.title")}</h4>
+        <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-widest mt-1">{t("soilchart.subtitle")}</p>
       </div>
       <div className="h-64 w-full">
         <ResponsiveContainer width="100%" height="100%">
@@ -51,15 +53,15 @@ export default function SoilHealthChart({ data }: SoilHealthChartProps) {
                 <stop offset="95%" stopColor="#f43f5e" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e4e4e7" />
-            <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#71717a', fontWeight: 600 }} dy={10} />
-            <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#71717a', fontWeight: 600 }} />
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-input)" />
+            <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'var(--text-muted)', fontWeight: 600 }} dy={10} />
+            <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'var(--text-muted)', fontWeight: 600 }} />
             <Tooltip 
-              contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', fontWeight: 'bold' }}
+              contentStyle={{ borderRadius: '16px', border: '1px solid var(--border-card)', boxShadow: '0 10px 25px rgba(0,0,0,0.15)', fontWeight: 'bold', backgroundColor: 'var(--bg-card)', color: 'var(--text-main)' }}
               itemStyle={{ fontSize: '13px' }}
-              labelStyle={{ color: '#a1a1aa', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}
+              labelStyle={{ color: 'var(--text-muted)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}
             />
-            <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', fontWeight: 600, paddingTop: '20px' }} />
+            <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', fontWeight: 600, paddingTop: '20px', color: 'var(--text-main)' }} />
             
             <Area type="monotone" dataKey="Nitrogen" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorN)" />
             <Area type="monotone" dataKey="Phosphorus" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorP)" />

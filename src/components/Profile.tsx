@@ -6,9 +6,11 @@ import { db } from "../lib/firebase";
 import { handleFirestoreError, OperationType } from "../lib/firebaseUtils";
 import { motion } from "motion/react";
 import ThemeToggle from "./ThemeToggle";
+import { useLanguage } from "../lib/LanguageContext";
 
 export default function Profile() {
   const { user, profile, updateProfile, logout } = useAuth();
+  const { t, setLanguage } = useLanguage();
   const [formData, setFormData] = useState({
     displayName: profile?.displayName || "",
     farmDetails: profile?.farmDetails || "",
@@ -35,7 +37,14 @@ export default function Profile() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true); setSuccess(false);
-    try { await updateProfile(formData); setSuccess(true); setTimeout(() => setSuccess(false), 3000); }
+    try {
+      await updateProfile(formData);
+      // Sync language context with profile preference
+      if (formData.preferredLanguage === 'Hindi' || formData.preferredLanguage === 'English') {
+        setLanguage(formData.preferredLanguage as 'Hindi' | 'English');
+      }
+      setSuccess(true); setTimeout(() => setSuccess(false), 3000);
+    }
     catch { /* handled */ }
     finally { setLoading(false); }
   };
@@ -71,14 +80,14 @@ export default function Profile() {
           <div className="relative z-10 flex-1 text-center md:text-left">
             <div className="flex flex-wrap justify-center md:justify-start items-center gap-2 mb-3">
               <span className="text-[10px] font-bold uppercase tracking-widest bg-emerald-500/15 text-emerald-400 px-3 py-1 rounded-full border border-emerald-500/20">
-                Verified Farmer
+                {t("profile.verified_farmer")}
               </span>
               <span className="text-[10px] font-bold uppercase tracking-widest text-bento-text-muted px-3 py-1 rounded-full border flex items-center gap-1" style={{ background: 'var(--bg-input)', borderColor: 'var(--border-input)' }}>
                 <Globe size={9} /> {formData.preferredLanguage}
               </span>
             </div>
             <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-bento-text-main mb-2">
-              {profile?.displayName || "Guardian of Land"}
+              {profile?.displayName || t("profile.guardian")}
             </h1>
             <p className="text-bento-text-muted font-medium flex items-center justify-center md:justify-start gap-2 text-sm">
               <Mail size={14} className="text-emerald-400/60" />
@@ -89,11 +98,11 @@ export default function Profile() {
 
         {/* Stats */}
         <div className="glass-panel rounded-[1.75rem] p-7 flex flex-col justify-between">
-          <h3 className="text-[10px] font-bold uppercase tracking-widest text-bento-text-muted mb-6">Agriculture Impact</h3>
+          <h3 className="text-[10px] font-bold uppercase tracking-widest text-bento-text-muted mb-6">{t("profile.impact")}</h3>
           <div className="space-y-5">
             {[
-              { label: "Mapped Plots", value: stats.plots, icon: Layers, color: "emerald" },
-              { label: "Health Audits", value: stats.reports, icon: ShieldCheck, color: "indigo" },
+              { label: t("profile.mapped_plots"), value: stats.plots, icon: Layers, color: "emerald" },
+              { label: t("profile.health_audits"), value: stats.reports, icon: ShieldCheck, color: "indigo" },
             ].map(stat => (
               <div key={stat.label} className="flex items-center gap-4">
                 <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${stat.color === 'emerald' ? 'bg-emerald-500/12 text-emerald-400 border border-emerald-500/20' : 'bg-indigo-500/12 text-indigo-400 border border-indigo-500/20'}`}>
@@ -107,7 +116,7 @@ export default function Profile() {
             ))}
           </div>
           <div className="mt-6 p-3.5 bg-emerald-500/5 border border-emerald-500/10 rounded-xl italic text-[11px] font-medium text-bento-text-muted leading-relaxed">
-            "The best fertilizer is the farmer's shadow."
+            {t("profile.quote")}
           </div>
         </div>
       </div>
@@ -121,12 +130,12 @@ export default function Profile() {
             <div className="w-9 h-9 rounded-xl flex items-center justify-center border" style={{ background: 'var(--bg-input)', borderColor: 'var(--border-input)' }}>
               <User size={18} style={{ color: 'var(--text-muted)' }} />
             </div>
-            <h2 className="text-lg font-bold" style={{ color: 'var(--text-main)' }}>Profile Settings</h2>
+            <h2 className="text-lg font-bold" style={{ color: 'var(--text-main)' }}>{t("profile.settings")}</h2>
           </div>
 
           <div className="space-y-5 flex-1">
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--text-muted)' }}>Display Name</label>
+              <label className="block text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--text-muted)' }}>{t("profile.display_name")}</label>
               <input
                 type="text"
                 value={formData.displayName}
@@ -137,7 +146,7 @@ export default function Profile() {
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--text-muted)' }}>Preferred Language</label>
+              <label className="block text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--text-muted)' }}>{t("profile.language")}</label>
               <div className="relative">
                 <select
                   value={formData.preferredLanguage}
@@ -152,11 +161,11 @@ export default function Profile() {
 
             {/* Appearance row */}
             <div className="pt-4 border-t border-[var(--border-input)]">
-              <label className="block text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--text-muted)' }}>Appearance</label>
+              <label className="block text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--text-muted)' }}>{t("profile.appearance")}</label>
               <div className="flex items-center justify-between bg-[var(--bg-input)] border border-[var(--border-input)] rounded-2xl px-5 py-3.5">
                 <div className="flex items-center gap-2.5">
                   <Palette size={16} className="text-emerald-400" />
-                  <span className="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>Color Theme</span>
+                  <span className="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>{t("profile.color_theme")}</span>
                 </div>
                 <ThemeToggle variant="pill" />
               </div>
@@ -170,13 +179,13 @@ export default function Profile() {
               className="flex-1 min-w-[180px] px-6 py-4 bg-emerald-500 hover:bg-emerald-400 text-white rounded-2xl font-bold transition-all flex items-center justify-center gap-2.5 shadow-xl shadow-emerald-500/20 hover:-translate-y-0.5 active:scale-95 disabled:opacity-50"
             >
               {loading ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-              {loading ? "Saving…" : "Save Profile"}
+              {loading ? t("profile.saving") : t("profile.save")}
             </button>
 
             {success && (
               <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
                 className="flex items-center gap-2 text-emerald-400 font-bold text-xs uppercase tracking-widest bg-emerald-500/12 border border-emerald-500/20 px-5 py-4 rounded-2xl">
-                <ShieldCheck size={15} /> Saved!
+                <ShieldCheck size={15} /> {t("profile.saved")}
               </motion.div>
             )}
           </div>
@@ -188,10 +197,10 @@ export default function Profile() {
             <div className="w-9 h-9 bg-emerald-500/10 border border-emerald-500/18 rounded-xl flex items-center justify-center transition-transform group-hover:rotate-12">
               <Sprout size={18} className="text-emerald-400" />
             </div>
-            <h2 className="text-lg font-bold" style={{ color: 'var(--text-main)' }}>Farm Context</h2>
+            <h2 className="text-lg font-bold" style={{ color: 'var(--text-main)' }}>{t("profile.farm_context")}</h2>
           </div>
           <p className="text-sm font-medium mb-5 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-            Describe your environment. This enables the AI to provide surgically accurate, localized suggestions.
+            {t("profile.farm_context_desc")}
           </p>
 
           <div className="relative flex-1">
@@ -213,7 +222,7 @@ export default function Profile() {
             className="mt-6 w-full px-6 py-4 font-semibold hover:text-rose-400 hover:bg-rose-500/8 border border-transparent hover:border-rose-500/15 rounded-2xl transition-all flex items-center justify-center gap-2 text-sm"
             style={{ color: 'var(--text-muted)' }}
           >
-            <LogOut size={16} /> Sign Out
+            <LogOut size={16} /> {t("profile.sign_out")}
           </button>
         </div>
       </form>

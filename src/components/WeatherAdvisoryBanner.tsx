@@ -15,7 +15,7 @@ export default function WeatherAdvisoryBanner() {
         exit={{ height: 0, opacity: 0 }}
         className="overflow-hidden"
       >
-        <div className={`px-4 py-0.5 border-b flex items-center justify-center gap-2 text-center ${error ? 'bg-red-50 text-red-700 border-red-100' : 'bg-amber-50 text-amber-800 border-amber-100'}`}>
+        <div className={`px-4 py-0.5 border-b flex items-center justify-center gap-2 text-center ${error ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20'}`}>
           {error ? (
             <AlertCircle size={14} className="shrink-0" />
           ) : advisory?.includes('rain') ? (

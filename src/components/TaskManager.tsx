@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Field } from "./FieldManager";
+import { useLanguage } from "../lib/LanguageContext";
 
 export interface Reminder {
   id: string; userId: string; title: string; description?: string;
@@ -22,11 +23,12 @@ const TYPE_CONFIG: Record<string, { icon: React.ReactNode; color: string; bg: st
   "monitoring":  { icon: <Search   size={13} />, color: "text-purple-400", bg: "bg-purple-500/12 border-purple-500/20" },
   "follow-up":   { icon: <Activity size={13} />, color: "text-orange-400", bg: "bg-orange-500/12 border-orange-500/20" },
   "harvest":     { icon: <Wheat    size={13} />, color: "text-amber-400",  bg: "bg-amber-500/12 border-amber-500/20"   },
-  "other":       { icon: <ListTodo size={13} />, color: "text-slate-400",  bg: "bg-white/6 border-white/10"            },
+  "other":       { icon: <ListTodo size={13} />, color: "text-slate-400",  bg: "bg-[var(--bg-input)] border-[var(--border-input)]"            },
 };
 
 export default function TaskManager() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [fields,    setFields]    = useState<Field[]>([]);
   const [loading,   setLoading]   = useState(true);
@@ -108,20 +110,20 @@ export default function TaskManager() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse shadow-[0_0_4px_rgba(34,197,94,0.8)]" />
-            <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/70">Farm Scheduler</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/70">{t("tasks.scheduler")}</span>
           </div>
-          <h2 className="text-2xl md:text-3xl font-serif font-extrabold text-bento-text-main tracking-tight">Task Reminders</h2>
+          <h2 className="text-2xl md:text-3xl font-serif font-extrabold text-bento-text-main tracking-tight">{t("tasks.reminders")}</h2>
         </div>
 
         <div className="flex items-center gap-3">
           {/* Stats chips */}
           <div className="hidden md:flex items-center gap-2">
             <span className="text-xs font-bold px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
-              {pending.length} pending
+              {pending.length} {t("common.pending")}
             </span>
             {pending.filter(r => r.dueDate < todayStr).length > 0 && (
               <span className="text-xs font-bold px-3 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400">
-                {pending.filter(r => r.dueDate < todayStr).length} overdue
+                {pending.filter(r => r.dueDate < todayStr).length} {t("tasks.overdue")}
               </span>
             )}
           </div>
@@ -131,7 +133,7 @@ export default function TaskManager() {
               onClick={() => setIsAdding(true)}
               className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-emerald-500/20 hover:-translate-y-0.5 active:scale-95"
             >
-              <Plus size={16} /> Add Task
+              <Plus size={16} /> {t("tasks.add")}
             </button>
           )}
         </div>
@@ -143,7 +145,7 @@ export default function TaskManager() {
           <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }}>
             <form onSubmit={handleAddTask} className="glass-panel rounded-[1.75rem] p-6 md:p-8 border border-emerald-500/15">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-lg font-bold" style={{ color: 'var(--text-main)' }}>Schedule New Reminder</h3>
+                <h3 className="text-lg font-bold" style={{ color: 'var(--text-main)' }}>{t("tasks.schedule_new")}</h3>
                 <button type="button" onClick={() => setIsAdding(false)}
                   className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-rose-500/15 hover:text-rose-400 transition-colors border"
                   style={{ background: 'var(--bg-input)', borderColor: 'var(--border-input)', color: 'var(--text-muted)' }}>
@@ -153,7 +155,7 @@ export default function TaskManager() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {[
-                  { label: "Task Title *", type: "text", value: newTask.title || "", onChange: (v: string) => setNewTask({ ...newTask, title: v }), placeholder: "e.g. Spray Urea in North Plot", span: 1 },
+                  { label: t("tasks.task_title_label") + " *", type: "text", value: newTask.title || "", onChange: (v: string) => setNewTask({ ...newTask, title: v }), placeholder: "e.g. Spray Urea in North Plot", span: 1 },
                 ].map(f => (
                   <div key={f.label}>
                     <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--text-muted)' }}>{f.label}</label>
@@ -163,35 +165,35 @@ export default function TaskManager() {
                 ))}
 
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--text-muted)' }}>Category *</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--text-muted)' }}>{t("tasks.category")} *</label>
                   <select value={newTask.type} onChange={e => setNewTask({ ...newTask, type: e.target.value as any })}
                     className="w-full theme-input rounded-xl px-4 py-3 text-sm font-semibold appearance-none cursor-pointer focus:border-emerald-500/35">
-                    <option value="irrigation">Irrigation</option>
-                    <option value="fertilizer">Fertilizer Application</option>
-                    <option value="monitoring">Monitoring / Scouting</option>
-                    <option value="follow-up">Follow-up</option>
-                    <option value="harvest">Harvest</option>
-                    <option value="other">Other Activity</option>
+                    <option value="irrigation">{t("tasks.irrigation")}</option>
+                    <option value="fertilizer">{t("tasks.fert_app")}</option>
+                    <option value="monitoring">{t("tasks.monitoring_scouting")}</option>
+                    <option value="follow-up">{t("tasks.follow_up")}</option>
+                    <option value="harvest">{t("tasks.harvest")}</option>
+                    <option value="other">{t("tasks.other_activity")}</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--text-muted)' }}>Due Date *</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--text-muted)' }}>{t("tasks.due_date")} *</label>
                   <input type="date" value={newTask.dueDate} onChange={e => setNewTask({ ...newTask, dueDate: e.target.value })} required
                     className="w-full theme-input rounded-xl px-4 py-3 text-sm font-semibold focus:border-emerald-500/35" />
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--text-muted)' }}>Plot</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--text-muted)' }}>{t("tasks.plot")}</label>
                   <select value={newTask.fieldId} onChange={e => setNewTask({ ...newTask, fieldId: e.target.value })}
                     className="w-full theme-input rounded-xl px-4 py-3 text-sm font-semibold appearance-none cursor-pointer focus:border-emerald-500/35">
-                    <option value="">None / General</option>
+                    <option value="">{t("tasks.none_general")}</option>
                     {fields.map(f => <option key={f.id} value={f.id}>{f.name} ({f.area} {f.unit})</option>)}
                   </select>
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--text-muted)' }}>Notes</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--text-muted)' }}>{t("common.notes")}</label>
                   <textarea value={newTask.description} onChange={e => setNewTask({ ...newTask, description: e.target.value })}
                     placeholder="e.g. Mix 50kg per acre, spray before 10 AM…" rows={3}
                     className="w-full theme-input rounded-xl px-4 py-3 text-sm font-semibold resize-none focus:border-emerald-500/35" />
@@ -205,7 +207,7 @@ export default function TaskManager() {
                 </button>
                 <button type="submit"
                   className="px-7 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-2">
-                  <CheckCircle2 size={15} /> Save Task
+                  <CheckCircle2 size={15} /> {t("tasks.save")}
                 </button>
               </div>
             </form>
@@ -220,7 +222,7 @@ export default function TaskManager() {
         <div>
           <div className="flex items-center gap-2 mb-4">
             <CalendarDays size={15} className="text-emerald-400" />
-            <h3 className="text-sm font-bold text-bento-text-main uppercase tracking-wider">Pending <span className="text-bento-text-muted">({pending.length})</span></h3>
+            <h3 className="text-sm font-bold text-bento-text-main uppercase tracking-wider">{t("common.pending")} <span className="text-bento-text-muted">({pending.length})</span></h3>
           </div>
 
           <div className="space-y-3">
@@ -239,7 +241,7 @@ export default function TaskManager() {
                     }`}>
 
                     <button onClick={() => toggleTask(task)} className="shrink-0 mt-0.5 hover:scale-110 active:scale-95 transition-transform">
-                      <Circle size={20} className="text-white/15 group-hover:text-emerald-400 transition-colors" />
+                      <Circle size={20} className="text-[var(--text-subtle)] group-hover:text-emerald-400 transition-colors" />
                     </button>
 
                     <div className="flex-1 min-w-0">
@@ -258,11 +260,11 @@ export default function TaskManager() {
                         <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                           isOverdue ? 'bg-rose-500/12 border-rose-500/20 text-rose-400'   :
                           isToday   ? 'bg-amber-500/12 border-amber-500/20 text-amber-400' :
-                                      'bg-white/4 border-white/8 text-bento-text-muted'
+                                      'bg-[var(--bg-input)] border-[var(--border-input)] text-bento-text-muted'
                         }`}>
                           {isOverdue && <AlertCircle size={10} />}
                           {new Date(task.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                          {isToday && " (Today)"}{isOverdue && " (Overdue)"}
+                          {isToday && ` (${t("tasks.today")})`}{isOverdue && ` (${t("tasks.overdue")})`}
                         </span>
                         {field && (
                           <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-500/12 border border-teal-500/20 text-teal-400">
@@ -283,13 +285,13 @@ export default function TaskManager() {
             {!loading && pending.length === 0 && (
               <div className="glass-panel rounded-2xl p-8 text-center border-dashed">
                 <ListTodo size={28} className="mx-auto text-bento-text-muted/40 mb-2" />
-                <p className="text-sm text-bento-text-muted font-medium">No pending tasks</p>
+                <p className="text-sm text-bento-text-muted font-medium">{t("tasks.no_pending")}</p>
                 <button onClick={() => setIsAdding(true)} className="text-emerald-400 text-xs font-semibold mt-2 hover:underline">
-                  Create a reminder
+                  {t("tasks.create_reminder")}
                 </button>
               </div>
             )}
-            {loading && <div className="h-16 flex items-center justify-center"><div className="w-5 h-5 border-2 border-white/10 border-t-emerald-400 rounded-full animate-spin" /></div>}
+            {loading && <div className="h-16 flex items-center justify-center"><div className="w-5 h-5 border-2 border-[var(--border-input)] border-t-emerald-400 rounded-full animate-spin" /></div>}
           </div>
         </div>
 
@@ -297,18 +299,18 @@ export default function TaskManager() {
         <div>
           <div className="flex items-center gap-2 mb-4">
             <CheckCircle2 size={15} className="text-emerald-400" />
-            <h3 className="text-sm font-bold text-bento-text-main uppercase tracking-wider">Completed <span className="text-bento-text-muted">({completed.length})</span></h3>
+            <h3 className="text-sm font-bold text-bento-text-main uppercase tracking-wider">{t("common.completed")} <span className="text-bento-text-muted">({completed.length})</span></h3>
           </div>
 
           <div className="space-y-2 opacity-70 hover:opacity-100 transition-opacity">
             {completed.length === 0 && !loading && (
-              <p className="text-xs text-center text-bento-text-muted/60 italic py-6">No completed tasks yet</p>
+              <p className="text-xs text-center text-bento-text-muted/60 italic py-6">{t("tasks.no_completed")}</p>
             )}
             {completed.map(task => {
               const field = fields.find(f => f.id === task.fieldId);
               return (
                 <motion.div layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} key={task.id}
-                  className="glass-panel rounded-xl p-3 flex gap-3 group border-white/6">
+                  className="glass-panel rounded-xl p-3 flex gap-3 group border-[var(--border-input)]">
                   <button onClick={() => toggleTask(task)} className="shrink-0 mt-0.5" title="Mark as pending">
                     <CheckCircle2 size={18} className="text-emerald-500" />
                   </button>

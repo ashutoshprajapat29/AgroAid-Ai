@@ -30,6 +30,7 @@ import { db } from "../lib/firebase";
 import { handleFirestoreError, OperationType } from "../lib/firebaseUtils";
 import Markdown from "react-markdown";
 import { Field, SoilReport } from "./FieldManager";
+import { useLanguage } from "../lib/LanguageContext";
 
 interface Message {
   role: 'user' | 'bot';
@@ -39,10 +40,11 @@ interface Message {
 
 export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
   const { user, profile } = useAuth();
-  const defaultMessage: Message = {
-    role: 'bot',
-    content: "Hi! 👋 I'm your AI Farming Advisor. How can I help your farm today?"
-  };
+  const { t } = useLanguage();
+  const defaultMessage: Message = useMemo(() => ({
+    role: 'bot' as const,
+    content: t("advisor.default_greeting")
+  }), [t]);
 
   const [chatHistories, setChatHistories] = useState<Record<string, Message[]>>({
     'default': [defaultMessage]
@@ -117,7 +119,7 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
     });
 
     const advicePath = 'advice';
-    const adviceQuery = query(collection(db, "advice"), where("userId", "==", user.uid));
+    const adviceQuery = query(collection(db, "advice"), where("userId", "==", user.uid), orderBy("createdAt", "desc"), limit(200));
     const unsubscribeAdvice = onSnapshot(adviceQuery, (snapshot) => {
       const histories: Record<string, Message[]> = { 'default': [defaultMessage] };
       
@@ -577,7 +579,7 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
               <MessageSquare size={12} />
             </div>
             <div className="min-w-0">
-              <h2 className="text-[11px] md:text-sm font-bold tracking-tight leading-none truncate" style={{ color: 'var(--text-main)' }}>Advisor AI</h2>
+              <h2 className="text-[11px] md:text-sm font-bold tracking-tight leading-none truncate" style={{ color: 'var(--text-main)' }}>{t("advisor.advisor_ai")}</h2>
             </div>
           </div>
 
@@ -593,7 +595,7 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
                       : 'hover:text-emerald-500'
                   } text-[9px] font-bold uppercase tracking-widest transition-all`}
                 >
-                  General
+                  {t("advisor.general_tab")}
                 </button>
                 {fields.map(f => (
                   <button
@@ -644,11 +646,11 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
       <AnimatePresence>
         {showAddPlot && (
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="absolute z-40 top-20 left-0 right-0 glass-panel shadow-2xl p-4 border border-emerald-500/15 rounded-2xl mx-4 md:mx-8">
-            <h3 className="font-bold mb-3 text-sm pb-2 border-b" style={{ color: 'var(--text-main)', borderColor: 'var(--border-input)' }}>Quick Map Field</h3>
+            <h3 className="font-bold mb-3 text-sm pb-2 border-b" style={{ color: 'var(--text-main)', borderColor: 'var(--border-input)' }}>{t("advisor.quick_map")}</h3>
             <form onSubmit={saveNewPlot} className="flex gap-2">
               <input type="text" placeholder="e.g. North Plot" value={newPlotName} onChange={e => setNewPlotName(e.target.value)} required
                 className="flex-1 theme-input rounded-xl px-4 py-2 font-semibold text-sm" />
-              <button type="submit" disabled={loading} className="bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-sm px-5 py-2 rounded-xl transition-colors">{loading ? 'Saving…' : 'Add'}</button>
+              <button type="submit" disabled={loading} className="bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-sm px-5 py-2 rounded-xl transition-colors">{loading ? t("profile.saving") : t("common.add")}</button>
               <button type="button" onClick={() => setShowAddPlot(false)} className="p-2 hover:text-rose-400 rounded-xl border transition-colors" style={{ color: 'var(--text-muted)', background: 'var(--bg-input)', borderColor: 'var(--border-input)' }}><X size={16} /></button>
             </form>
           </motion.div>
@@ -670,8 +672,8 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
                 <div className="action-card-icon w-8 h-8 md:w-12 md:h-12">
                   <Camera size={18} className="md:w-6 md:h-6" />
                 </div>
-                <span className="text-[10px] md:text-xs font-black uppercase tracking-widest leading-tight">Snap Photo</span>
-                <p className="text-[8px] md:text-[9px] mt-1 font-bold opacity-60">Check Diseases</p>
+                <span className="text-[10px] md:text-xs font-black uppercase tracking-widest leading-tight">{t("advisor.snap_photo")}</span>
+                <p className="text-[8px] md:text-[9px] mt-1 font-bold opacity-60">{t("advisor.check_diseases")}</p>
               </button>
 
               <button
@@ -681,8 +683,8 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
                 <div className="action-card-icon w-8 h-8 md:w-12 md:h-12">
                   <Leaf size={18} className="md:w-6 md:h-6" />
                 </div>
-                <span className="text-[10px] md:text-xs font-black uppercase tracking-widest leading-tight">Daily Plan</span>
-                <p className="text-[8px] md:text-[9px] mt-1 font-bold opacity-60">Get To-Do List</p>
+                <span className="text-[10px] md:text-xs font-black uppercase tracking-widest leading-tight">{t("advisor.daily_plan")}</span>
+                <p className="text-[8px] md:text-[9px] mt-1 font-bold opacity-60">{t("advisor.get_todo")}</p>
               </button>
 
               <button
@@ -692,8 +694,8 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
                 <div className="action-card-icon w-8 h-8 md:w-12 md:h-12">
                   <Sprout size={18} className="md:w-6 md:h-6" />
                 </div>
-                <span className="text-[10px] md:text-xs font-black uppercase tracking-widest leading-tight">Soil Check</span>
-                <p className="text-[8px] md:text-[9px] mt-1 font-bold opacity-60">Health Report</p>
+                <span className="text-[10px] md:text-xs font-black uppercase tracking-widest leading-tight">{t("advisor.soil_check")}</span>
+                <p className="text-[8px] md:text-[9px] mt-1 font-bold opacity-60">{t("advisor.health_report")}</p>
               </button>
 
               <button
@@ -703,11 +705,11 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
                 <div className="action-card-icon w-8 h-8 md:w-12 md:h-12">
                   <BookOpen size={18} className="md:w-6 md:h-6" />
                 </div>
-                <span className="text-[10px] md:text-xs font-black uppercase tracking-widest leading-tight">Yield Tips</span>
-                <p className="text-[8px] md:text-[9px] mt-1 font-bold opacity-60">Improve Growth</p>
+                <span className="text-[10px] md:text-xs font-black uppercase tracking-widest leading-tight">{t("advisor.yield_tips")}</span>
+                <p className="text-[8px] md:text-[9px] mt-1 font-bold opacity-60">{t("advisor.improve_growth")}</p>
               </button>
             </div>
-            <p className="mt-4 text-[9px] md:text-xs font-semibold text-bento-text-muted uppercase tracking-[0.2em]">Or just type below</p>
+            <p className="mt-4 text-[9px] md:text-xs font-semibold text-bento-text-muted uppercase tracking-[0.2em]">{t("advisor.type_below")}</p>
           </div>
         )}
 
@@ -736,7 +738,7 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
                 <div className="absolute -right-3 md:-right-12 bottom-2 flex flex-col gap-2">
                   <button
                     onClick={() => speakMessage(i, m.content)}
-                    className={`p-2 bg-white/5 backdrop-blur-md border border-white/8 rounded-xl transition-all duration-300 shadow-lg flex items-center justify-center ${(isSpeaking === i || speechLoading === i)
+                    className={`p-2 bg-[var(--bg-input)] backdrop-blur-md border border-[var(--border-input)] rounded-xl transition-all duration-300 shadow-lg flex items-center justify-center ${(isSpeaking === i || speechLoading === i)
                         ? 'text-rose-400 border-rose-500/30 scale-110 opacity-100'
                         : 'opacity-0 group-hover:opacity-100 text-bento-text-muted hover:bg-emerald-500/15 hover:border-emerald-500/25 hover:text-emerald-400 hover:-translate-y-0.5'
                       }`}
@@ -760,7 +762,7 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
           <div className="flex justify-start">
             <div className="glass-panel border border-emerald-500/15 p-3.5 rounded-2xl mr-12 flex items-center gap-2">
               <Loader2 className="animate-spin text-emerald-400" size={18} />
-              <span className="text-xs font-medium text-bento-text-muted">Thinking…</span>
+              <span className="text-xs font-medium text-bento-text-muted">{t("advisor.thinking")}</span>
             </div>
           </div>
         )}
@@ -769,7 +771,7 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
       </div>
       <div className="flex flex-col gap-1 pb-0">
         {selectedImages.length > 0 && (
-          <div className="flex flex-wrap gap-2 bg-black/30 backdrop-blur-md p-2.5 rounded-2xl border border-emerald-500/15 animate-in fade-in slide-in-from-bottom-2">
+          <div className="flex flex-wrap gap-2 bg-[var(--bg-input)] backdrop-blur-md p-2.5 rounded-2xl border border-emerald-500/15 animate-in fade-in slide-in-from-bottom-2">
             {selectedImages.map((img, idx) => (
               <div key={idx} className="relative w-12 h-12 md:w-16 md:h-16 rounded-xl overflow-hidden border border-emerald-500/20 shrink-0">
                 <img src={img} alt={`Preview ${idx}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -786,7 +788,7 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
                 <p className="text-[10px] font-bold text-bento-text-main uppercase tracking-widest">{selectedImages.length} Photo{selectedImages.length > 1 ? 's' : ''}</p>
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" style={{ boxShadow: '0 0 4px rgba(34,197,94,0.8)' }} />
               </div>
-              <p className="text-[9px] text-bento-text-muted font-semibold uppercase tracking-widest mt-0.5">Multi-Image</p>
+              <p className="text-[9px] text-bento-text-muted font-semibold uppercase tracking-widest mt-0.5">{t("advisor.multi_image")}</p>
             </div>
           </div>
         )}
@@ -806,7 +808,7 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
             className={`p-2.5 md:p-3 rounded-xl border transition-all flex items-center justify-center shrink-0 ${
               selectedImages.length > 0
                 ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400 scale-105 shadow-lg shadow-emerald-500/15'
-                : 'bg-white/5 border-white/8 text-bento-text-muted hover:text-emerald-400 hover:border-emerald-500/25 active:scale-95'
+                : 'bg-[var(--bg-input)] border-[var(--border-input)] text-bento-text-muted hover:text-emerald-400 hover:border-emerald-500/25 active:scale-95'
             }`}
           >
             <Camera size={18} />
@@ -818,7 +820,7 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
             className={`p-2.5 md:p-3 rounded-xl border transition-all flex items-center justify-center shrink-0 ${
               isListening
                 ? 'bg-rose-500/15 border-rose-500/30 text-rose-400 animate-pulse scale-105'
-                : 'bg-white/5 border-white/8 text-bento-text-muted hover:text-emerald-400 hover:border-emerald-500/25 active:scale-95'
+                : 'bg-[var(--bg-input)] border-[var(--border-input)] text-bento-text-muted hover:text-emerald-400 hover:border-emerald-500/25 active:scale-95'
             }`}
             title={isListening ? "Stop Listening" : "Voice Typing"}
           >
@@ -831,8 +833,8 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => (e.key === 'Enter' && !e.shiftKey) && handleSend()}
-              placeholder="Ask anything about your farm…"
-              className="w-full bg-white/5 border border-white/8 rounded-xl px-4 py-3 md:py-3.5 focus:outline-none focus:border-emerald-500/35 focus:bg-white/7 transition-all font-medium text-sm text-bento-text-main placeholder:text-bento-text-muted/40"
+              placeholder={t("advisor.ask_placeholder")}
+              className="w-full bg-[var(--bg-input)] border border-[var(--border-input)] rounded-xl px-4 py-3 md:py-3.5 focus:outline-none focus:border-emerald-500/35 focus:bg-[var(--bg-hover)] transition-all font-medium text-sm text-bento-text-main placeholder:text-bento-text-muted/40"
             />
           </div>
 

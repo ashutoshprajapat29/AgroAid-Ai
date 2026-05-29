@@ -26,8 +26,68 @@ function getAIClient() {
   return aiClients[randomIndex];
 }
 
+// ─── In-memory advisor response cache (5 min TTL) ─────────────────────────────
+const advisorCache = new Map<string, { text: string; ts: number }>();
+const ADVISOR_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+function getAdvisorCacheKey(query: string, fieldId?: string, historyLen?: number): string {
+  return `${(fieldId || 'default')}::${historyLen ?? 0}::${query.trim().toLowerCase()}`;
+}
+
+function getCachedAdvisorResponse(key: string): string | null {
+  const entry = advisorCache.get(key);
+  if (entry && Date.now() - entry.ts < ADVISOR_CACHE_TTL) return entry.text;
+  if (entry) advisorCache.delete(key); // expired
+  return null;
+}
+
+function setCachedAdvisorResponse(key: string, text: string): void {
+  // Cap cache size to prevent memory leaks
+  if (advisorCache.size > 50) {
+    const oldest = advisorCache.keys().next().value;
+    if (oldest) advisorCache.delete(oldest);
+  }
+  advisorCache.set(key, { text, ts: Date.now() });
+}
+
+// ─── Smart extraction heuristic ───────────────────────────────────────────────
+// Only call extractFarmUpdates when conversation likely contains actionable farm data.
+// This skips greetings, general questions, weather queries, etc. — saving ~50% of calls.
+const EXTRACT_KEYWORDS = [
+  // Crops & planting
+  'crop', 'plant', 'sow', 'seed', 'harvest', 'yield', 'variety', 'cultivar',
+  'फसल', 'बोना', 'बीज', 'कटाई', 'उपज', 'किस्म',
+  // Soil & nutrients
+  'soil', 'ph', 'nitrogen', 'phosphorus', 'potassium', 'fertilizer', 'manure', 'npk', 'urea', 'dap',
+  'मिट्टी', 'उर्वरक', 'खाद', 'यूरिया',
+  // Sprays & disease
+  'spray', 'pesticide', 'fungicide', 'insecticide', 'disease', 'blight', 'rot', 'wilt', 'pest', 'bug',
+  'कीट', 'रोग', 'छिड़काव', 'दवाई',
+  // Irrigation
+  'irrigat', 'watering', 'drip', 'flood irrigation', 'mulch',
+  'सिंचाई', 'पानी',
+  // Tasks & scheduling
+  'schedule', 'task', 'todo', 'remind', 'plan', 'apply', 'dose',
+  'योजना', 'कार्य',
+  // Specific data signals
+  'kg', 'quintal', 'acre', 'hectare', 'bigha',
+];
+
+export function shouldExtractUpdates(userQuery: string, botResponse: string): boolean {
+  const combined = (userQuery + ' ' + botResponse).toLowerCase();
+  return EXTRACT_KEYWORDS.some(kw => combined.includes(kw));
+}
+
 export async function getFarmingAdvice(query: string, farmDetails?: string, history: any[] = [], preferredLanguage: string = "English", fieldContext?: any, latestSoilReport?: any) {
   if (!GEN_AI_KEY && !GEN_AI_KEY2) return "The AI advisor is currently unavailable due to configuration issues. Please contact support.";
+
+  // Check in-memory cache for identical recent queries (prevents duplicate calls)
+  const cacheKey = getAdvisorCacheKey(query, fieldContext?.id, history.length);
+  const cached = getCachedAdvisorResponse(cacheKey);
+  if (cached) {
+    console.log('[Gemini] Returning cached advisor response');
+    return cached;
+  }
   
   let context = farmDetails ? `General farm context: ${farmDetails}\n` : "";
   
@@ -89,7 +149,8 @@ export async function getFarmingAdvice(query: string, farmDetails?: string, hist
       console.warn("Gemini returned empty response:", response);
       return "I'm sorry, I couldn't generate a response at the moment. Please try again later.";
     }
-
+    // Cache the response for deduplication
+    setCachedAdvisorResponse(cacheKey, response.text);
     return response.text;
   } catch (error: any) {
     if (error.message === "ADVISOR_TIMEOUT") {
@@ -219,7 +280,13 @@ export async function getTTSAudio(text: string) {
 }
 
 export async function extractFarmUpdates(userQuery: string, botResponse: string, currentFieldData?: any) {
-  if (!GEN_AI_KEY && !GEN_AI_KEY2) return { fieldUpdates: {}, soilUpdates: {} };
+  if (!GEN_AI_KEY && !GEN_AI_KEY2) return { fieldUpdates: {}, soilUpdates: {}, newTasks: [] };
+
+  // Smart skip: don't waste an API call on casual/greeting messages
+  if (!shouldExtractUpdates(userQuery, botResponse)) {
+    console.log('[Gemini] Skipping extraction — no actionable farm keywords detected');
+    return { fieldUpdates: {}, soilUpdates: {}, newTasks: [] };
+  }
 
     // Trim field data to save tokens
     const trimmedFieldData = currentFieldData ? {
@@ -276,7 +343,7 @@ export async function extractFarmUpdates(userQuery: string, botResponse: string,
 
   try {
     const response = await getAIClient().models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-2.0-flash-lite",
       contents: [{ parts: [{ text: prompt }] }],
       config: {
         responseMimeType: "application/json",
@@ -323,8 +390,14 @@ export async function extractFarmUpdates(userQuery: string, botResponse: string,
       }
     });
 
-    const text = response.text.trim();
-    const parsed = JSON.parse(text);
+    const text = (response.text || '{}').trim();
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      console.warn('extractFarmUpdates: failed to parse response:', text);
+      return { fieldUpdates: {}, soilUpdates: {}, newTasks: [] };
+    }
     
     // Ensure numbers for soil correctly parsed
     if (parsed.soilUpdates) {
@@ -346,15 +419,16 @@ export async function extractFarmUpdates(userQuery: string, botResponse: string,
   }
 }
 
-export async function getMarketPrices(location: string = "India"): Promise<MarketPrice[]> {
+export async function getMarketPrices(location: string = "India", language: string = "English"): Promise<MarketPrice[]> {
   if (!GEN_AI_KEY && !GEN_AI_KEY2) return [];
 
   const prompt = `You are a live commodity market API. Return realistic, current wholesale market (Mandi) prices for 6 common crops (like Wheat, Rice, Tomato, Onion, Potato, Cotton, etc.) in ${location}.
+  ${language === 'Hindi' ? 'Return crop names in Hindi (Devanagari script). For example: गेहूं, चावल, टमाटर, प्याज, आलू, कपास.' : 'Return crop names in English.'}
   Return ONLY a valid JSON array of objects. Make the data realistic for the current season.`;
 
   try {
     const response = await getAIClient().models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-2.0-flash-lite",
       contents: [{ parts: [{ text: prompt }] }],
       config: {
         responseMimeType: "application/json",
@@ -375,7 +449,11 @@ export async function getMarketPrices(location: string = "India"): Promise<Marke
       }
     });
 
-    return JSON.parse(response.text || "[]");
+    try {
+      return JSON.parse(response.text || "[]");
+    } catch {
+      return [];
+    }
   } catch (error) {
     console.error("Failed to get market prices:", error);
     return [];

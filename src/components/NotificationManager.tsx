@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useAuth } from '../lib/AuthContext';
 import { getMessagingInstance, db } from '../lib/firebase';
 import { getToken, onMessage } from 'firebase/messaging';
@@ -6,6 +6,7 @@ import { doc, setDoc } from 'firebase/firestore';
 
 export default function NotificationManager() {
   const { user } = useAuth();
+  const unsubRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -45,8 +46,8 @@ export default function NotificationManager() {
               }
             }
 
-            // Listen for foreground messages
-            onMessage(messaging, (payload) => {
+            // Listen for foreground messages — save unsubscribe for cleanup (Fix #11)
+            unsubRef.current = onMessage(messaging, (payload) => {
               console.log('FCM Message received in foreground: ', payload);
               // Show a browser notification when app is open
               if (payload.notification) {
@@ -65,7 +66,14 @@ export default function NotificationManager() {
 
     // Give the messaging instance a short delay to ensure Firebase fully initializes
     const timer = setTimeout(setupNotifications, 3000);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      // Cleanup onMessage listener to prevent duplicates on remount
+      if (unsubRef.current) {
+        unsubRef.current();
+        unsubRef.current = null;
+      }
+    };
   }, [user]);
 
   return null; // This is a purely logical component, it renders nothing.

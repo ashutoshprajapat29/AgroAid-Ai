@@ -49,7 +49,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         await getDocFromServer(doc(db, 'test', 'connection'));
       } catch (error) {
-        handleFirestoreError(error, OperationType.GET, 'test/connection');
+        // Non-fatal: just log connectivity issues, don't crash
+        console.warn('Firestore connection test failed (may be offline):', error instanceof Error ? error.message : error);
       }
     }
     testConnection();

@@ -8,9 +8,11 @@ import { handleFirestoreError, OperationType } from "../lib/firebaseUtils";
 import Markdown from "react-markdown";
 import { Field } from "./FieldManager";
 import { motion, AnimatePresence } from "motion/react";
+import { useLanguage } from "../lib/LanguageContext";
 
 export default function DiseaseScanner() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [image, setImage]           = useState<string | null>(null);
   const [loading, setLoading]       = useState(false);
   const [result, setResult]         = useState<string | null>(null);
@@ -98,7 +100,7 @@ export default function DiseaseScanner() {
           } catch { /* silent */ }
         }
       }
-    } catch { setError("Failed to analyze image. Please try again."); }
+    } catch { setError(t("disease.error_analyze")); }
     finally { setLoading(false); }
   }, [image, loading, user, selectedFieldId, fields]);
 
@@ -113,7 +115,7 @@ export default function DiseaseScanner() {
           <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
             className="fixed top-20 inset-x-0 z-[100] flex justify-center pointer-events-none">
             <div className="bg-emerald-500/90 backdrop-blur-md text-white px-5 py-2 rounded-full flex items-center gap-2 shadow-xl border border-emerald-400/30 text-xs font-bold uppercase tracking-widest">
-              <CheckCircle2 size={14} /> Diagnostic Synced
+              <CheckCircle2 size={14} /> {t("disease.synced")}
             </div>
           </motion.div>
         )}
@@ -124,10 +126,10 @@ export default function DiseaseScanner() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse shadow-[0_0_4px_rgba(34,197,94,0.8)]" />
-            <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/70">AI Vision</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/70">{t("disease.ai_vision")}</span>
           </div>
-          <h2 className="text-2xl md:text-3xl font-serif font-extrabold text-bento-text-main tracking-tight">Plant Health Scanner</h2>
-          <p className="text-sm text-bento-text-muted mt-1 font-medium">Identify crop diseases instantly with Gemini AI vision.</p>
+          <h2 className="text-2xl md:text-3xl font-serif font-extrabold text-bento-text-main tracking-tight">{t("disease.scanner_title")}</h2>
+          <p className="text-sm text-bento-text-muted mt-1 font-medium">{t("disease.scanner_desc")}</p>
         </div>
 
         {fields.length > 0 && (
@@ -138,7 +140,7 @@ export default function DiseaseScanner() {
               onChange={e => setSelectedFieldId(e.target.value)}
               className="bg-transparent text-sm font-semibold focus:outline-none appearance-none cursor-pointer flex-1 text-bento-text-main"
             >
-              <option value="">General Scan</option>
+              <option value="">{t("disease.general_scan")}</option>
               {fields.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
             </select>
           </div>
@@ -158,12 +160,12 @@ export default function DiseaseScanner() {
                 ? 'border-emerald-500/20 bg-black/20'
                 : dragging
                   ? 'border-emerald-400 bg-emerald-500/10 shadow-[0_0_30px_rgba(34,197,94,0.15)]'
-                  : 'border-dashed border-emerald-500/20 bg-gradient-to-br from-[#061209] to-[#04090a] hover:border-emerald-500/35 hover:bg-emerald-500/4'
+                : 'border-dashed border-emerald-500/20 bg-[var(--bg-input)] hover:border-emerald-500/35 hover:bg-emerald-500/4'
             }`}
           >
             {!image && (
               <div className="absolute top-4 left-4 text-[9px] font-bold uppercase tracking-widest text-emerald-500/40">
-                Disease Detection · AI
+                {t("disease.detection_badge")}
               </div>
             )}
 
@@ -172,9 +174,9 @@ export default function DiseaseScanner() {
                 <img src={image} alt="Preview" className="w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
                 <div className="absolute bottom-0 inset-x-0 p-4 flex justify-between items-center">
-                  <span className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--text-main)' }}>Image loaded</span>
+                  <span className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--text-main)' }}>{t("disease.image_loaded")}</span>
                   <button onClick={reset} className="p-2 border transition-all rounded-xl" style={{ background: 'var(--bg-input)', borderColor: 'var(--border-input)', color: 'var(--text-main)' }}>
-                    <RefreshCw size={16} className="text-white" />
+                    <RefreshCw size={16} />
                   </button>
                 </div>
               </>
@@ -188,8 +190,8 @@ export default function DiseaseScanner() {
                     <Upload size={12} className="text-white" />
                   </div>
                 </div>
-                <span className="text-base font-bold text-bento-text-main mb-1">Tap to Upload or Drop</span>
-                <span className="text-xs text-bento-text-muted font-medium">Maize · Wheat · Tomato · Rice</span>
+                <span className="text-base font-bold text-bento-text-main mb-1">{t("disease.tap_upload")}</span>
+                <span className="text-xs text-bento-text-muted font-medium">{t("disease.crops_hint")}</span>
                 <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
               </label>
             )}
@@ -203,7 +205,7 @@ export default function DiseaseScanner() {
               text-white shadow-xl shadow-emerald-500/20 hover:shadow-emerald-500/30 hover:-translate-y-0.5 active:scale-[0.98]"
           >
             {loading ? <Loader2 className="animate-spin" size={20} /> : <ScanLine size={20} />}
-            {loading ? "Analyzing Specimen…" : "Start AI Analysis"}
+            {loading ? t("disease.analyzing_specimen") : t("disease.start_analysis")}
           </button>
 
           {error && (
@@ -221,13 +223,13 @@ export default function DiseaseScanner() {
             <div className="flex items-center justify-between px-6 py-4 border-b border-emerald-500/10">
               <div className="flex items-center gap-2">
                 <ScanLine size={16} className="text-emerald-400" />
-                <span className="text-sm font-bold text-bento-text-main tracking-tight">Diagnostics Lab</span>
+                <span className="text-sm font-bold text-bento-text-main tracking-tight">{t("disease.diagnostics")}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <div className={`w-1.5 h-1.5 rounded-full ${loading ? 'bg-amber-400 animate-pulse' : result ? 'bg-emerald-400' : 'bg-[var(--border-strong)]'}`}
                   style={result && !loading ? { boxShadow: '0 0 6px rgba(34,197,94,0.7)' } : {}} />
                 <span className="text-[10px] font-bold uppercase tracking-widest text-bento-text-muted">
-                  {loading ? "Processing" : result ? "Analysis Ready" : "Standby"}
+                  {loading ? t("disease.processing") : result ? t("disease.ready") : t("disease.standby")}
                 </span>
               </div>
             </div>
@@ -246,8 +248,8 @@ export default function DiseaseScanner() {
                     <ScanLine size={20} className="text-emerald-400 absolute inset-0 m-auto" />
                   </div>
                   <div className="text-center">
-                    <p className="text-sm font-semibold text-bento-text-main">Analyzing specimen…</p>
-                    <p className="text-xs text-bento-text-muted mt-1">Gemini AI is examining your image</p>
+                    <p className="text-sm font-semibold text-bento-text-main">{t("disease.analyzing_msg")}</p>
+                    <p className="text-xs text-bento-text-muted mt-1">{t("disease.examining")}</p>
                   </div>
                 </div>
               ) : (
@@ -255,9 +257,9 @@ export default function DiseaseScanner() {
                   <div className="w-16 h-16 rounded-2xl bg-emerald-500/8 border border-emerald-500/15 flex items-center justify-center mb-4">
                     <CheckCircle2 size={32} className="text-emerald-500/40" />
                   </div>
-                  <h4 className="text-base font-bold text-bento-text-main mb-2">Ready for Inspection</h4>
+                  <h4 className="text-base font-bold text-bento-text-main mb-2">{t("disease.ready_title")}</h4>
                   <p className="text-sm text-bento-text-muted max-w-xs leading-relaxed">
-                    Upload or take a photo of the affected plant part to begin the AI diagnostic process.
+                    {t("disease.ready_desc")}
                   </p>
                 </div>
               )}
@@ -266,14 +268,14 @@ export default function DiseaseScanner() {
             {/* Stats bar */}
             <div className="px-6 py-4 border-t border-emerald-500/10 grid grid-cols-2 gap-4">
               <div className="bg-emerald-500/6 border border-emerald-500/12 rounded-xl p-3">
-                <label className="text-[9px] font-bold uppercase tracking-widest text-bento-text-muted block mb-1">Confidence</label>
+                <label className="text-[9px] font-bold uppercase tracking-widest text-bento-text-muted block mb-1">{t("disease.confidence")}</label>
                 <span className={`text-lg font-extrabold ${result ? 'text-emerald-400' : 'text-bento-text-muted/40'}`}>
                   {result ? "98.4%" : "—"}
                 </span>
               </div>
               <div className="border rounded-xl p-3" style={{ background: 'var(--bg-input)', borderColor: 'var(--border-input)' }}>
-                <label className="text-[9px] font-bold uppercase tracking-widest text-bento-text-muted block mb-1">Model</label>
-                <span className="text-sm font-bold text-bento-text-muted">Gemini Vision</span>
+                <label className="text-[9px] font-bold uppercase tracking-widest text-bento-text-muted block mb-1">{t("disease.model_label")}</label>
+                <span className="text-sm font-bold text-bento-text-muted">{t("disease.model_name")}</span>
               </div>
             </div>
           </div>

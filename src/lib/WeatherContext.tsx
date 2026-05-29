@@ -74,11 +74,13 @@ export function WeatherProvider({ children }: { children: ReactNode }) {
           const weatherRes = await fetch(
             `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto`
           );
+          if (!weatherRes.ok) throw new Error(`Weather API error: ${weatherRes.status}`);
           const weatherData = await weatherRes.json();
 
           const locationRes = await fetch(
             `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
           );
+          if (!locationRes.ok) throw new Error(`Geocode API error: ${locationRes.status}`);
           const locationData = await locationRes.json();
           const cityName = locationData.city || locationData.locality || locationData.principalSubdivision || "My Farm";
           

@@ -1,6 +1,7 @@
 import { AuthProvider, useAuth } from "./lib/AuthContext";
 import { WeatherProvider } from "./lib/WeatherContext";
 import { ThemeProvider } from "./lib/ThemeContext";
+import { LanguageProvider, useLanguage } from "./lib/LanguageContext";
 import { useState, lazy, Suspense } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -8,6 +9,7 @@ import {
   Mic, Compass, CheckCircle2, Activity, Smartphone,
 } from "lucide-react";
 import ThemeToggle from "./components/ThemeToggle";
+import LanguageToggle from "./components/LanguageToggle";
 
 import FarmingAdvisor from "./components/FarmingAdvisor";
 import NotificationManager from "./components/NotificationManager";
@@ -22,14 +24,14 @@ const MarketDashboard = lazy(() => import("./components/MarketDashboard"));
 
 type TabType = 'advisor' | 'disease' | 'profile' | 'voice' | 'fields' | 'tasks' | 'market';
 
-const NAV_ITEMS: { id: TabType; icon: React.ElementType; label: string }[] = [
-  { id: 'advisor',  icon: MessageSquare, label: 'Advisor'  },
-  { id: 'disease',  icon: Camera,        label: 'Health'   },
-  { id: 'fields',   icon: Compass,       label: 'Plots'    },
-  { id: 'tasks',    icon: CheckCircle2,  label: 'Tasks'    },
-  { id: 'market',   icon: Activity,      label: 'Market'   },
-  { id: 'voice',    icon: Mic,           label: 'Voice'    },
-  { id: 'profile',  icon: UserIcon,      label: 'Profile'  },
+const NAV_CONFIG: { id: TabType; icon: React.ElementType; labelKey: string }[] = [
+  { id: 'advisor',  icon: MessageSquare, labelKey: 'nav.advisor'  },
+  { id: 'disease',  icon: Camera,        labelKey: 'nav.health'   },
+  { id: 'fields',   icon: Compass,       labelKey: 'nav.plots'    },
+  { id: 'tasks',    icon: CheckCircle2,  labelKey: 'nav.tasks'    },
+  { id: 'market',   icon: Activity,      labelKey: 'nav.market'   },
+  { id: 'voice',    icon: Mic,           labelKey: 'nav.voice'    },
+  { id: 'profile',  icon: UserIcon,      labelKey: 'nav.profile'  },
 ];
 
 /* ── Loading fallback ──────────────────────────────────────── */
@@ -47,6 +49,8 @@ function PageLoader() {
 /* ── Authenticated shell ───────────────────────────────────── */
 function AuthenticatedApp() {
   const [activeTab, setActiveTab] = useState<TabType>('advisor');
+  const { t } = useLanguage();
+  const NAV_ITEMS = NAV_CONFIG.map(item => ({ ...item, label: t(item.labelKey) }));
 
   return (
     <div className="h-screen h-[100dvh] flex flex-col overflow-hidden relative" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-main)' }}>
@@ -73,6 +77,7 @@ function AuthenticatedApp() {
           <Suspense fallback={<div className="w-28 h-7 skeleton rounded-full" />}>
             <WeatherWidget />
           </Suspense>
+          <LanguageToggle variant="icon" />
           <ThemeToggle variant="icon" />
         </div>
       </header>
@@ -197,13 +202,14 @@ function NavButton({ active, onClick, icon, label }: {
 /* ── Landing page ──────────────────────────────────────────── */
 function Landing() {
   const { login, sendOTP, verifyOTP, loading } = useAuth();
-  const [lang, setLang]   = useState(localStorage.getItem('preferredLanguage') || "Hindi");
+  const [lang, setLang]   = useState<'English'|'Hindi'>(() => (localStorage.getItem('preferredLanguage') as 'English'|'Hindi') || "English");
+  const { setLanguage, t } = useLanguage();
   const [phone, setPhone] = useState("");
   const [otp, setOtp]     = useState("");
   const [step, setStep]   = useState<'method' | 'phone' | 'otp'>('method');
   const [error, setError] = useState("");
 
-  const selectLang = (l: string) => { setLang(l); localStorage.setItem('preferredLanguage', l); };
+  const selectLang = (l: 'English'|'Hindi') => { setLang(l); setLanguage(l); };
 
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault(); setError("");
@@ -257,8 +263,9 @@ function Landing() {
         <div className="flex items-center gap-3">
           <div className="hidden md:flex items-center gap-2 text-[11px] font-semibold" style={{ color: 'var(--text-muted)' }}>
             <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse shadow-[0_0_4px_rgba(34,197,94,0.8)]" />
-            Powered by Gemini AI · Live Data
+            {lang === 'Hindi' ? 'Gemini AI द्वारा · लाइव डेटा' : 'Powered by Gemini AI · Live Data'}
           </div>
+          <LanguageToggle variant="pill" />
           <ThemeToggle variant="pill" />
         </div>
       </div>
@@ -284,16 +291,14 @@ function Landing() {
             <span className="text-bento-text-main"> AI</span>
           </h1>
           <p className="text-base md:text-lg text-bento-text-muted max-w-md mx-auto leading-relaxed font-medium">
-            {lang === 'Hindi'
-              ? "किसानों को AI-संचालित जानकारी और सीधे बाज़ार से सशक्त बनाना।"
-              : "Empowering farmers with AI-driven insights and precision agriculture tools."}
+            {t("landing.subtitle")}
           </p>
         </motion.div>
       </div>
 
       {/* Language toggle */}
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }} className="relative z-10 mb-7">
-        <div className="flex bg-white/4 backdrop-blur-md p-1 rounded-full border border-white/8 gap-1">
+        <div className="flex p-1 rounded-full gap-1 border" style={{ background: 'var(--bg-input)', borderColor: 'var(--border-input)' }}>
           {(['Hindi', 'English'] as const).map(l => (
             <button
               key={l}
@@ -301,8 +306,9 @@ function Landing() {
               className={`px-6 py-2 rounded-full text-sm font-bold transition-all duration-300 ${
                 lang === l
                   ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30'
-                  : 'text-bento-text-muted hover:text-bento-text-main'
+                  : 'hover:text-emerald-400'
               }`}
+              style={lang !== l ? { color: 'var(--text-muted)' } : undefined}
             >
               {l === 'Hindi' ? 'हिन्दी' : 'English'}
             </button>
@@ -323,8 +329,8 @@ function Landing() {
             {step === 'method' && (
               <motion.div key="method" initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 16 }} className="space-y-4">
                 <div className="text-center mb-8">
-                  <h2 className="text-2xl font-bold text-bento-text-main">Sign in to your farm</h2>
-                  <p className="text-sm text-bento-text-muted mt-1.5">Your AI agriculture assistant awaits</p>
+                  <h2 className="text-2xl font-bold text-bento-text-main">{t("auth.title")}</h2>
+                  <p className="text-sm text-bento-text-muted mt-1.5">{t("auth.subtitle")}</p>
                 </div>
 
                 <button
@@ -335,45 +341,45 @@ function Landing() {
                   {loading
                     ? <Loader2 className="animate-spin" size={20} />
                     : <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5 bg-white p-0.5 rounded-full" alt="" />}
-                  <span>Continue with Google</span>
+                  <span>{t("auth.google")}</span>
                 </button>
 
                 <div className="relative flex items-center py-4">
-                  <div className="flex-grow border-t border-white/8" />
-                  <span className="mx-4 text-[11px] font-bold uppercase tracking-widest text-bento-text-muted">or</span>
-                  <div className="flex-grow border-t border-white/8" />
+                  <div className="flex-grow border-t" style={{ borderColor: 'var(--border-input)' }} />
+                  <span className="mx-4 text-[11px] font-bold uppercase tracking-widest text-bento-text-muted">{t("common.or")}</span>
+                  <div className="flex-grow border-t" style={{ borderColor: 'var(--border-input)' }} />
                 </div>
 
                 <button
                   onClick={() => setStep('phone')}
-                  className="w-full px-6 py-4 bg-white/4 border border-white/10 text-bento-text-main rounded-2xl font-bold hover:bg-white/8 hover:border-emerald-500/25 transition-all duration-300 flex items-center justify-center gap-3 active:scale-[0.98]"
+                  className="w-full px-6 py-4 bg-[var(--bg-input)] border border-[var(--border-input)] text-bento-text-main rounded-2xl font-bold hover:bg-[var(--bg-hover)] hover:border-emerald-500/25 transition-all duration-300 flex items-center justify-center gap-3 active:scale-[0.98]"
                 >
                   <Smartphone size={20} className="text-emerald-400" />
-                  <span>Continue with Phone</span>
+                  <span>{t("auth.phone")}</span>
                 </button>
               </motion.div>
             )}
 
             {step === 'phone' && (
               <motion.div key="phone" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }}>
-                <h2 className="text-xl font-bold text-bento-text-main mb-1">Enter Mobile Number</h2>
-                <p className="text-[11px] text-bento-text-muted mb-6 uppercase tracking-widest font-semibold">We'll send you a verification code</p>
+                <h2 className="text-xl font-bold text-bento-text-main mb-1">{t("auth.enterPhone")}</h2>
+                <p className="text-[11px] text-bento-text-muted mb-6 uppercase tracking-widest font-semibold">{t("auth.otpHint")}</p>
                 <form onSubmit={handleSendOTP} className="space-y-4">
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-bento-text-muted font-bold text-sm">+91</span>
                     <input
                       type="tel" placeholder="9998887770" value={phone}
                       onChange={e => setPhone(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl pl-14 pr-4 py-4 text-lg font-bold text-bento-text-main placeholder:text-bento-text-muted/40 focus:border-emerald-500/40 focus:bg-white/7 outline-none transition-all"
+                      className="w-full bg-[var(--bg-input)] border border-[var(--border-input)] rounded-2xl pl-14 pr-4 py-4 text-lg font-bold text-bento-text-main placeholder:text-bento-text-muted/40 focus:border-emerald-500/40 focus:bg-[var(--bg-hover)] outline-none transition-all"
                       required
                     />
                   </div>
                   {error && <p className="text-rose-400 text-xs font-semibold">{error}</p>}
                   <button type="submit" disabled={loading} className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-white rounded-2xl font-bold transition-all shadow-lg shadow-emerald-500/25 active:scale-[0.98] disabled:opacity-50">
-                    {loading ? <Loader2 className="animate-spin mx-auto" size={20} /> : "Send OTP"}
+                    {loading ? <Loader2 className="animate-spin mx-auto" size={20} /> : t("auth.sendOTP")}
                   </button>
                   <button type="button" onClick={() => setStep('method')} className="w-full text-[11px] font-semibold text-bento-text-muted uppercase tracking-widest hover:text-bento-text-main transition-colors">
-                    Back
+                    {t("auth.back")}
                   </button>
                 </form>
               </motion.div>
@@ -381,21 +387,21 @@ function Landing() {
 
             {step === 'otp' && (
               <motion.div key="otp" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }}>
-                <h2 className="text-xl font-bold text-bento-text-main mb-1">Verify OTP</h2>
-                <p className="text-[11px] text-bento-text-muted mb-6 uppercase tracking-widest font-semibold">Enter the 6-digit code sent to your phone</p>
+                <h2 className="text-xl font-bold text-bento-text-main mb-1">{t("auth.verifyOtp")}</h2>
+                <p className="text-[11px] text-bento-text-muted mb-6 uppercase tracking-widest font-semibold">{t("auth.otpCodeHint")}</p>
                 <form onSubmit={handleVerifyOTP} className="space-y-4">
                   <input
                     type="text" placeholder="123456" maxLength={6} value={otp}
                     onChange={e => setOtp(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-4 text-2xl font-bold text-center tracking-[0.5em] text-bento-text-main placeholder:text-bento-text-muted/30 focus:border-emerald-500/40 outline-none transition-all"
+                    className="w-full bg-[var(--bg-input)] border border-[var(--border-input)] rounded-2xl px-4 py-4 text-2xl font-bold text-center tracking-[0.5em] text-bento-text-main placeholder:text-bento-text-muted/30 focus:border-emerald-500/40 outline-none transition-all"
                     required
                   />
                   {error && <p className="text-rose-400 text-xs font-semibold">{error}</p>}
                   <button type="submit" disabled={loading} className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-white rounded-2xl font-bold transition-all shadow-lg shadow-emerald-500/25 active:scale-[0.98] disabled:opacity-50">
-                    {loading ? <Loader2 className="animate-spin mx-auto" size={20} /> : "Verify & Sign In"}
+                    {loading ? <Loader2 className="animate-spin mx-auto" size={20} /> : t("auth.verify")}
                   </button>
                   <button type="button" onClick={() => setStep('phone')} className="w-full text-[11px] font-semibold text-bento-text-muted uppercase tracking-widest hover:text-bento-text-main transition-colors">
-                    Resend or Edit Number
+                    {t("auth.resendOrEdit")}
                   </button>
                 </form>
               </motion.div>
@@ -411,9 +417,9 @@ function Landing() {
         className="relative z-10 w-full max-w-5xl px-4 md:px-8 pb-16 grid md:grid-cols-3 gap-4"
       >
         {[
-          { icon: MessageSquare, title: "Smart Advisor",   desc: "Get crop suggestions tailored to your soil, climate, and location.",       gradient: "from-emerald-500 to-green-700",  shadow: "shadow-emerald-500/20" },
-          { icon: Camera,        title: "Disease Scanner", desc: "Identify plant diseases instantly with AI-powered vision analysis.",         gradient: "from-rose-500 to-rose-700",     shadow: "shadow-rose-500/20"    },
-          { icon: Compass,       title: "Plot Manager",   desc: "Map your fields, log soil reports and track plot-specific activities.",    gradient: "from-teal-500 to-teal-700",     shadow: "shadow-teal-500/20"    },
+          { icon: MessageSquare, title: t("feature.advisor.title"), desc: t("feature.advisor.desc"), gradient: "from-emerald-500 to-green-700",  shadow: "shadow-emerald-500/20" },
+          { icon: Camera,        title: t("feature.disease.title"), desc: t("feature.disease.desc"), gradient: "from-rose-500 to-rose-700",     shadow: "shadow-rose-500/20"    },
+          { icon: Compass,       title: t("feature.plots.title"),   desc: t("feature.plots.desc"),   gradient: "from-teal-500 to-teal-700",     shadow: "shadow-teal-500/20"    },
         ].map((card, i) => (
           <motion.div
             key={card.title}
@@ -436,17 +442,20 @@ function Landing() {
 export default function App() {
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <WeatherProvider>
-          <MainWrapper />
-        </WeatherProvider>
-      </AuthProvider>
+      <LanguageProvider>
+        <AuthProvider>
+          <WeatherProvider>
+            <MainWrapper />
+          </WeatherProvider>
+        </AuthProvider>
+      </LanguageProvider>
     </ThemeProvider>
   );
 }
 
 function MainWrapper() {
   const { user, loading } = useAuth();
+  const { t } = useLanguage();
 
   if (loading) {
     return (
@@ -458,7 +467,7 @@ function MainWrapper() {
             </div>
             <div className="absolute inset-0 rounded-2xl border-2 border-emerald-500/30 animate-ping" />
           </div>
-          <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>Loading AgroAid AI…</p>
+          <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>{t("app.loading")}</p>
         </div>
       </div>
     );

@@ -154,5 +154,27 @@ service cloud.firestore {
       allow create: if isVerified() && isValidId(adviceId) && isValidAdvice(incoming());
       allow delete: if isVerified() && isOwner(resource.data.userId);
     }
+
+    // ── Market / Mandi collections (public read, Cloud Function write only) ──
+    // Anyone signed in can read market prices (they are public government data)
+    match /mandi_prices/{docId} {
+      allow read: if isSignedIn();
+      allow write: if false; // Only Cloud Functions write here
+    }
+
+    match /mandi_latest/{docId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    match /market_news/{docId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    // System logs — admin only, no client access
+    match /system_logs/{docId} {
+      allow read, write: if false;
+    }
   }
 }

@@ -4,35 +4,37 @@ import {
   MapPin, Loader2, CalendarDays, Thermometer, Droplets
 } from "lucide-react";
 import { useWeather } from "../lib/WeatherContext";
-
-const weatherCodes: Record<number, { description: string; icon: React.ReactNode }> = {
-  0:  { description: "Clear sky",        icon: <Sun className="text-amber-400" /> },
-  1:  { description: "Mainly clear",     icon: <Sun className="text-amber-400" /> },
-  2:  { description: "Partly cloudy",    icon: <Cloud className="text-slate-400" /> },
-  3:  { description: "Overcast",         icon: <Cloud className="text-slate-500" /> },
-  45: { description: "Foggy",            icon: <Cloud className="text-slate-400" /> },
-  48: { description: "Rime fog",         icon: <Cloud className="text-slate-400" /> },
-  51: { description: "Light drizzle",    icon: <CloudRain className="text-blue-300" /> },
-  53: { description: "Mod. drizzle",     icon: <CloudRain className="text-blue-400" /> },
-  55: { description: "Dense drizzle",    icon: <CloudRain className="text-blue-500" /> },
-  61: { description: "Light rain",       icon: <CloudRain className="text-blue-300" /> },
-  63: { description: "Moderate rain",    icon: <CloudRain className="text-blue-400" /> },
-  65: { description: "Heavy rain",       icon: <CloudRain className="text-blue-500" /> },
-  71: { description: "Light snow",       icon: <CloudSnow className="text-sky-200" /> },
-  73: { description: "Mod. snow",        icon: <CloudSnow className="text-sky-300" /> },
-  75: { description: "Heavy snow",       icon: <CloudSnow className="text-sky-400" /> },
-  95: { description: "Thunderstorm",     icon: <CloudLightning className="text-violet-400" /> },
-};
+import { useLanguage } from "../lib/LanguageContext";
 
 export default function WeatherWidget() {
   const { weather, loading, error } = useWeather();
+  const { t } = useLanguage();
   const [showForecast, setShowForecast] = useState(false);
+
+  const weatherCodes: Record<number, { description: string; icon: React.ReactNode }> = {
+    0:  { description: t("weather.clear"),        icon: <Sun className="text-amber-400" /> },
+    1:  { description: t("weather.clear"),        icon: <Sun className="text-amber-400" /> },
+    2:  { description: t("weather.partly_cloudy"), icon: <Cloud className="text-slate-400" /> },
+    3:  { description: t("weather.cloudy"),        icon: <Cloud className="text-slate-500" /> },
+    45: { description: t("weather.fog"),           icon: <Cloud className="text-slate-400" /> },
+    48: { description: t("weather.fog"),           icon: <Cloud className="text-slate-400" /> },
+    51: { description: t("weather.drizzle"),       icon: <CloudRain className="text-blue-300" /> },
+    53: { description: t("weather.drizzle"),       icon: <CloudRain className="text-blue-400" /> },
+    55: { description: t("weather.drizzle"),       icon: <CloudRain className="text-blue-500" /> },
+    61: { description: t("weather.rain"),          icon: <CloudRain className="text-blue-300" /> },
+    63: { description: t("weather.rain"),          icon: <CloudRain className="text-blue-400" /> },
+    65: { description: t("weather.heavy_rain"),    icon: <CloudRain className="text-blue-500" /> },
+    71: { description: t("weather.snow"),          icon: <CloudSnow className="text-sky-200" /> },
+    73: { description: t("weather.snow"),          icon: <CloudSnow className="text-sky-300" /> },
+    75: { description: t("weather.snow"),          icon: <CloudSnow className="text-sky-400" /> },
+    95: { description: t("weather.thunder"),       icon: <CloudLightning className="text-violet-400" /> },
+  };
 
   if (loading) {
     return (
       <div className="flex items-center gap-2 text-sm font-medium text-bento-text-muted animate-pulse">
         <Loader2 size={14} className="animate-spin text-emerald-500" />
-        <span className="hidden md:inline text-xs">Fetching climate…</span>
+        <span className="hidden md:inline text-xs">{t("weather.fetching")}</span>
       </div>
     );
   }
@@ -41,7 +43,7 @@ export default function WeatherWidget() {
     return (
       <div className="flex items-center gap-1.5 text-xs font-medium text-bento-text-muted">
         <MapPin size={12} className="text-rose-400" />
-        <span className="hidden md:inline">Weather unavailable</span>
+        <span className="hidden md:inline">{t("weather.unavailable")}</span>
       </div>
     );
   }
@@ -54,7 +56,7 @@ export default function WeatherWidget() {
         onClick={() => setShowForecast(!showForecast)}
         className="flex items-center gap-2 p-1.5 md:p-2 rounded-xl hover:bg-emerald-500/8 transition-all group"
       >
-        <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-white/5 border border-white/8 flex items-center justify-center group-hover:border-emerald-500/20 transition-colors">
+        <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-[var(--bg-input)] border border-[var(--border-input)] flex items-center justify-center group-hover:border-emerald-500/20 transition-colors">
           {info.icon}
         </div>
         <div className="hidden md:flex flex-col items-start leading-tight">
@@ -77,7 +79,7 @@ export default function WeatherWidget() {
           <div className="fixed inset-0 z-40" onClick={() => setShowForecast(false)} />
           <div className="absolute top-12 md:top-14 right-0 w-64 glass-panel rounded-2xl p-5 z-50 animate-in fade-in zoom-in-95 duration-200 border border-emerald-500/15">
             <div className="flex items-center justify-between mb-4">
-              <h4 className="text-[10px] font-bold uppercase tracking-widest text-bento-text-muted">3-Day Forecast</h4>
+              <h4 className="text-[10px] font-bold uppercase tracking-widest text-bento-text-muted">{t("weather.forecast_3day")}</h4>
               <CalendarDays size={13} className="text-emerald-400" />
             </div>
 
@@ -88,7 +90,7 @@ export default function WeatherWidget() {
                   <div key={i} className="flex items-center justify-between group">
                     <div className="w-8 text-[10px] font-bold text-bento-text-muted">{day.date}</div>
                     <div className="flex-1 flex items-center gap-2.5 px-2">
-                      <div className="w-7 h-7 rounded-lg bg-white/4 border border-white/6 flex items-center justify-center group-hover:border-emerald-500/15 transition-colors">
+                      <div className="w-7 h-7 rounded-lg bg-[var(--bg-input)] border border-[var(--border-input)] flex items-center justify-center group-hover:border-emerald-500/15 transition-colors">
                         {dayInfo.icon}
                       </div>
                       <span className="text-[10px] font-medium text-bento-text-muted truncate max-w-[70px]">
@@ -108,13 +110,13 @@ export default function WeatherWidget() {
             <div className="mt-4 pt-4 border-t border-emerald-500/10 grid grid-cols-2 gap-3">
               <div>
                 <div className="flex items-center gap-1 text-[9px] font-bold text-bento-text-muted uppercase tracking-tight mb-1">
-                  <Thermometer size={10} className="text-emerald-400" /> Feels Like
+                  <Thermometer size={10} className="text-emerald-400" /> {t("weather.feels_like")}
                 </div>
                 <div className="text-sm font-bold text-emerald-400">{weather.current.temp}°C</div>
               </div>
               <div>
                 <div className="flex items-center gap-1 text-[9px] font-bold text-bento-text-muted uppercase tracking-tight mb-1">
-                  <Droplets size={10} className="text-blue-400" /> Humidity
+                  <Droplets size={10} className="text-blue-400" /> {t("weather.humidity")}
                 </div>
                 <div className="text-sm font-bold text-blue-400">{weather.current.humidity}%</div>
               </div>

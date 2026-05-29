@@ -23,6 +23,7 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import PlotMap from "./PlotMap";
 import SoilHealthChart from "./SoilHealthChart";
+import { useLanguage } from "../lib/LanguageContext";
 
 export interface Field {
   id: string;
@@ -73,6 +74,7 @@ function SoilMetric({ label, value, max, color, unit = '' }: { label: string, va
 
 export default function FieldManager() {
   const { user, profile } = useAuth();
+  const { t } = useLanguage();
   
   const [fields, setFields] = useState<Field[]>([]);
   const [reports, setReports] = useState<SoilReport[]>([]);
@@ -354,7 +356,7 @@ export default function FieldManager() {
               setFieldFormData({ name: '', area: '', unit: 'Acres', soilType: '', location: '', description: '', currentCrop: '', variety: '', plantingDate: '', previousSprays: '', irrigationTimings: '', otherDetails: '' });
               setIsAddingField(true);
             }}
-            className="flex items-center justify-center gap-3 bg-white text-teal-800 px-10 py-5 rounded-[28px] font-black hover:bg-teal-50 active:scale-95 transition-all shadow-2xl hover:shadow-white/20"
+            className="flex items-center justify-center gap-3 bg-teal-500 text-white px-10 py-5 rounded-[28px] font-black hover:bg-teal-400 active:scale-95 transition-all shadow-2xl hover:shadow-teal-500/20"
           >
             <Plus size={24} />
             <span>Map New Plot</span>
@@ -378,7 +380,7 @@ export default function FieldManager() {
               </button>
               
               <div className="flex items-center gap-4 mb-8">
-                <div className="w-12 h-12 bg-teal-100 text-teal-600 rounded-2xl flex items-center justify-center">
+                <div className="w-12 h-12 bg-teal-500/15 text-teal-400 rounded-2xl flex items-center justify-center">
                   <MapPin size={24} />
                 </div>
                 <div>
@@ -479,20 +481,20 @@ export default function FieldManager() {
               </button>
               
               <div className="flex items-center gap-4 mb-8">
-                <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center">
+                <div className="w-12 h-12 bg-indigo-500/15 text-indigo-400 rounded-2xl flex items-center justify-center">
                   <FlaskConical size={24} />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-black text-[var(--text-main)]">{editingSoilId ? 'Update Soil Report' : 'Log Soil Test Results'}</h2>
-                  {activeFieldForSoil && <p className="text-indigo-600 font-bold text-sm bg-indigo-50 inline-block px-2 py-1 rounded mt-1">Plot Link: {fields.find(f => f.id === activeFieldForSoil)?.name}</p>}
+                  <h2 className="text-2xl font-black text-[var(--text-main)]">{editingSoilId ? t("plots.update_soil") : t("plots.log_soil")}</h2>
+                  {activeFieldForSoil && <p className="text-indigo-400 font-bold text-sm bg-indigo-500/10 inline-block px-2 py-1 rounded mt-1">{t("plots.plot_link")}: {fields.find(f => f.id === activeFieldForSoil)?.name}</p>}
                 </div>
               </div>
 
               <form onSubmit={handleSoilSubmit} className="space-y-6">
-                <div className="bg-amber-50 rounded-2xl p-5 border border-amber-100 mb-6">
-                  <div className="flex items-start gap-3">
-                    <FlaskConical className="text-amber-500 mt-1 shrink-0" size={20} />
-                    <p className="text-sm text-amber-800 font-medium">Record the exact metrics from your laboratory soil test. You can also upload photos of your report via the AI Advisor to log this automatically.</p>
+                <div className="bg-amber-500/10 rounded-2xl p-5 border border-amber-500/20 mb-6">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Info size={16} className="text-amber-400 shrink-0" />
+                    <p className="text-sm text-[var(--text-main)] font-medium opacity-80">{t("plots.soil_info")}</p>
                   </div>
                 </div>
 
@@ -542,7 +544,7 @@ export default function FieldManager() {
 
       {!loading && fields.length === 0 && (
         <div className="bento-card bg-[var(--bg-card)] p-20 flex flex-col items-center justify-center text-center shadow-xl border-2 border-dashed border-[var(--border-input)]">
-          <div className="p-6 bg-teal-50 text-teal-400 rounded-full mb-6">
+          <div className="p-6 bg-teal-500/10 text-teal-400 rounded-full mb-6">
              <Layers size={64} />
           </div>
           <h3 className="text-2xl font-black text-[var(--text-main)]">No Farm Plots Mapped</h3>
@@ -601,7 +603,7 @@ export default function FieldManager() {
                         <Edit2 size={18} />
                       </button>
                       {deletingFieldId === field.id ? (
-                        <div className="flex items-center gap-1 bg-red-50 p-1 rounded-lg border border-red-200 ml-1">
+                        <div className="flex items-center gap-1 bg-rose-500/10 p-1 rounded-lg border border-rose-500/20 ml-1">
                           <button onClick={(e) => handleFieldDelete(e, field.id)} className="px-2 py-1 text-xs font-bold text-white bg-red-500 hover:bg-red-600 rounded">Delete</button>
                           <button onClick={(e) => { e.stopPropagation(); setDeletingFieldId(null); }} className="px-2 py-1 text-xs font-bold text-[var(--text-muted)] hover:text-[var(--text-main)] bg-[var(--bg-card)] border border-[var(--border-strong)] rounded">Cancel</button>
                         </div>
@@ -631,11 +633,11 @@ export default function FieldManager() {
                     
                     {/* Embedded Crop Activity UI */}
                     {(field.currentCrop || field.variety || field.plantingDate || field.previousSprays || field.irrigationTimings) && (
-                      <div className="bg-teal-50/50 border border-teal-100 p-4 rounded-2xl mt-4">
+                      <div className="bg-teal-500/8 border border-teal-500/15 p-4 rounded-2xl mt-4">
                         <div className="flex justify-between items-center mb-3 border-b border-teal-100/50 pb-2">
-                           <h4 className="font-black text-teal-800 flex items-center gap-2"><Sprout className="text-teal-600" size={16} /> Crop Activity</h4>
+                           <h4 className="font-black text-[var(--text-main)] flex items-center gap-2"><Sprout className="text-teal-400" size={16} /> {t("plots.crop_activity")}</h4>
                         </div>
-                        <div className="grid grid-cols-2 gap-y-3 gap-x-2 text-sm text-teal-900">
+                        <div className="grid grid-cols-2 gap-y-3 gap-x-2 text-sm text-[var(--text-main)]">
                           {field.currentCrop && <div><span className="font-black text-[10px] uppercase tracking-widest text-teal-600/70 block mb-0.5">Crop</span> <span className="font-bold">{field.currentCrop}</span></div>}
                           {field.variety && <div><span className="font-black text-[10px] uppercase tracking-widest text-teal-600/70 block mb-0.5">Variety</span> <span className="font-bold">{field.variety}</span></div>}
                           {field.plantingDate && <div><span className="font-black text-[10px] uppercase tracking-widest text-teal-600/70 block mb-0.5">Planted</span> <span className="font-bold">{field.plantingDate}</span></div>}
@@ -656,7 +658,7 @@ export default function FieldManager() {
                     </h4>
                     <button 
                       onClick={() => openSoilModal(field.id, latestReport || undefined)} 
-                      className={`text-sm font-bold ${latestReport ? 'text-teal-600 bg-teal-50 hover:bg-teal-100' : 'text-indigo-600 bg-indigo-100 hover:bg-indigo-200'} px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1`}
+                      className={`text-sm font-bold ${latestReport ? 'text-teal-400 bg-teal-500/10 hover:bg-teal-500/20' : 'text-indigo-400 bg-indigo-500/15 hover:bg-indigo-500/25'} px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1`}
                     >
                       {latestReport ? <Database size={16}/> : <Plus size={16}/>}
                       {latestReport ? 'Update Health' : 'Add Audit'}
@@ -670,7 +672,7 @@ export default function FieldManager() {
                            <div className="absolute top-6 right-6 flex gap-2 z-30 opacity-0 group-hover/soil:opacity-100 transition-opacity">
                               <button onClick={(e) => { e.stopPropagation(); openSoilModal(field.id, latestReport); }} className="p-2.5 bg-[var(--bg-input)] text-[var(--text-subtle)] hover:text-indigo-600 rounded-xl transition-colors"><Edit2 size={16} /></button>
                               {deletingSoilId === latestReport.id ? (
-                                <div className="flex items-center gap-1 bg-red-50 p-1.5 rounded-xl border border-red-100">
+                                <div className="flex items-center gap-1 bg-rose-500/10 p-1.5 rounded-xl border border-rose-500/20">
                                   <button onClick={(e) => handleSoilDelete(e, latestReport.id)} className="px-3 py-1.5 text-[10px] font-black text-white bg-red-500 rounded-lg uppercase tracking-tight">Delete</button>
                                   <button onClick={(e) => { e.stopPropagation(); setDeletingSoilId(null); }} className="px-3 py-1.5 text-[10px] font-black text-[var(--text-muted)] bg-[var(--bg-card)] border border-[var(--border-strong)] rounded-lg uppercase tracking-tight">Cancel</button>
                                 </div>
@@ -679,7 +681,7 @@ export default function FieldManager() {
                               )}
                            </div>
                            <div className="flex items-center gap-3 mb-8">
-                             <div className="w-10 h-10 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 shadow-sm border border-indigo-100">
+                             <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 shadow-sm border border-indigo-500/20">
                                <Calendar size={18} />
                              </div>
                              <div>
@@ -743,7 +745,7 @@ export default function FieldManager() {
                    <div className="absolute top-4 right-4 flex gap-1 z-30 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button onClick={(e) => { e.stopPropagation(); openSoilModal(null, report); }} className="p-2 text-[var(--text-subtle)] hover:text-indigo-600 transition-colors"><Edit2 size={16} /></button>
                       {deletingSoilId === report.id ? (
-                        <div className="flex items-center gap-1 bg-red-50 p-1 rounded-lg">
+                        <div className="flex items-center gap-1 bg-rose-500/10 p-1 rounded-lg">
                           <button onClick={(e) => handleSoilDelete(e, report.id)} className="px-2 py-1 text-xs font-bold text-white bg-red-500 rounded">Delete</button>
                           <button onClick={(e) => { e.stopPropagation(); setDeletingSoilId(null); }} className="px-2 py-1 text-xs font-bold text-[var(--text-muted)] bg-[var(--bg-card)] rounded">Cancel</button>
                         </div>
