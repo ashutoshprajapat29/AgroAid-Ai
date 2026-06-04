@@ -31,6 +31,7 @@ import { handleFirestoreError, OperationType } from "../lib/firebaseUtils";
 import Markdown from "react-markdown";
 import { Field, SoilReport } from "./FieldManager";
 import { useLanguage } from "../lib/LanguageContext";
+import { isGeminiQuotaExceeded } from "../lib/apiCache";
 
 interface Message {
   role: 'user' | 'bot';
@@ -362,6 +363,17 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
     if ((!input.trim() && selectedImages.length === 0) || loading || !user || isProcessingRef.current) return;
     isProcessingRef.current = true;
     setLoading(true);
+
+    // Check Gemini daily quota before proceeding
+    if (isGeminiQuotaExceeded()) {
+      const limitMsg = t("advisor.default_greeting").includes("नमस्ते")
+        ? "⚠️ आज की AI सीमा समाप्त हो गई है (100/दिन)। कृपया कल पुनः प्रयास करें।"
+        : "⚠️ Daily AI limit reached (100/day). Please try again tomorrow.";
+      updateMessages(selectedFieldId || 'default', prev => [...prev, { role: 'bot', content: limitMsg }]);
+      setLoading(false);
+      isProcessingRef.current = false;
+      return;
+    }
 
     if (isListening) {
       recognitionRef.current?.stop();
