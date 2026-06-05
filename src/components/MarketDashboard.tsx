@@ -14,10 +14,12 @@ import {
 import {
   fetchLatestPrices, fetchPriceHistory, fetchMarketNews,
   fetchMarketSentiment, fetchNearbyPrices, searchMandiPrices,
-  fetchMarketComparison,
+  fetchMarketComparison, fetchStates, fetchDistricts, fetchMarkets,
+  fetchCommodityVarieties,
   INDIA_STATES_DISTRICTS,
   COMMON_COMMODITIES, COMMON_COMMODITIES_HI,
   MandiPrice, PriceHistory, NewsItem, SentimentResult, MarketCompare,
+  VarietyPrice,
 } from "../services/mandiService";
 import { useLanguage } from "../lib/LanguageContext";
 
@@ -317,6 +319,17 @@ export default function MarketDashboard() {
   const [showSearchResults, setShowSearchResults] = useState(false);
   const prevLocation = useRef("");
 
+  // Cascading market filter
+  const [selectedMarket, setSelectedMarket] = useState("All");
+  const [availableStates, setAvailableStates] = useState<string[]>(Object.keys(INDIA_STATES_DISTRICTS));
+  const [availableDistricts, setAvailableDistricts] = useState<string[]>(INDIA_STATES_DISTRICTS["Madhya Pradesh"] ?? []);
+  const [availableMarkets, setAvailableMarkets] = useState<string[]>([]);
+  const [loadingMarkets, setLoadingMarkets] = useState(false);
+
+  // Variety breakdown
+  const [varieties, setVarieties] = useState<VarietyPrice[]>([]);
+  const [loadingVarieties, setLoadingVarieties] = useState(false);
+
   // Commodity Detail View
   const [detailCommodity, setDetailCommodity] = useState<MandiPrice | null>(null);
   const [timeRange, setTimeRange] = useState<TimeRange>("30D");
@@ -343,8 +356,8 @@ export default function MarketDashboard() {
   // Error state
   const [priceError, setPriceError] = useState("");
 
-  const districts = INDIA_STATES_DISTRICTS[selectedState] ?? [];
-  const states    = Object.keys(INDIA_STATES_DISTRICTS);
+  const districts = availableDistricts;
+  const states    = availableStates;
 
   const formatCommodityName = (s: string) => {
     if (!s) return s;
@@ -411,16 +424,16 @@ export default function MarketDashboard() {
     setPriceError("");
     try {
       if (forceRefresh) {
-        localStorage.removeItem(`agroaid_cache_mandi_v2_${selectedState}_${selectedDistrict}`.replace(/\s+/g, "_").toLowerCase());
+        localStorage.removeItem(`agroaid_cache_mandi_latest_${selectedState}_${selectedDistrict}_all`.replace(/\s+/g, "_").toLowerCase());
       }
-      const data = await fetchLatestPrices(selectedState, selectedDistrict, language);
+      const data = await fetchLatestPrices(selectedState, selectedDistrict, undefined, language);
       setPrices(data);
       setLastFetched(new Date());
       if (data.length > 0 && !selectedCommodity) setSelectedCommodity(data[0].commodity);
       if (data.length === 0) {
         setPriceError(isHindi
           ? "इस जिले के लिए कोई डेटा नहीं मिला। कृपया दूसरा जिला आज़माएं।"
-          : "No data found for this district. The data.gov.in API may be slow — try another district.");
+          : "No data found for this district. Try another district or check back after the nightly sync.");
       }
     } catch (e) {
       setPriceError(isHindi
@@ -446,6 +459,31 @@ export default function MarketDashboard() {
   useEffect(() => { loadPrices(); }, [loadPrices]);
   useEffect(() => { loadNews(); },   [loadNews]);
 
+  // ── Load states from DB ─────────────────────────────────────────────────
+  useEffect(() => {
+    fetchStates().then(setAvailableStates).catch(() => {});
+  }, []);
+
+  // ── Load districts when state changes ───────────────────────────────────
+  useEffect(() => {
+    fetchDistricts(selectedState).then((d) => {
+      setAvailableDistricts(d);
+    }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedState]);
+
+  // ── Load markets when district changes ──────────────────────────────────
+  useEffect(() => {
+    setLoadingMarkets(true);
+    setAvailableMarkets([]);
+    setSelectedMarket("All");
+    fetchMarkets(selectedState, selectedDistrict)
+      .then(setAvailableMarkets)
+      .catch(() => {})
+      .finally(() => setLoadingMarkets(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedState, selectedDistrict]);
+
   // ── Persist to localStorage & Auto-detect location ────────────────────────
   useEffect(() => {
     const hasVisited = localStorage.getItem("farmguide_state");
@@ -462,13 +500,25 @@ export default function MarketDashboard() {
     setSelectedCommodity(item.commodity);
     setTimeRange("30D");
     setSentiment(null);
-  }, []);
+    setVarieties([]);
+    // Load varieties for this commodity
+    const market = item.market_name || (selectedMarket !== "All" ? selectedMarket : "");
+    if (market) {
+      setLoadingVarieties(true);
+      fetchCommodityVarieties(selectedState, selectedDistrict, market, item.commodity)
+        .then(setVarieties)
+        .catch(() => setVarieties([]))
+        .finally(() => setLoadingVarieties(false));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedState, selectedDistrict, selectedMarket]);
 
   const closeCommodityDetail = useCallback(() => {
     setDetailCommodity(null);
     setSentiment(null);
     setPriceHistory([]);
     setMarketComparison([]);
+    setVarieties([]);
   }, []);
 
   // ── Load price history + market comparison when detail view opens / range changes
@@ -481,7 +531,8 @@ export default function MarketDashboard() {
       setLoadingHistory(true);
       setPriceHistory([]);
       try {
-        const hist = await fetchPriceHistory(commodity, selectedState, selectedDistrict, timeRange);
+        const marketFilter = selectedMarket !== "All" ? selectedMarket : undefined;
+        const hist = await fetchPriceHistory(commodity, selectedState, selectedDistrict, timeRange, marketFilter);
         setPriceHistory(hist);
       } catch (e) {
         console.error(e);
@@ -490,12 +541,13 @@ export default function MarketDashboard() {
       }
     })();
 
-    // Load market comparison (same commodity across mandis)
+    // Load market comparison (same commodity across mandis in the district)
     (async () => {
       setLoadingComparison(true);
       setMarketComparison([]);
       try {
-        const data = await fetchMarketComparison(commodity, selectedState);
+        const excludeMkt = selectedMarket !== "All" ? selectedMarket : undefined;
+        const data = await fetchMarketComparison(commodity, selectedState, selectedDistrict, excludeMkt);
         setMarketComparison(data);
       } catch (e) {
         console.error(e);
@@ -541,11 +593,16 @@ export default function MarketDashboard() {
     ? ((priceChangeRange / priceHistory[0].modal_price) * 100).toFixed(1)
     : "0";
 
-  // Display prices — show search results or regular prices
-  const displayPrices = showSearchResults ? searchResults : prices;
+  // Display prices — show search results or regular prices (filtered by market)
+  const filteredPrices = selectedMarket !== "All"
+    ? prices.filter((p) => p.market_name === selectedMarket)
+    : prices;
+  const displayPrices = showSearchResults ? searchResults : filteredPrices;
   const displayTitle = showSearchResults
     ? (isHindi ? `"${searchQuery}" के परिणाम` : `Results for "${searchQuery}"`)
-    : (isHindi ? "आज के मंडी भाव" : "Today's Mandi Rates");
+    : selectedMarket !== "All"
+      ? (isHindi ? `${selectedMarket} मंडी भाव` : `${selectedMarket} Mandi Rates`)
+      : (isHindi ? "आज के मंडी भाव" : "Today's Mandi Rates");
 
   const barChartData = marketComparison.map((c) => ({
     ...c,
@@ -623,7 +680,7 @@ export default function MarketDashboard() {
         style={{ background: "var(--bg-card)", borderColor: "var(--border-card)" }}
       >
         {/* Location row */}
-        <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_auto] gap-3">
           <Dropdown
             label={isHindi ? "राज्य" : "State"}
             value={selectedState}
@@ -633,6 +690,7 @@ export default function MarketDashboard() {
               setSelectedState(v);
               const firstDist = INDIA_STATES_DISTRICTS[v]?.[0] ?? "";
               setSelectedDistrict(firstDist);
+              setSelectedMarket("All");
               setLocationName("");
               closeCommodityDetail();
             }}
@@ -642,7 +700,21 @@ export default function MarketDashboard() {
             value={selectedDistrict}
             options={districts}
             icon={MapPin}
-            onChange={(v) => { setSelectedDistrict(v); setLocationName(""); closeCommodityDetail(); }}
+            onChange={(v) => { setSelectedDistrict(v); setSelectedMarket("All"); setLocationName(""); closeCommodityDetail(); }}
+          />
+          <Dropdown
+            label={isHindi ? "मंडी" : "Market"}
+            value={selectedMarket === "All" ? (isHindi ? "सभी मंडियां" : "All Markets") : selectedMarket}
+            options={[
+              isHindi ? "सभी मंडियां" : "All Markets",
+              ...availableMarkets,
+            ]}
+            icon={Store}
+            onChange={(v) => {
+              const market = (v === "All Markets" || v === "सभी मंडियां") ? "All" : v;
+              setSelectedMarket(market);
+              closeCommodityDetail();
+            }}
           />
           <div className="flex items-end">
             <button
@@ -839,6 +911,68 @@ export default function MarketDashboard() {
                     ))}
                   </div>
                 </div>
+
+                {/* Variety-Wise Breakdown */}
+                {(varieties.length > 0 || loadingVarieties) && (
+                  <div className="rounded-2xl p-6 border" style={{ background: "var(--bg-card)", borderColor: "var(--border-card)" }}>
+                    <div className="flex items-center gap-3 mb-5">
+                      <div className="p-2 rounded-xl bg-blue-500/12 border border-blue-500/20">
+                        <Store size={16} className="text-blue-400" />
+                      </div>
+                      <div>
+                        <h3 className="font-black text-sm" style={{ color: "var(--text-main)" }}>
+                          {isHindi ? "किस्म-वार भाव" : "Variety-Wise Prices"}
+                        </h3>
+                        <p className="text-[10px] font-semibold" style={{ color: "var(--text-muted)" }}>
+                          {detailCommodity.market_name || selectedMarket} · {isHindi ? "ताज़ा भाव" : "Latest prices"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {loadingVarieties ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 size={20} className="animate-spin text-blue-400" />
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {varieties.map((v, i) => {
+                          const bestPrice = Math.max(...varieties.map(x => x.modal_price));
+                          const isBest = v.modal_price === bestPrice;
+                          return (
+                            <div
+                              key={v.variety + i}
+                              className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+                                isBest ? "border-emerald-500/30 bg-emerald-500/8" : ""
+                              }`}
+                              style={!isBest ? { background: "var(--bg-input)", borderColor: "var(--border-input)" } : undefined}
+                            >
+                              <div className="flex items-center gap-2">
+                                {isBest && <span className="text-emerald-400 text-xs">✨</span>}
+                                <span className="text-sm font-bold" style={{ color: "var(--text-main)" }}>
+                                  {v.variety || "Standard"}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-4">
+                                <div className="text-center">
+                                  <p className="text-[8px] font-black uppercase" style={{ color: "var(--text-subtle)" }}>Min</p>
+                                  <p className="text-xs font-bold text-blue-400">₹{v.min_price.toLocaleString("en-IN")}</p>
+                                </div>
+                                <div className="text-center">
+                                  <p className="text-[8px] font-black uppercase" style={{ color: "var(--text-subtle)" }}>Modal</p>
+                                  <p className="text-xs font-bold text-emerald-400">₹{v.modal_price.toLocaleString("en-IN")}</p>
+                                </div>
+                                <div className="text-center">
+                                  <p className="text-[8px] font-black uppercase" style={{ color: "var(--text-subtle)" }}>Max</p>
+                                  <p className="text-xs font-bold text-rose-400">₹{v.max_price.toLocaleString("en-IN")}</p>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Time-Range Price Chart */}
                 <div className="rounded-2xl p-6 border" style={{ background: "var(--bg-card)", borderColor: "var(--border-card)" }}>

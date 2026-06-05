@@ -1,26 +1,20 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import axios from "axios";
+import { createClient } from "@supabase/supabase-js";
 
 admin.initializeApp();
 const db = admin.firestore();
 
+// ─── Supabase admin client (service_role for writes) ──────────────────────────
+const supabaseAdmin = createClient(
+  process.env.SUPABASE_URL ?? "",
+  process.env.SUPABASE_SERVICE_ROLE_KEY ?? ""
+);
+
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
 // ─────────────────────────────────────────────────────────────────────────────
-interface MandiRecord {
-  state: string;
-  district: string;
-  market_name: string;
-  commodity: string;
-  variety: string;
-  min_price: number;
-  max_price: number;
-  modal_price: number;
-  date: string;
-  ingested_at: admin.firestore.Timestamp;
-}
-
 interface NewsItem {
   title: string;
   impact: string;
@@ -48,112 +42,160 @@ async function callGemini(prompt: string, jsonMode = false): Promise<string> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FUNCTION 1: Ingest Daily Mandi Prices from Data.gov.in / Agmarknet
-// Runs every day at 18:30 IST (13:00 UTC)
+// HELPER: Parse date from data.gov.in (handles DD/MM/YYYY and YYYY-MM-DD)
 // ─────────────────────────────────────────────────────────────────────────────
-export const ingestMandiPrices = functions
-  .runWith({ timeoutSeconds: 300, memory: "512MB" })
-  .pubsub.schedule("0 13 * * *")
+function parseArrivalDate(dateStr: string): string {
+  if (!dateStr) return new Date().toISOString().split("T")[0];
+  // Handle "DD/MM/YYYY" format
+  if (dateStr.includes("/")) {
+    const parts = dateStr.split("/");
+    if (parts.length === 3) {
+      return `${parts[2]}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`;
+    }
+  }
+  // Already "YYYY-MM-DD"
+  return dateStr;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Priority states for nightly sync (North India focus)
+// ─────────────────────────────────────────────────────────────────────────────
+const PRIORITY_STATES = [
+  "Madhya Pradesh", "Rajasthan", "Maharashtra", "Gujarat",
+  "Uttar Pradesh", "Bihar", "Haryana", "Punjab",
+  "Uttarakhand", "Himachal Pradesh", "Delhi", "Chandigarh",
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FUNCTION 1: Sync Mandi Prices to Supabase (replaces old Firestore ingestion)
+// Runs every day at 11:00 PM IST (17:30 UTC)
+// ─────────────────────────────────────────────────────────────────────────────
+export const syncMandiToSupabase = functions
+  .runWith({ timeoutSeconds: 540, memory: "1GB" })
+  .pubsub.schedule("30 17 * * *")
   .timeZone("Asia/Kolkata")
   .onRun(async (_context) => {
-    functions.logger.info("Starting Mandi price ingestion...");
+    functions.logger.info("Starting Mandi → Supabase sync for priority states...");
 
-    const AGMARKNET_API =
-      "https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070";
-    const API_KEY = process.env.DATA_GOV_API_KEY ?? "579b464db66ec23bdd000001cdd3946e44ce4aab351d4b4ec1aa1c95";
+    const API_URL = "https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070";
+    const API_KEY = process.env.DATA_GOV_API_KEY ?? "";
 
-    const today = new Date().toISOString().split("T")[0];
-    let offset = 0;
-    const limit = 500;
-    let totalIngested = 0;
-    const batch = db.batch();
-    let batchCount = 0;
+    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      functions.logger.error("SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set. Aborting sync.");
+      return null;
+    }
 
-    try {
-      // Paginate through all results for today
+    let totalUpserted = 0;
+    let totalErrors = 0;
+    const startTime = Date.now();
+
+    for (const state of PRIORITY_STATES) {
+      let offset = 0;
+      const limit = 500;
+      const stateRecords: Record<string, unknown>[] = [];
+
+      // Paginate through all records for this state
       while (true) {
-        const response = await axios.get(AGMARKNET_API, {
-          params: {
-            "api-key": API_KEY,
-            format: "json",
-            limit,
-            offset,
-            filters: `[Arrival_Date=${today}]`,
-          },
-          timeout: 20000,
-        });
+        try {
+          const response = await axios.get(API_URL, {
+            params: {
+              "api-key": API_KEY,
+              format: "json",
+              limit,
+              offset,
+              "filters[state.keyword]": state,
+            },
+            timeout: 20000,
+          });
 
-        const records: any[] = response.data?.records ?? [];
-        if (!records.length) break;
+          const records: any[] = response.data?.records ?? [];
+          if (!records.length) break;
 
-        for (const r of records) {
-          try {
-            const state = (r["State"] ?? "").trim();
-            const district = (r["District"] ?? "").trim();
-            const market = (r["Market"] ?? "").trim();
-            const commodity = (r["Commodity"] ?? "").trim();
-            const variety = (r["Variety"] ?? "").trim();
-            const minPrice = parseFloat(r["Min_x0020_Price"] ?? r["Min Price"] ?? "0");
-            const maxPrice = parseFloat(r["Max_x0020_Price"] ?? r["Max Price"] ?? "0");
-            const modalPrice = parseFloat(r["Modal_x0020_Price"] ?? r["Modal Price"] ?? "0");
-
-            if (!state || !commodity || !modalPrice) continue;
-
-            const docId = `${state}_${district}_${commodity}_${today}`
-              .replace(/\s+/g, "_")
-              .toLowerCase();
-
-            const data: MandiRecord = {
-              state,
-              district,
-              market_name: market,
-              commodity,
-              variety,
-              min_price: minPrice,
-              max_price: maxPrice,
-              modal_price: modalPrice,
-              date: today,
-              ingested_at: admin.firestore.Timestamp.now(),
+          for (const r of records) {
+            const row = {
+              state: (r.state ?? "").trim(),
+              district: (r.district ?? "").trim(),
+              market_name: (r.market ?? "").trim(),
+              commodity: (r.commodity ?? "").trim(),
+              variety: (r.variety ?? "").trim(),
+              min_price: parseInt(r.min_price) || 0,
+              max_price: parseInt(r.max_price) || 0,
+              modal_price: parseInt(r.modal_price) || 0,
+              arrival_date: parseArrivalDate(r.arrival_date ?? ""),
             };
 
-            // Full history collection
-            batch.set(db.collection("mandi_prices").doc(docId), data, { merge: true });
-
-            // Latest price per district-commodity (cheap reads for home feed)
-            const latestDocId = `${state}_${district}_${commodity}`
-              .replace(/\s+/g, "_")
-              .toLowerCase();
-            batch.set(db.collection("mandi_latest").doc(latestDocId), data, { merge: true });
-
-            batchCount++;
-            totalIngested++;
-
-            // Firestore batch limit is 500
-            if (batchCount >= 490) {
-              await batch.commit();
-              batchCount = 0;
+            if (row.state && row.commodity && row.modal_price > 0) {
+              stateRecords.push(row);
             }
-          } catch (rowErr) {
-            functions.logger.warn("Skipping bad row:", rowErr);
           }
-        }
 
-        if (records.length < limit) break;
-        offset += limit;
+          if (records.length < limit) break;
+          offset += limit;
+        } catch (err: any) {
+          functions.logger.warn(`Fetch failed for ${state} offset=${offset}:`, err.message ?? err);
+          totalErrors++;
+          break;
+        }
       }
 
-      if (batchCount > 0) await batch.commit();
-      functions.logger.info(`Ingested ${totalIngested} mandi records for ${today}`);
-    } catch (err: any) {
-      functions.logger.error("Mandi ingestion failed:", err.message ?? err);
-      // Store error status in Firestore for monitoring
-      await db.collection("system_logs").doc("mandi_ingestion").set({
-        last_run: admin.firestore.Timestamp.now(),
-        status: "error",
-        error: err.message ?? "Unknown error",
-        date: today,
-      });
+      // Batch upsert into Supabase (max 500 rows per call)
+      for (let i = 0; i < stateRecords.length; i += 500) {
+        const batch = stateRecords.slice(i, i + 500);
+        try {
+          const { error } = await supabaseAdmin
+            .from("mandi_prices")
+            .upsert(batch, {
+              onConflict: "state,district,market_name,commodity,variety,arrival_date",
+            });
+
+          if (error) {
+            functions.logger.warn(`Upsert error for ${state}:`, error.message);
+            totalErrors++;
+          } else {
+            totalUpserted += batch.length;
+          }
+        } catch (err: any) {
+          functions.logger.warn(`Upsert exception for ${state}:`, err.message ?? err);
+          totalErrors++;
+        }
+      }
+
+      functions.logger.info(`[${state}] ${stateRecords.length} records processed`);
     }
+
+    // Purge records older than 30 days
+    try {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 30);
+      const cutoffStr = cutoff.toISOString().split("T")[0];
+
+      const { error, count } = await supabaseAdmin
+        .from("mandi_prices")
+        .delete()
+        .lt("arrival_date", cutoffStr);
+
+      if (error) {
+        functions.logger.warn("Purge error:", error.message);
+      } else {
+        functions.logger.info(`Purged ${count ?? "?"} rows older than ${cutoffStr}`);
+      }
+    } catch (err: any) {
+      functions.logger.warn("Purge exception:", err.message ?? err);
+    }
+
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+    functions.logger.info(`Sync complete: ${totalUpserted} rows upserted, ${totalErrors} errors, ${duration}s`);
+
+    // Log sync status to Firestore for monitoring
+    await db.collection("system_logs").doc("mandi_sync").set({
+      last_run: admin.firestore.Timestamp.now(),
+      status: totalErrors === 0 ? "success" : "partial",
+      total_upserted: totalUpserted,
+      total_errors: totalErrors,
+      duration_seconds: parseFloat(duration),
+      states: PRIORITY_STATES.length,
+    });
+
     return null;
   });
 
@@ -231,30 +273,35 @@ export const getMarketSentiment = functions
 
     functions.logger.info(`Sentiment request: ${commodity} in ${state}/${district}`);
 
-    // 1. Fetch last 30 days of modal prices from Firestore
+    // 1. Fetch last 30 days of modal prices from Supabase
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const cutoffDate = thirtyDaysAgo.toISOString().split("T")[0];
 
     let priceHistory: { date: string; modal_price: number; min_price: number; max_price: number }[] = [];
     try {
-      const q = db.collection("mandi_prices")
-        .where("commodity", "==", commodity)
-        .where("state", "==", state)
-        .where("date", ">=", cutoffDate)
-        .orderBy("date", "asc")
+      const { data: rows, error } = await supabaseAdmin
+        .from("mandi_prices")
+        .select("arrival_date, modal_price, min_price, max_price")
+        .eq("commodity", commodity)
+        .eq("state", state)
+        .gte("arrival_date", cutoffDate)
+        .order("arrival_date", { ascending: true })
         .limit(30);
 
-      const snap = await q.get();
-      priceHistory = snap.docs.map((d) => {
-        const r = d.data();
-        return { date: r.date, modal_price: r.modal_price, min_price: r.min_price, max_price: r.max_price };
-      });
+      if (!error && rows) {
+        priceHistory = rows.map((r: any) => ({
+          date: r.arrival_date,
+          modal_price: r.modal_price,
+          min_price: r.min_price,
+          max_price: r.max_price,
+        }));
+      }
     } catch (e) {
-      functions.logger.warn("Firestore price history query failed:", e);
+      functions.logger.warn("Supabase price history query failed:", e);
     }
 
-    // 2. Fetch latest news summaries
+    // 2. Fetch latest news summaries from Firestore
     let newsItems: NewsItem[] = [];
     try {
       const newsDoc = await db.collection("market_news").doc("latest").get();
@@ -313,4 +360,3 @@ Return valid JSON: { "sentiment": "Bullish"|"Bearish"|"Stable", "confidence": nu
       };
     }
   });
-

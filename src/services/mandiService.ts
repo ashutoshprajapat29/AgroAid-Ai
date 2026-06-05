@@ -1,11 +1,14 @@
 /**
  * mandiService.ts
- * Real data.gov.in API for mandi prices + price history via date filters.
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Supabase PostgreSQL-backed mandi price service.
+ * All price/market queries go through Supabase RPCs with client-side caching.
  * RSS feeds for real news. Gemini AI only for sentiment classification.
  */
 
 import { GoogleGenAI } from "@google/genai";
 import { cachedApiCall, cachedGeminiCall, cacheGet, cacheSet, TTL } from "../lib/apiCache";
+import { supabase, isSupabaseConfigured } from "../lib/supabase";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface MandiPrice {
@@ -25,6 +28,14 @@ export interface PriceHistory {
   modal_price: number;
   min_price: number;
   max_price: number;
+}
+
+export interface VarietyPrice {
+  variety: string;
+  min_price: number;
+  max_price: number;
+  modal_price: number;
+  date: string;
 }
 
 export interface NewsItem {
@@ -52,10 +63,19 @@ export interface MarketCompare {
   date: string;
 }
 
-// ─── API config ───────────────────────────────────────────────────────────────
-const DATA_GOV_API_KEY = import.meta.env.VITE_DATA_GOV_API_KEY ?? "";
+// ─── Time Range ───────────────────────────────────────────────────────────────
+type TimeRange = "1D" | "7D" | "30D" | "1Y";
 
-// ─── Gemini client (only for sentiment) ───────────────────────────────────────
+function timeRangeToDays(range: TimeRange): number {
+  switch (range) {
+    case "1D":  return 1;
+    case "7D":  return 7;
+    case "30D": return 30;
+    case "1Y":  return 365;
+  }
+}
+
+// ─── Gemini client (only for sentiment + news classification) ─────────────────
 const GEN_AI_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const GEN_AI_KEY2 = import.meta.env.VITE_GEMINI_API_KEY2;
 const ai = new GoogleGenAI({ apiKey: GEN_AI_KEY ?? GEN_AI_KEY2 ?? "" });
@@ -69,301 +89,252 @@ async function geminiGenerate(prompt: string): Promise<string> {
   return resp.text ?? "[]";
 }
 
-// ─── data.gov.in API call ─────────────────────────────────────────────────────
-interface DataGovRecord {
-  state: string;
-  district: string;
-  market: string;
-  commodity: string;
-  variety: string;
-  grade: string;
-  arrival_date: string;
-  min_price: string;
-  max_price: string;
-  modal_price: string;
+// ─── Helper: Format commodity name ────────────────────────────────────────────
+function formatName(s: string): string {
+  if (!s) return s;
+  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
 }
 
-async function callDataGovAPI(params: Record<string, string>, retries = 1): Promise<DataGovRecord[]> {
-  const qp = new URLSearchParams();
-  qp.set("api-key", DATA_GOV_API_KEY);
-  qp.set("format", "json");
-  qp.set("limit", params.limit ?? "30");
+// ═══════════════════════════════════════════════════════════════════════════════
+// SUPABASE-BACKED QUERIES
+// ═══════════════════════════════════════════════════════════════════════════════
 
-  if (params.offset) qp.set("offset", params.offset);
-  if (params.state) qp.set("filters[state.keyword]", params.state);
-  if (params.district) qp.set("filters[district]", params.district);
-  if (params.market) qp.set("filters[market]", params.market);
-  if (params.commodity) qp.set("filters[commodity]", params.commodity);
-  if (params.arrival_date) qp.set("filters[arrival_date]", params.arrival_date);
-
-  const queryString = qp.toString().replace(/\+/g, "%20");
-  const targetUrl = `https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070?${queryString}`;
-  
-  for (let i = 0; i <= retries; i++) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
-      
-      const resp = await fetch(targetUrl, { signal: controller.signal });
-      clearTimeout(timeoutId);
-
-      if (!resp.ok) throw new Error(`data.gov.in API error: ${resp.status}`);
-      const json = await resp.json();
-      return (json.records ?? []) as DataGovRecord[];
-    } catch (error) {
-      if (i === retries) {
-        console.error("data.gov.in final attempt failed:", error);
-        throw error;
-      }
-      console.warn(`data.gov.in attempt ${i + 1} failed, retrying...`);
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-    }
-  }
-  return [];
+// ─── 1. Fetch States (from DB, fallback to hardcoded) ─────────────────────────
+export async function fetchStates(): Promise<string[]> {
+  return cachedApiCall(
+    "mandi_db_states",
+    TTL.HISTORY, // 24hr cache
+    async () => {
+      if (!isSupabaseConfigured) return Object.keys(INDIA_STATES_DISTRICTS);
+      const { data, error } = await supabase.rpc("get_states");
+      if (error) throw error;
+      const states = (data ?? []).map((r: any) => r.state as string);
+      return states.length > 0 ? states : Object.keys(INDIA_STATES_DISTRICTS);
+    },
+    Object.keys(INDIA_STATES_DISTRICTS)
+  );
 }
 
-function recordToMandiPrice(r: DataGovRecord): MandiPrice {
-  return {
-    state: r.state ?? "",
-    district: r.district ?? "",
-    market_name: r.market ?? "",
-    commodity: r.commodity ?? "",
-    variety: r.variety ?? "",
-    min_price: parseInt(r.min_price) || 0,
-    max_price: parseInt(r.max_price) || 0,
-    modal_price: parseInt(r.modal_price) || 0,
-    date: r.arrival_date ?? new Date().toISOString().split("T")[0],
-  };
+// ─── 2. Fetch Districts for State (from DB, fallback to hardcoded) ────────────
+export async function fetchDistricts(state: string): Promise<string[]> {
+  const cacheKey = `mandi_db_districts_${state}`.replace(/\s+/g, "_").toLowerCase();
+  return cachedApiCall(
+    cacheKey,
+    TTL.PRICES, // 6hr cache
+    async () => {
+      if (!isSupabaseConfigured) return INDIA_STATES_DISTRICTS[state] ?? [];
+      const { data, error } = await supabase.rpc("get_districts", { p_state: state });
+      if (error) throw error;
+      const districts = (data ?? []).map((r: any) => r.district as string);
+      return districts.length > 0 ? districts : (INDIA_STATES_DISTRICTS[state] ?? []);
+    },
+    INDIA_STATES_DISTRICTS[state] ?? []
+  );
 }
 
-// ─── Date helpers ─────────────────────────────────────────────────────────────
-type TimeRange = "1D" | "7D" | "30D" | "1Y";
-
-function getDateRange(range: TimeRange): { from: string; to: string } {
-  const to = new Date();
-  const from = new Date();
-  switch (range) {
-    case "1D":  from.setDate(from.getDate() - 1); break;
-    case "7D":  from.setDate(from.getDate() - 7); break;
-    case "30D": from.setDate(from.getDate() - 30); break;
-    case "1Y":  from.setFullYear(from.getFullYear() - 1); break;
-  }
-  const fmt = (d: Date) => d.toISOString().split("T")[0];
-  return { from: fmt(from), to: fmt(to) };
+// ─── 3. Fetch Markets for District (from DB) ─────────────────────────────────
+export async function fetchMarkets(state: string, district: string): Promise<string[]> {
+  const cacheKey = `mandi_db_markets_${state}_${district}`.replace(/\s+/g, "_").toLowerCase();
+  return cachedApiCall(
+    cacheKey,
+    TTL.PRICES, // 6hr cache
+    async () => {
+      if (!isSupabaseConfigured) return [];
+      const { data, error } = await supabase.rpc("get_markets", {
+        p_state: state,
+        p_district: district,
+      });
+      if (error) throw error;
+      return (data ?? []).map((r: any) => r.market_name as string);
+    },
+    []
+  );
 }
 
-// ─── 1. Latest mandi prices (REAL API) ────────────────────────────────────────
+// ─── 4. Latest Mandi Prices ──────────────────────────────────────────────────
 export async function fetchLatestPrices(
   state: string,
   district: string,
+  market?: string,
   _language = "English"
 ): Promise<MandiPrice[]> {
-  const cacheKey = `mandi_v2_${state}_${district}`.replace(/\s+/g, "_").toLowerCase();
+  const marketKey = market && market !== "All" ? market : "all";
+  const cacheKey = `mandi_latest_${state}_${district}_${marketKey}`.replace(/\s+/g, "_").toLowerCase();
 
   return cachedApiCall(
     cacheKey,
-    TTL.MANDI_API,
+    TTL.MANDI_API, // 2hr cache
     async () => {
-      try {
-        const records = await callDataGovAPI({ state, district, limit: "30" });
-        if (records.length > 0) {
-          return records.map(recordToMandiPrice);
-        }
-      } catch (e) {
-        console.warn("data.gov.in API failed:", e);
-      }
-      // Fallback: try without district filter
-      try {
-        const records = await callDataGovAPI({ state, limit: "20" });
-        if (records.length > 0) {
-          return records.map(recordToMandiPrice);
-        }
-      } catch (e) {
-        console.warn("data.gov.in state-level fallback failed:", e);
-      }
-      return [];
+      if (!isSupabaseConfigured) return [];
+
+      const params: Record<string, any> = { p_state: state, p_district: district };
+      if (market && market !== "All") params.p_market = market;
+
+      const { data, error } = await supabase.rpc("get_latest_prices", params);
+      if (error) throw error;
+
+      return (data ?? []).map((r: any): MandiPrice => ({
+        state: r.state ?? "",
+        district: r.district ?? "",
+        market_name: r.market_name ?? "",
+        commodity: r.commodity ?? "",
+        variety: r.variety ?? "",
+        min_price: r.min_price ?? 0,
+        max_price: r.max_price ?? 0,
+        modal_price: r.modal_price ?? 0,
+        date: r.arrival_date ?? "",
+      }));
     },
     [] as MandiPrice[]
   );
 }
 
-// ─── 2. Search mandis/commodities ─────────────────────────────────────────────
+// ─── 5. Search Commodities/Markets ───────────────────────────────────────────
 export async function searchMandiPrices(
   searchQuery: string,
-  searchType: "commodity" | "market" = "commodity"
+  _searchType: "commodity" | "market" = "commodity"
 ): Promise<MandiPrice[]> {
-  const cacheKey = `mandi_search_${searchType}_${searchQuery}`.replace(/\s+/g, "_").toLowerCase();
+  const cacheKey = `mandi_search_${searchQuery}`.replace(/\s+/g, "_").toLowerCase();
 
   return cachedApiCall(
     cacheKey,
     TTL.MANDI_API,
     async () => {
-      // Try original case first, then uppercase fallback
-      for (const caseVariant of [searchQuery, searchQuery.toUpperCase()]) {
-        try {
-          const params: Record<string, string> = { limit: "50" };
-          if (searchType === "commodity") {
-            params.commodity = caseVariant;
-          } else {
-            params.market = caseVariant;
-          }
-          const records = await callDataGovAPI(params);
-          if (records.length > 0) return records.map(recordToMandiPrice);
-        } catch (e) {
-          console.warn(`Mandi search failed for "${caseVariant}":`, e);
-        }
-      }
-      return [];
+      if (!isSupabaseConfigured) return [];
+
+      const { data, error } = await supabase.rpc("search_mandi", { p_query: searchQuery });
+      if (error) throw error;
+      return (data ?? []).map((r: any): MandiPrice => ({
+        state: r.state ?? "",
+        district: r.district ?? "",
+        market_name: r.market_name ?? "",
+        commodity: r.commodity ?? "",
+        variety: r.variety ?? "",
+        min_price: r.min_price ?? 0,
+        max_price: r.max_price ?? 0,
+        modal_price: r.modal_price ?? 0,
+        date: r.arrival_date ?? "",
+      }));
     },
     [] as MandiPrice[]
   );
 }
 
-// ─── 3. Real Price History via data.gov.in date filters ───────────────────────
+// ─── 6. Commodity Variety Breakdown ──────────────────────────────────────────
+export async function fetchCommodityVarieties(
+  state: string,
+  district: string,
+  market: string,
+  commodity: string
+): Promise<VarietyPrice[]> {
+  const cacheKey = `mandi_varieties_${state}_${district}_${market}_${commodity}`.replace(/\s+/g, "_").toLowerCase();
+
+  return cachedApiCall(
+    cacheKey,
+    TTL.MANDI_API,
+    async () => {
+      if (!isSupabaseConfigured) return [];
+
+      const { data, error } = await supabase.rpc("get_commodity_varieties", {
+        p_state: state,
+        p_district: district,
+        p_market: market,
+        p_commodity: commodity,
+      });
+      if (error) throw error;
+      return (data ?? []).map((r: any): VarietyPrice => ({
+        variety: r.variety || "Standard",
+        min_price: r.min_price ?? 0,
+        max_price: r.max_price ?? 0,
+        modal_price: r.modal_price ?? 0,
+        date: r.arrival_date ?? "",
+      }));
+    },
+    [] as VarietyPrice[]
+  );
+}
+
+// ─── 7. Price History ────────────────────────────────────────────────────────
 export async function fetchPriceHistory(
   commodity: string,
   state: string,
   district: string,
-  range: TimeRange = "30D"
+  range: TimeRange = "30D",
+  market?: string
 ): Promise<PriceHistory[]> {
-  const cacheKey = `history_${range}_${commodity}_${state}_${district}`.replace(/\s+/g, "_").toLowerCase();
+  const marketKey = market && market !== "All" ? market : "all";
+  const cacheKey = `history_${range}_${commodity}_${state}_${district}_${marketKey}`.replace(/\s+/g, "_").toLowerCase();
 
   return cachedApiCall(
     cacheKey,
     range === "1D" ? TTL.MANDI_API : TTL.HISTORY,
     async () => {
-      const { from, to } = getDateRange(range);
-      const commodityUpper = commodity.toUpperCase();
+      if (!isSupabaseConfigured) return [];
 
-      // data.gov.in supports arrival_date filter — fetch records in date range
-      try {
-        // Try fetching with district + commodity + date range
-        const records = await callDataGovAPI({
-          state,
-          district,
-          commodity: commodityUpper,
-          arrival_date: `${from}to${to}`,
-          limit: "500",
-        });
+      const days = timeRangeToDays(range);
+      const params: Record<string, any> = {
+        p_commodity: commodity,
+        p_state: state,
+        p_district: district,
+        p_days: days,
+      };
+      if (market && market !== "All") params.p_market = market;
 
-        if (records.length > 0) {
-          return aggregateHistory(records);
-        }
-      } catch (e) {
-        console.warn("Price history with district failed:", e);
-      }
+      const { data, error } = await supabase.rpc("get_price_history", params);
+      if (error) throw error;
 
-      // Fallback: state-level (no district)
-      try {
-        const records = await callDataGovAPI({
-          state,
-          commodity: commodityUpper,
-          arrival_date: `${from}to${to}`,
-          limit: "500",
-        });
-        if (records.length > 0) {
-          return aggregateHistory(records);
-        }
-      } catch (e) {
-        console.warn("Price history state-level fallback failed:", e);
-      }
-
-      // Final fallback: just commodity nationwide
-      try {
-        const records = await callDataGovAPI({
-          commodity: commodityUpper,
-          arrival_date: `${from}to${to}`,
-          limit: "200",
-        });
-        if (records.length > 0) {
-          return aggregateHistory(records);
-        }
-      } catch (e) {
-        console.warn("Price history nationwide fallback failed:", e);
-      }
-
-      return [];
+      return (data ?? []).map((r: any): PriceHistory => ({
+        date: r.arrival_date ?? "",
+        modal_price: r.avg_modal ?? 0,
+        min_price: r.avg_min ?? 0,
+        max_price: r.avg_max ?? 0,
+      })).filter((p) => p.modal_price > 0);
     },
     [] as PriceHistory[]
   );
 }
 
-/** Aggregate multiple records per date into daily averages */
-function aggregateHistory(records: DataGovRecord[]): PriceHistory[] {
-  const dayMap = new Map<string, { modals: number[]; mins: number[]; maxs: number[] }>();
-
-  for (const r of records) {
-    const date = r.arrival_date ?? "";
-    if (!date) continue;
-    if (!dayMap.has(date)) dayMap.set(date, { modals: [], mins: [], maxs: [] });
-    const bucket = dayMap.get(date)!;
-    const modal = parseInt(r.modal_price) || 0;
-    const min = parseInt(r.min_price) || 0;
-    const max = parseInt(r.max_price) || 0;
-    if (modal > 0) bucket.modals.push(modal);
-    if (min > 0) bucket.mins.push(min);
-    if (max > 0) bucket.maxs.push(max);
-  }
-
-  const avg = (arr: number[]) => arr.length > 0 ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : 0;
-
-  return Array.from(dayMap.entries())
-    .map(([date, b]) => ({
-      date,
-      modal_price: avg(b.modals),
-      min_price: avg(b.mins),
-      max_price: avg(b.maxs),
-    }))
-    .filter((p) => p.modal_price > 0)
-    .sort((a, b) => a.date.localeCompare(b.date));
-}
-
-// ─── 4. Market Comparison — Same commodity, different mandis ──────────────────
+// ─── 8. Nearby Market Comparison ─────────────────────────────────────────────
 export async function fetchMarketComparison(
   commodity: string,
-  state: string
+  state: string,
+  district?: string,
+  excludeMarket?: string
 ): Promise<MarketCompare[]> {
-  const cacheKey = `mandi_mkt_compare_${commodity}_${state}`.replace(/\s+/g, "_").toLowerCase();
+  const excl = excludeMarket && excludeMarket !== "All" ? excludeMarket : "none";
+  const cacheKey = `mandi_nearby_${commodity}_${district ?? state}_${excl}`.replace(/\s+/g, "_").toLowerCase();
 
   return cachedApiCall(
     cacheKey,
     TTL.MANDI_API,
     async () => {
-      try {
-        const records = await callDataGovAPI({
-          state,
-          commodity: commodity.toUpperCase(),
-          limit: "100",
-        });
-        // Group by market and pick the latest record for each
-        const marketMap = new Map<string, MarketCompare>();
-        for (const r of records) {
-          const key = r.market;
-          if (!marketMap.has(key)) {
-            marketMap.set(key, {
-              market_name: r.market ?? "",
-              district: r.district ?? "",
-              modal_price: parseInt(r.modal_price) || 0,
-              min_price: parseInt(r.min_price) || 0,
-              max_price: parseInt(r.max_price) || 0,
-              date: r.arrival_date ?? "",
-            });
-          }
-        }
-        return Array.from(marketMap.values())
-          .filter((m) => m.modal_price > 0)
-          .sort((a, b) => b.modal_price - a.modal_price)
-          .slice(0, 15);
-      } catch (e) {
-        console.warn("Market comparison failed:", e);
-        return [];
+      if (!isSupabaseConfigured) return [];
+
+      const params: Record<string, any> = {
+        p_district: district ?? "",
+        p_commodity: commodity,
+      };
+      if (excludeMarket && excludeMarket !== "All") {
+        params.p_exclude_market = excludeMarket;
       }
+
+      const { data, error } = await supabase.rpc("get_nearby_markets", params);
+      if (error) throw error;
+
+      return (data ?? []).map((r: any): MarketCompare => ({
+        market_name: r.market_name ?? "",
+        district: r.district ?? "",
+        modal_price: r.modal_price ?? 0,
+        min_price: r.min_price ?? 0,
+        max_price: r.max_price ?? 0,
+        date: r.arrival_date ?? "",
+      })).sort((a, b) => b.modal_price - a.modal_price);
     },
     [] as MarketCompare[]
   );
 }
 
-// ─── 5. Nearby mandis (geolocation → state mapping) ──────────────────────────
+// ─── 9. Nearby mandis (geolocation → state mapping) ──────────────────────────
 export async function fetchNearbyPrices(
   lat: number,
   lng: number
@@ -394,7 +365,7 @@ async function reverseGeocode(lat: number, lng: number): Promise<{ state: string
     return result;
   } catch (e) {
     console.warn("Reverse geocoding failed:", e);
-    return { state: "Madhya Pradesh", district: "Ratlam" }; // updated default
+    return { state: "Madhya Pradesh", district: "Ratlam" };
   }
 }
 
@@ -436,7 +407,10 @@ function mapToDataGovState(rawState: string): string {
   return stateMap[rawState.toLowerCase().trim()] ?? rawState;
 }
 
-// ─── 6. Real News via RSS feeds ───────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// NEWS (RSS feeds — unchanged)
+// ═══════════════════════════════════════════════════════════════════════════════
+
 const RSS_FEEDS = [
   { url: "https://www.krishijagran.com/rss/news.xml", source: "Krishi Jagran" },
   { url: "https://economictimes.indiatimes.com/news/economy/agriculture/rssfeeds/68880913.cms", source: "ET Agriculture" },
@@ -577,7 +551,10 @@ Keep title under 12 words. Impact: 2 plain sentences.`;
   );
 }
 
-// ─── 7. AI Market Sentiment (Gemini — user-triggered) ─────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// SENTIMENT (Gemini — user-triggered, unchanged)
+// ═══════════════════════════════════════════════════════════════════════════════
+
 export async function fetchMarketSentiment(
   commodity: string,
   priceHistory: PriceHistory[],
@@ -628,7 +605,10 @@ Analyze and return ONLY valid JSON:
   );
 }
 
-// ─── Filter data ──────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// FALLBACK DATA (used when Supabase not yet configured)
+// ═══════════════════════════════════════════════════════════════════════════════
+
 export const INDIA_STATES_DISTRICTS: Record<string, string[]> = {
   "Madhya Pradesh": ["Ratlam", "Indore", "Bhopal", "Gwalior", "Jabalpur", "Sagar", "Dewas", "Ujjain","Morena","Chhindwara","Sehore","Mandla","Bhind","Mandsaur","Betul","Neemuch","Dhar","Balaghat","Raisen","Harda","Sidhi","Hoshangabad","Guna","Narsinghpur","Satna","Khargone","Sheopur","Shajapur","Umaria","Shivpuri"],
   "Maharashtra": ["Pune", "Nashik", "Kolhapur", "Solapur", "Aurangabad", "Nagpur", "Ahmednagar"],
