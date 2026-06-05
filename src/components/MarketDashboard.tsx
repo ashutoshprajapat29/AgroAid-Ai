@@ -26,10 +26,10 @@ import { useLanguage } from "../lib/LanguageContext";
 // ─── Time Range type ──────────────────────────────────────────────────────────
 type TimeRange = "1D" | "7D" | "30D" | "1Y";
 const TIME_RANGES: { key: TimeRange; label: string; labelHi: string }[] = [
-  { key: "1D",  label: "1D",  labelHi: "1दिन" },
-  { key: "7D",  label: "7D",  labelHi: "7दिन" },
-  { key: "30D", label: "1M",  labelHi: "1माह" },
-  { key: "1Y",  label: "1Y",  labelHi: "1साल" },
+  { key: "1D", label: "1D", labelHi: "1दिन" },
+  { key: "7D", label: "7D", labelHi: "7दिन" },
+  { key: "30D", label: "1M", labelHi: "1माह" },
+  { key: "1Y", label: "1Y", labelHi: "1साल" },
 ];
 
 // ─── Custom Tooltip for Chart ─────────────────────────────────────────────────
@@ -104,8 +104,8 @@ function MarketBarTooltip({ active, payload }: any) {
 function SentimentBadge({ s, isHindi }: { s: SentimentResult; isHindi: boolean }) {
   const config = {
     Bullish: { bg: "bg-emerald-500/15", border: "border-emerald-500/30", text: "text-emerald-400", icon: TrendingUp, label: isHindi ? "तेज़ी" : "Bullish", dot: "bg-emerald-400" },
-    Bearish: { bg: "bg-rose-500/15",    border: "border-rose-500/30",    text: "text-rose-400",    icon: TrendingDown, label: isHindi ? "मंदी" : "Bearish", dot: "bg-rose-400" },
-    Stable:  { bg: "bg-amber-500/15",   border: "border-amber-500/30",   text: "text-amber-400",   icon: Minus,        label: isHindi ? "स्थिर" : "Stable",  dot: "bg-amber-400" },
+    Bearish: { bg: "bg-rose-500/15", border: "border-rose-500/30", text: "text-rose-400", icon: TrendingDown, label: isHindi ? "मंदी" : "Bearish", dot: "bg-rose-400" },
+    Stable: { bg: "bg-amber-500/15", border: "border-amber-500/30", text: "text-amber-400", icon: Minus, label: isHindi ? "स्थिर" : "Stable", dot: "bg-amber-400" },
   }[s.sentiment] ?? { bg: "bg-slate-500/15", border: "border-slate-500/20", text: "text-slate-400", icon: Minus, label: s.sentiment, dot: "bg-slate-400" };
 
   const Icon = config.icon;
@@ -123,8 +123,8 @@ function SentimentBadge({ s, isHindi }: { s: SentimentResult; isHindi: boolean }
 function NewsCard({ item, index }: { item: NewsItem; index: number }) {
   const sentConf = {
     Positive: { bg: "bg-emerald-500/10", border: "border-emerald-500/20", badge: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30", dot: "bg-emerald-400" },
-    Negative: { bg: "bg-rose-500/10",    border: "border-rose-500/20",    badge: "bg-rose-500/20 text-rose-400 border-rose-500/30",          dot: "bg-rose-400"    },
-    Neutral:  { bg: "bg-amber-500/10",   border: "border-amber-500/20",   badge: "bg-amber-500/20 text-amber-400 border-amber-500/30",        dot: "bg-amber-400"   },
+    Negative: { bg: "bg-rose-500/10", border: "border-rose-500/20", badge: "bg-rose-500/20 text-rose-400 border-rose-500/30", dot: "bg-rose-400" },
+    Neutral: { bg: "bg-amber-500/10", border: "border-amber-500/20", badge: "bg-amber-500/20 text-amber-400 border-amber-500/30", dot: "bg-amber-400" },
   }[item.sentiment];
 
   return (
@@ -184,11 +184,10 @@ function PriceCard({ item, selected, onClick, sentiment }: {
       onClick={onClick}
       whileHover={{ y: -2 }}
       whileTap={{ scale: 0.98 }}
-      className={`relative w-full text-left rounded-[1.5rem] p-5 border transition-all duration-300 overflow-hidden ${
-        selected
+      className={`relative w-full text-left rounded-[1.5rem] p-5 border transition-all duration-300 overflow-hidden ${selected
           ? "border-emerald-500/40 bg-emerald-500/8"
           : "hover:border-emerald-500/20"
-      }`}
+        }`}
       style={!selected ? { background: "var(--bg-card)", borderColor: "var(--border-card)" } : undefined}
     >
       {selected && (
@@ -229,16 +228,19 @@ function PriceCard({ item, selected, onClick, sentiment }: {
           ))}
         </div>
 
-        <div className="mt-2 flex items-center gap-1">
-          {parseFloat(changePercent) > 3 ? (
-            <ArrowUpRight size={12} className="text-rose-400" />
-          ) : parseFloat(changePercent) < -3 ? (
-            <ArrowDownRight size={12} className="text-emerald-400" />
-          ) : (
-            <Minus size={12} style={{ color: "var(--text-subtle)" }} />
-          )}
-          <span className="text-[10px] font-bold" style={{ color: "var(--text-muted)" }}>
-            ₹{change.toLocaleString("en-IN")} spread · {changePercent}%
+        <div className="mt-2 flex items-center justify-between">
+          <div className="flex items-center gap-1">
+            {parseFloat(changePercent) > 15 ? (
+              <ArrowUpRight size={12} className="text-amber-400" />
+            ) : (
+              <Minus size={12} style={{ color: "var(--text-subtle)" }} />
+            )}
+            <span className="text-[10px] font-bold" style={{ color: "var(--text-muted)" }}>
+              Spread ₹{change.toLocaleString("en-IN")} · {changePercent}%
+            </span>
+          </div>
+          <span className="text-[9px] font-semibold" style={{ color: "var(--text-subtle)" }}>
+            Data as of {new Date(item.arrival_date).toLocaleDateString("en-IN", { day: 'numeric', month: 'short' })}
           </span>
         </div>
       </div>
@@ -312,6 +314,7 @@ export default function MarketDashboard() {
     return localStorage.getItem("farmguide_district") || "Ratlam";
   });
   const [selectedCommodity, setSelectedCommodity] = useState("");
+  const [visibleCount, setVisibleCount] = useState(12);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchType, setSearchType] = useState<"commodity" | "market">("commodity");
   const [isSearching, setIsSearching] = useState(false);
@@ -339,25 +342,25 @@ export default function MarketDashboard() {
   const [locationName, setLocationName] = useState("");
 
   // Data
-  const [prices, setPrices]             = useState<MandiPrice[]>([]);
+  const [prices, setPrices] = useState<MandiPrice[]>([]);
   const [priceHistory, setPriceHistory] = useState<PriceHistory[]>([]);
-  const [news, setNews]                 = useState<NewsItem[]>([]);
-  const [sentiment, setSentiment]       = useState<SentimentResult | null>(null);
+  const [news, setNews] = useState<NewsItem[]>([]);
+  const [sentiment, setSentiment] = useState<SentimentResult | null>(null);
   const [marketComparison, setMarketComparison] = useState<MarketCompare[]>([]);
 
   // Loading states
-  const [loadingPrices,    setLoadingPrices]    = useState(true);
-  const [loadingHistory,   setLoadingHistory]   = useState(false);
-  const [loadingNews,      setLoadingNews]       = useState(true);
+  const [loadingPrices, setLoadingPrices] = useState(true);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [loadingNews, setLoadingNews] = useState(true);
   const [loadingSentiment, setLoadingSentiment] = useState(false);
   const [loadingComparison, setLoadingComparison] = useState(false);
-  const [lastFetched, setLastFetched]           = useState<Date | null>(null);
+  const [lastFetched, setLastFetched] = useState<Date | null>(null);
 
   // Error state
   const [priceError, setPriceError] = useState("");
 
   const districts = availableDistricts;
-  const states    = availableStates;
+  const states = availableStates;
 
   const formatCommodityName = (s: string) => {
     if (!s) return s;
@@ -388,7 +391,7 @@ export default function MarketDashboard() {
     } finally {
       setLocating(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Search ────────────────────────────────────────────────────────────────
@@ -425,6 +428,9 @@ export default function MarketDashboard() {
     try {
       if (forceRefresh) {
         localStorage.removeItem(`agroaid_cache_mandi_latest_${selectedState}_${selectedDistrict}_all`.replace(/\s+/g, "_").toLowerCase());
+        localStorage.removeItem(`agroaid_cache_mandi_db_markets_${selectedState}_${selectedDistrict}`.replace(/\s+/g, "_").toLowerCase());
+        // Refetch markets so dropdown updates immediately
+        fetchMarkets(selectedState, selectedDistrict).then(setAvailableMarkets).catch(() => {});
       }
       const data = await fetchLatestPrices(selectedState, selectedDistrict, undefined, language);
       setPrices(data);
@@ -442,7 +448,7 @@ export default function MarketDashboard() {
     } finally {
       setLoadingPrices(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedState, selectedDistrict, language, isHindi]);
 
   // ── Load news ─────────────────────────────────────────────────────────────
@@ -457,19 +463,19 @@ export default function MarketDashboard() {
   }, [language]);
 
   useEffect(() => { loadPrices(); }, [loadPrices]);
-  useEffect(() => { loadNews(); },   [loadNews]);
+  useEffect(() => { loadNews(); }, [loadNews]);
 
   // ── Load states from DB ─────────────────────────────────────────────────
   useEffect(() => {
-    fetchStates().then(setAvailableStates).catch(() => {});
+    fetchStates().then(setAvailableStates).catch(() => { });
   }, []);
 
   // ── Load districts when state changes ───────────────────────────────────
   useEffect(() => {
     fetchDistricts(selectedState).then((d) => {
       setAvailableDistricts(d);
-    }).catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    }).catch(() => { });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedState]);
 
   // ── Load markets when district changes ──────────────────────────────────
@@ -479,9 +485,9 @@ export default function MarketDashboard() {
     setSelectedMarket("All");
     fetchMarkets(selectedState, selectedDistrict)
       .then(setAvailableMarkets)
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoadingMarkets(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedState, selectedDistrict]);
 
   // ── Persist to localStorage & Auto-detect location ────────────────────────
@@ -510,7 +516,7 @@ export default function MarketDashboard() {
         .catch(() => setVarieties([]))
         .finally(() => setLoadingVarieties(false));
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedState, selectedDistrict, selectedMarket]);
 
   const closeCommodityDetail = useCallback(() => {
@@ -555,8 +561,17 @@ export default function MarketDashboard() {
         setLoadingComparison(false);
       }
     })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detailCommodity, timeRange, selectedState, selectedDistrict]);
+
+  // ── Auto-trigger sentiment once history finishes loading ──────────────────
+  useEffect(() => {
+    if (!detailCommodity || loadingHistory || sentiment || loadingSentiment) return;
+    if (priceHistory.length === 0) return; // no data to analyse yet
+    // Auto-run on first load of a commodity detail (sentiment not yet fetched)
+    runSentimentAnalysis();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadingHistory, detailCommodity]);
 
   // ── Manual sentiment trigger ──────────────────────────────────────────────
   const runSentimentAnalysis = async () => {
@@ -604,6 +619,9 @@ export default function MarketDashboard() {
       ? (isHindi ? `${selectedMarket} मंडी भाव` : `${selectedMarket} Mandi Rates`)
       : (isHindi ? "आज के मंडी भाव" : "Today's Mandi Rates");
 
+  // Reset visible count when prices change
+  const displayKey = selectedState + selectedDistrict + selectedMarket + (showSearchResults ? searchQuery : "");
+
   const barChartData = marketComparison.map((c) => ({
     ...c,
     shortName: (c.market_name || "").slice(0, 12),
@@ -612,11 +630,11 @@ export default function MarketDashboard() {
   // ── Filtered news for selected commodity ──────────────────────────────────
   const detailNews = detailCommodity
     ? news.filter(
-        (n) =>
-          !n.commodity ||
-          n.commodity === "General" ||
-          n.commodity.toLowerCase() === detailCommodity.commodity.toLowerCase()
-      )
+      (n) =>
+        !n.commodity ||
+        n.commodity === "General" ||
+        n.commodity.toLowerCase() === detailCommodity.commodity.toLowerCase()
+    )
     : [];
 
   return (
@@ -692,6 +710,7 @@ export default function MarketDashboard() {
               setSelectedDistrict(firstDist);
               setSelectedMarket("All");
               setLocationName("");
+              setVisibleCount(12);
               closeCommodityDetail();
             }}
           />
@@ -700,7 +719,7 @@ export default function MarketDashboard() {
             value={selectedDistrict}
             options={districts}
             icon={MapPin}
-            onChange={(v) => { setSelectedDistrict(v); setSelectedMarket("All"); setLocationName(""); closeCommodityDetail(); }}
+            onChange={(v) => { setSelectedDistrict(v); setSelectedMarket("All"); setLocationName(""); setVisibleCount(12); closeCommodityDetail(); }}
           />
           <Dropdown
             label={isHindi ? "मंडी" : "Market"}
@@ -713,6 +732,7 @@ export default function MarketDashboard() {
             onChange={(v) => {
               const market = (v === "All Markets" || v === "सभी मंडियां") ? "All" : v;
               setSelectedMarket(market);
+              setVisibleCount(12);
               closeCommodityDetail();
             }}
           />
@@ -776,11 +796,10 @@ export default function MarketDashboard() {
                 <button
                   key={t.key}
                   onClick={() => setSearchType(t.key)}
-                  className={`flex items-center gap-1.5 px-3 py-2.5 text-xs font-bold transition-all ${
-                    searchType === t.key
+                  className={`flex items-center gap-1.5 px-3 py-2.5 text-xs font-bold transition-all ${searchType === t.key
                       ? "bg-emerald-500/20 text-emerald-400"
                       : ""
-                  }`}
+                    }`}
                   style={searchType !== t.key ? { background: "var(--bg-input)", color: "var(--text-muted)" } : undefined}
                 >
                   <t.icon size={12} />
@@ -941,9 +960,8 @@ export default function MarketDashboard() {
                           return (
                             <div
                               key={v.variety + i}
-                              className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
-                                isBest ? "border-emerald-500/30 bg-emerald-500/8" : ""
-                              }`}
+                              className={`flex items-center justify-between p-3 rounded-xl border transition-all ${isBest ? "border-emerald-500/30 bg-emerald-500/8" : ""
+                                }`}
                               style={!isBest ? { background: "var(--bg-input)", borderColor: "var(--border-input)" } : undefined}
                             >
                               <div className="flex items-center gap-2">
@@ -989,11 +1007,10 @@ export default function MarketDashboard() {
                         <button
                           key={r.key}
                           onClick={() => setTimeRange(r.key)}
-                          className={`px-3 py-1.5 text-[11px] font-bold transition-all ${
-                            timeRange === r.key
+                          className={`px-3 py-1.5 text-[11px] font-bold transition-all ${timeRange === r.key
                               ? "bg-emerald-500/20 text-emerald-400"
                               : ""
-                          }`}
+                            }`}
                           style={timeRange !== r.key ? { background: "var(--bg-input)", color: "var(--text-muted)" } : undefined}
                         >
                           {isHindi ? r.labelHi : r.label}
@@ -1065,9 +1082,9 @@ export default function MarketDashboard() {
                             label={{ value: "Avg", fontSize: 9, fill: "#f59e0b", position: "right" }}
                           />
                         )}
-                        <Area type="monotone" dataKey="Max"   stroke="#f87171" strokeWidth={1.5} fill="url(#maxGrad)"   dot={false} strokeOpacity={0.7} />
+                        <Area type="monotone" dataKey="Max" stroke="#f87171" strokeWidth={1.5} fill="url(#maxGrad)" dot={false} strokeOpacity={0.7} />
                         <Area type="monotone" dataKey="Modal" stroke="#22c55e" strokeWidth={2.5} fill="url(#modalGrad)" dot={false} />
-                        <Area type="monotone" dataKey="Min"   stroke="#60a5fa" strokeWidth={1.5} fill="url(#minGrad)"   dot={false} strokeOpacity={0.7} />
+                        <Area type="monotone" dataKey="Min" stroke="#60a5fa" strokeWidth={1.5} fill="url(#minGrad)" dot={false} strokeOpacity={0.7} />
                       </AreaChart>
                     </ResponsiveContainer>
                   )}
@@ -1206,10 +1223,9 @@ export default function MarketDashboard() {
                             initial={{ width: 0 }}
                             animate={{ width: `${sentiment.confidence}%` }}
                             transition={{ duration: 0.8, ease: "easeOut" }}
-                            className={`h-full rounded-full ${
-                              sentiment.sentiment === "Bullish" ? "bg-emerald-500" :
-                              sentiment.sentiment === "Bearish" ? "bg-rose-500" : "bg-amber-500"
-                            }`}
+                            className={`h-full rounded-full ${sentiment.sentiment === "Bullish" ? "bg-emerald-500" :
+                                sentiment.sentiment === "Bearish" ? "bg-rose-500" : "bg-amber-500"
+                              }`}
                           />
                         </div>
                       </div>
@@ -1297,23 +1313,47 @@ export default function MarketDashboard() {
                   </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  <AnimatePresence>
-                    {displayPrices.slice(0, 12).map((item, idx) => (
-                      <motion.div
-                        key={item.commodity + item.market_name + idx}
-                        initial={{ opacity: 0, y: 16 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: idx * 0.04 }}
+                <div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <AnimatePresence>
+                      {displayPrices.slice(0, visibleCount).map((item, idx) => (
+                        <motion.div
+                          key={item.commodity + item.market_name + idx}
+                          initial={{ opacity: 0, y: 16 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: Math.min(idx, 5) * 0.04 }}
+                        >
+                          <PriceCard
+                            item={item}
+                            selected={selectedCommodity === item.commodity}
+                            onClick={() => openCommodityDetail(item)}
+                          />
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
+                  </div>
+
+                  {/* Load More */}
+                  {visibleCount < displayPrices.length && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="flex flex-col items-center gap-2 mt-5"
+                    >
+                      <p className="text-[10px] font-semibold" style={{ color: "var(--text-subtle)" }}>
+                        {isHindi
+                          ? `${visibleCount} / ${displayPrices.length} फसलें दिख रही हैं`
+                          : `Showing ${visibleCount} of ${displayPrices.length} commodities`}
+                      </p>
+                      <button
+                        onClick={() => setVisibleCount((c) => c + 12)}
+                        className="flex items-center gap-2 px-6 py-2.5 rounded-xl border font-bold text-sm transition-all hover:border-emerald-500/40 hover:text-emerald-400 active:scale-95"
+                        style={{ background: "var(--bg-card)", borderColor: "var(--border-card)", color: "var(--text-muted)" }}
                       >
-                        <PriceCard
-                          item={item}
-                          selected={selectedCommodity === item.commodity}
-                          onClick={() => openCommodityDetail(item)}
-                        />
-                      </motion.div>
-                    ))}
-                  </AnimatePresence>
+                        {isHindi ? "और दिखाएं" : "Load More"}
+                      </button>
+                    </motion.div>
+                  )}
                 </div>
               )}
             </div>
@@ -1368,8 +1408,8 @@ export default function MarketDashboard() {
             <div className="mt-4 pt-4 border-t grid grid-cols-3 gap-2" style={{ borderColor: "var(--border-card)" }}>
               {[
                 { color: "bg-emerald-400", label: isHindi ? "सकारात्मक" : "Positive" },
-                { color: "bg-rose-400",    label: isHindi ? "नकारात्मक" : "Negative" },
-                { color: "bg-amber-400",   label: isHindi ? "तटस्थ" : "Neutral" },
+                { color: "bg-rose-400", label: isHindi ? "नकारात्मक" : "Negative" },
+                { color: "bg-amber-400", label: isHindi ? "तटस्थ" : "Neutral" },
               ].map((l) => (
                 <div key={l.label} className="flex items-center gap-1">
                   <div className={`w-1.5 h-1.5 rounded-full ${l.color}`} />

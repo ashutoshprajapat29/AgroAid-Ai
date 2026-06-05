@@ -192,9 +192,9 @@ export async function fetchLatestPrices(
 // ─── 5. Search Commodities/Markets ───────────────────────────────────────────
 export async function searchMandiPrices(
   searchQuery: string,
-  _searchType: "commodity" | "market" = "commodity"
+  searchType: "commodity" | "market" = "commodity"
 ): Promise<MandiPrice[]> {
-  const cacheKey = `mandi_search_${searchQuery}`.replace(/\s+/g, "_").toLowerCase();
+  const cacheKey = `mandi_search_${searchType}_${searchQuery}`.replace(/\s+/g, "_").toLowerCase();
 
   return cachedApiCall(
     cacheKey,
@@ -202,7 +202,10 @@ export async function searchMandiPrices(
     async () => {
       if (!isSupabaseConfigured) return [];
 
-      const { data, error } = await supabase.rpc("search_mandi", { p_query: searchQuery });
+      const { data, error } = await supabase.rpc("search_mandi", {
+        p_query: searchQuery,
+        p_search_type: searchType,
+      });
       if (error) throw error;
       return (data ?? []).map((r: any): MandiPrice => ({
         state: r.state ?? "",
@@ -302,7 +305,7 @@ export async function fetchMarketComparison(
   excludeMarket?: string
 ): Promise<MarketCompare[]> {
   const excl = excludeMarket && excludeMarket !== "All" ? excludeMarket : "none";
-  const cacheKey = `mandi_nearby_${commodity}_${district ?? state}_${excl}`.replace(/\s+/g, "_").toLowerCase();
+  const cacheKey = `mandi_nearby_${commodity}_${state}_${district ?? state}_${excl}`.replace(/\s+/g, "_").toLowerCase();
 
   return cachedApiCall(
     cacheKey,
@@ -311,6 +314,7 @@ export async function fetchMarketComparison(
       if (!isSupabaseConfigured) return [];
 
       const params: Record<string, any> = {
+        p_state: state,
         p_district: district ?? "",
         p_commodity: commodity,
       };
@@ -408,59 +412,11 @@ function mapToDataGovState(rawState: string): string {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// NEWS (RSS feeds — unchanged)
+// NEWS (Fetched via Firebase Cloud Function)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const RSS_FEEDS = [
-  { url: "https://www.krishijagran.com/rss/news.xml", source: "Krishi Jagran" },
-  { url: "https://economictimes.indiatimes.com/news/economy/agriculture/rssfeeds/68880913.cms", source: "ET Agriculture" },
-];
-
-interface RSSArticle {
-  title: string;
-  description: string;
-  link: string;
-  source: string;
-}
-
-async function fetchRSSFeed(feedUrl: string, source: string): Promise<RSSArticle[]> {
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-    // Use a free CORS proxy for RSS feeds (allorigins)
-    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(feedUrl)}`;
-    const resp = await fetch(proxyUrl, { signal: controller.signal });
-    clearTimeout(timeoutId);
-
-    if (!resp.ok) throw new Error(`RSS fetch failed: ${resp.status}`);
-    const text = await resp.text();
-
-    // Parse XML manually (no DOM parser dependency)
-    const articles: RSSArticle[] = [];
-    const itemRegex = /<item>([\s\S]*?)<\/item>/gi;
-    let match;
-    while ((match = itemRegex.exec(text)) !== null && articles.length < 5) {
-      const item = match[1];
-      const title = item.match(/<title><!\[CDATA\[(.*?)\]\]>|<title>(.*?)<\/title>/)?.[1] || item.match(/<title>(.*?)<\/title>/)?.[1] || "";
-      const desc = item.match(/<description><!\[CDATA\[(.*?)\]\]>|<description>(.*?)<\/description>/)?.[1] || item.match(/<description>(.*?)<\/description>/)?.[1] || "";
-      const link = item.match(/<link>(.*?)<\/link>/)?.[1] || "";
-
-      if (title.trim()) {
-        articles.push({
-          title: title.replace(/<[^>]+>/g, "").trim(),
-          description: desc.replace(/<[^>]+>/g, "").trim().slice(0, 200),
-          link: link.trim(),
-          source,
-        });
-      }
-    }
-    return articles;
-  } catch (e) {
-    console.warn(`RSS feed ${source} failed:`, e);
-    return [];
-  }
-}
+import { httpsCallable } from "firebase/functions";
+import { functions } from "../lib/firebase";
 
 export async function fetchMarketNews(language = "English"): Promise<NewsItem[]> {
   const cacheKey = `news_rss_${language}`.toLowerCase();
@@ -469,82 +425,16 @@ export async function fetchMarketNews(language = "English"): Promise<NewsItem[]>
     cacheKey,
     TTL.NEWS,
     async () => {
-      // 1. Fetch real RSS articles
-      const allArticles: RSSArticle[] = [];
-      const feedResults = await Promise.allSettled(
-        RSS_FEEDS.map((f) => fetchRSSFeed(f.url, f.source))
-      );
-      for (const result of feedResults) {
-        if (result.status === "fulfilled") allArticles.push(...result.value);
-      }
-
-      // If we have real articles, use Gemini to classify sentiment only
-      if (allArticles.length > 0) {
-        const topArticles = allArticles.slice(0, 5);
-        try {
-          const langNote = language === "Hindi"
-            ? "Translate title and impact to Hindi (Devanagari script)."
-            : "Keep in English.";
-
-          const prompt = `Classify the sentiment of these agricultural news articles.
-${langNote}
-Articles:
-${topArticles.map((a, i) => `${i + 1}. "${a.title}" — ${a.description}`).join("\n")}
-
-Return ONLY a JSON array. For each article:
-{"title":string,"impact":string (2 short sentences summarizing market impact),"sentiment":"Positive"|"Negative"|"Neutral","commodity":string (main commodity mentioned or "General"),"source":string,"link":string}
-Preserve the source and link from input.`;
-
-          const raw = await geminiGenerate(prompt);
-          let parsed = JSON.parse(raw);
-          if (Array.isArray(parsed)) {
-            // Restore source/link from original articles
-            parsed = parsed.map((item: any, i: number) => ({
-              ...item,
-              source: topArticles[i]?.source ?? item.source ?? "",
-              link: topArticles[i]?.link ?? item.link ?? "",
-            }));
-            return parsed.slice(0, 4) as NewsItem[];
-          }
-        } catch (e) {
-          console.warn("Gemini sentiment classification failed, using raw articles:", e);
-          // Fallback: return raw articles without sentiment
-          return topArticles.slice(0, 4).map((a) => ({
-            title: a.title,
-            impact: a.description,
-            sentiment: "Neutral" as const,
-            commodity: "General",
-            source: a.source,
-            link: a.link,
-          }));
-        }
-      }
-
-      // Fallback: AI-generated news if RSS fails entirely
       try {
-        const langNote = language === "Hindi"
-          ? "Write title and impact in Hindi (Devanagari script)."
-          : "Write in English.";
-
-        const prompt = `You are an expert Indian agri-economist. Generate 3 realistic, impactful agricultural news items for Indian farmers today.
-Cover: 1 government policy/MSP, 1 monsoon/weather impact, 1 export/import trade.
-${langNote}
-Return ONLY a JSON array of exactly 3 objects:
-{"title":string,"impact":string,"sentiment":"Positive"|"Negative"|"Neutral","commodity":string}
-Keep title under 12 words. Impact: 2 plain sentences.`;
-
-        const raw = await geminiGenerate(prompt);
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed.slice(0, 3) : [];
-      } catch {
-        return [{
-          title: language === "Hindi" ? "सरकार ने खरीफ फसलों का MSP बढ़ाया" : "Government raises Kharif crop MSP",
-          impact: language === "Hindi"
-            ? "सरकार ने प्रमुख खरीफ फसलों का न्यूनतम समर्थन मूल्य बढ़ाया है। इससे किसानों को उनकी फसल का उचित मूल्य मिलेगा।"
-            : "The government has increased the Minimum Support Price for major Kharif crops. This ensures farmers receive fair value.",
-          sentiment: "Positive",
-          commodity: "General",
-        }];
+        const fetchNewsFn = httpsCallable<{ language: string }, { items: NewsItem[]; cached: boolean }>(
+          functions,
+          "fetchAgriNews"
+        );
+        const result = await fetchNewsFn({ language });
+        return result.data.items || [];
+      } catch (e) {
+        console.error("Failed to fetch agri news from Cloud Function:", e);
+        return [];
       }
     },
     [] as NewsItem[]

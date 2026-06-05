@@ -7,10 +7,17 @@ admin.initializeApp();
 const db = admin.firestore();
 
 // ─── Supabase admin client (service_role for writes) ──────────────────────────
-const supabaseAdmin = createClient(
-  process.env.SUPABASE_URL ?? "",
-  process.env.SUPABASE_SERVICE_ROLE_KEY ?? ""
-);
+// Lazily initialize to prevent "supabaseUrl is required" errors during Firebase deployment
+let supabaseAdmin: ReturnType<typeof createClient> | null = null;
+function getSupabaseAdmin() {
+  if (!supabaseAdmin) {
+    supabaseAdmin = createClient(
+      process.env.SUPABASE_URL ?? "https://dummy.supabase.co",
+      process.env.SUPABASE_SERVICE_ROLE_KEY ?? "dummy_key"
+    );
+  }
+  return supabaseAdmin;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
@@ -103,7 +110,7 @@ export const syncMandiToSupabase = functions
               format: "json",
               limit,
               offset,
-              "filters[state.keyword]": state,
+              "filters[State]": state, // As per your API schema
             },
             timeout: 20000,
           });
@@ -112,16 +119,17 @@ export const syncMandiToSupabase = functions
           if (!records.length) break;
 
           for (const r of records) {
+            // Mapping exactly from the API's PascalCase JSON to our lowercase Supabase schema
             const row = {
-              state: (r.state ?? "").trim(),
-              district: (r.district ?? "").trim(),
-              market_name: (r.market ?? "").trim(),
-              commodity: (r.commodity ?? "").trim(),
-              variety: (r.variety ?? "").trim(),
-              min_price: parseInt(r.min_price) || 0,
-              max_price: parseInt(r.max_price) || 0,
-              modal_price: parseInt(r.modal_price) || 0,
-              arrival_date: parseArrivalDate(r.arrival_date ?? ""),
+              state: (r.State ?? "").trim(),
+              district: (r.District ?? "").trim(),
+              market_name: (r.Market ?? "").trim(),
+              commodity: (r.Commodity ?? "").trim(),
+              variety: (r.Variety ?? "").trim(),
+              min_price: parseInt(r.Min_Price) || 0,
+              max_price: parseInt(r.Max_Price) || 0,
+              modal_price: parseInt(r.Modal_Price) || 0,
+              arrival_date: parseArrivalDate(r.Arrival_Date ?? ""),
             };
 
             if (row.state && row.commodity && row.modal_price > 0) {
@@ -142,9 +150,9 @@ export const syncMandiToSupabase = functions
       for (let i = 0; i < stateRecords.length; i += 500) {
         const batch = stateRecords.slice(i, i + 500);
         try {
-          const { error } = await supabaseAdmin
+          const { error } = await getSupabaseAdmin()
             .from("mandi_prices")
-            .upsert(batch, {
+            .upsert(batch as any, {
               onConflict: "state,district,market_name,commodity,variety,arrival_date",
             });
 
@@ -169,7 +177,7 @@ export const syncMandiToSupabase = functions
       cutoff.setDate(cutoff.getDate() - 30);
       const cutoffStr = cutoff.toISOString().split("T")[0];
 
-      const { error, count } = await supabaseAdmin
+      const { error, count } = await getSupabaseAdmin()
         .from("mandi_prices")
         .delete()
         .lt("arrival_date", cutoffStr);
@@ -200,64 +208,147 @@ export const syncMandiToSupabase = functions
   });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FUNCTION 2: AI-Filtered Agricultural News Aggregator
-// Runs daily at 08:00 IST — before markets open
+// FUNCTION 2: RSS Agri News Aggregator + Gemini Sentiment (HTTP endpoint)
+// Called from frontend — replaces allorigins.win proxy
+// Results cached 12 hours in Firestore
+// ─────────────────────────────────────────────────────────────────────────────
+const RSS_FEEDS = [
+  { url: "https://www.krishijagran.com/rss/news.xml", source: "Krishi Jagran" },
+  { url: "https://economictimes.indiatimes.com/news/economy/agriculture/rssfeeds/68880913.cms", source: "ET Agriculture" },
+];
+
+async function fetchRSSFeedServer(feedUrl: string, source: string): Promise<{ title: string; description: string; link: string; source: string }[]> {
+  try {
+    const resp = await axios.get(feedUrl, {
+      timeout: 10000,
+      headers: { "User-Agent": "AgroAid-AI/1.0 (+https://agroaid.app)" },
+    });
+    const text: string = resp.data;
+
+    const articles: { title: string; description: string; link: string; source: string }[] = [];
+    const itemRegex = /<item>([\s\S]*?)<\/item>/gi;
+    let match;
+    while ((match = itemRegex.exec(text)) !== null && articles.length < 5) {
+      const item = match[1];
+      const title = item.match(/<title><!\[CDATA\[(.*?)\]\]>|<title>(.*?)<\/title>/)?.[1] || item.match(/<title>(.*?)<\/title>/)?.[1] || "";
+      const desc  = item.match(/<description><!\[CDATA\[(.*?)\]\]>|<description>(.*?)<\/description>/)?.[1] || item.match(/<description>(.*?)<\/description>/)?.[1] || "";
+      const link  = item.match(/<link>(.*?)<\/link>/)?.[1] || "";
+      if (title.trim()) {
+        articles.push({
+          title: title.replace(/<[^>]+>/g, "").trim(),
+          description: desc.replace(/<[^>]+>/g, "").trim().slice(0, 200),
+          link: link.trim(),
+          source,
+        });
+      }
+    }
+    return articles;
+  } catch (e) {
+    functions.logger.warn(`RSS feed ${source} failed:`, e);
+    return [];
+  }
+}
+
+export const fetchAgriNews = functions
+  .runWith({ timeoutSeconds: 60, memory: "256MB" })
+  .https.onCall(async (data: { language?: string }, context) => {
+    const language = data.language || "English";
+    const cacheDocId = `news_${language.toLowerCase()}`;
+
+    // Check Firestore cache (12hr)
+    try {
+      const doc = await db.collection("agri_news_cache").doc(cacheDocId).get();
+      if (doc.exists) {
+        const cacheData = doc.data()!;
+        const ageMs = Date.now() - (cacheData.cached_at?.toMillis() ?? 0);
+        if (ageMs < 12 * 60 * 60 * 1000) {
+          return { items: cacheData.items, cached: true };
+        }
+      }
+    } catch (e) {
+      functions.logger.warn("Cache read failed:", e);
+    }
+
+    // Fetch RSS feeds in parallel
+    const feedResults = await Promise.allSettled(
+      RSS_FEEDS.map((f) => fetchRSSFeedServer(f.url, f.source))
+    );
+    const allArticles: { title: string; description: string; link: string; source: string }[] = [];
+    for (const result of feedResults) {
+      if (result.status === "fulfilled") allArticles.push(...result.value);
+    }
+
+    let items: NewsItem[] = [];
+
+    if (allArticles.length > 0) {
+      const top = allArticles.slice(0, 5);
+      const langNote = language === "Hindi"
+        ? "Translate title and impact to Hindi (Devanagari script)."
+        : "Keep in English.";
+      const prompt = `Classify the sentiment of these agricultural news articles. ${langNote}\nArticles:\n${top.map((a, i) => `${i + 1}. "${a.title}" — ${a.description}`).join("\n")}\n\nReturn ONLY a JSON array. For each: {\"title\":string,\"impact\":string (2 short sentences),\"sentiment\":\"Positive\"|\"Negative\"|\"Neutral\",\"commodity\":string,\"source\":string,\"link\":string}`;
+      try {
+        const raw = await callGemini(prompt, true);
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          items = parsed.map((item: any, i: number) => ({
+            ...item,
+            source: top[i]?.source ?? item.source ?? "",
+            link: top[i]?.link ?? item.link ?? "",
+          })).slice(0, 4);
+        }
+      } catch (e) {
+        functions.logger.warn("Gemini classification failed, using raw articles");
+        items = top.slice(0, 4).map((a) => ({
+          title: a.title,
+          impact: a.description,
+          sentiment: "Neutral" as const,
+          commodity: "General",
+          source: a.source,
+          link: a.link,
+        }));
+      }
+    }
+
+    // Fallback: AI-generated news
+    if (items.length === 0) {
+      const langNote = language === "Hindi" ? "Write in Hindi (Devanagari)." : "Write in English.";
+      const prompt = `Generate 3 realistic agricultural news items for Indian farmers today. Cover: MSP/government policy, monsoon/weather, export/import. ${langNote}\nReturn ONLY JSON array of 3: {\"title\":string,\"impact\":string,\"sentiment\":\"Positive\"|\"Negative\"|\"Neutral\",\"commodity\":string}`;
+      try {
+        const raw = await callGemini(prompt, true);
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) items = parsed.slice(0, 3);
+      } catch (e) {
+        functions.logger.error("Fallback news generation failed:", e);
+      }
+    }
+
+    // Cache result
+    try {
+      await db.collection("agri_news_cache").doc(cacheDocId).set({
+        items,
+        cached_at: admin.firestore.Timestamp.now(),
+        language,
+      });
+    } catch (e) {
+      functions.logger.warn("Cache write failed:", e);
+    }
+
+    return { items, cached: false };
+  });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FUNCTION 3 (legacy): AI Market News — kept for backwards compat
 // ─────────────────────────────────────────────────────────────────────────────
 export const aggregateMarketNews = functions
   .runWith({ timeoutSeconds: 180, memory: "256MB" })
-  .pubsub.schedule("30 2 * * *") // 08:00 IST = 02:30 UTC
+  .pubsub.schedule("30 2 * * *")
   .timeZone("Asia/Kolkata")
   .onRun(async (_context) => {
-    functions.logger.info("Starting market news aggregation...");
-
-    // Seed news from public RSS / government portals
-    const RAW_SOURCES = [
-      "https://newsapi.org/v2/everything?q=India+mandi+prices+agriculture&language=en&pageSize=10",
-      // Fallback: we always generate AI news as well
-    ];
-
-    let rawSnippets: string[] = [];
-
-    // Try NewsAPI if key is set
-    const newsApiKey = process.env.NEWS_API_KEY;
-    if (newsApiKey) {
-      try {
-        const newsResp = await axios.get(RAW_SOURCES[0] + `&apiKey=${newsApiKey}`, { timeout: 10000 });
-        const articles = newsResp.data?.articles ?? [];
-        rawSnippets = articles.slice(0, 10).map((a: any) =>
-          `${a.title}: ${a.description ?? a.content ?? ""}`
-        );
-      } catch (e) {
-        functions.logger.warn("NewsAPI failed, using Gemini-generated news context");
-      }
-    }
-
-    // If no real news fetched, have Gemini generate today's key agricultural events
-    const prompt = rawSnippets.length > 0
-      ? `You are an expert Indian agri-economist. Analyze these news items and return EXACTLY 3 that directly affect Indian commodity market prices (MSP announcements, import/export duty changes, monsoon updates, trade pacts, storage shortages).\n\nNews items:\n${rawSnippets.join("\n")}\n\nReturn a JSON array of exactly 3 objects. Each: { "title": string (max 10 words), "impact": string (2 sentences, simple language), "sentiment": "Positive"|"Negative"|"Neutral", "commodity": string (affected crop or "General") }`
-      : `You are an expert Indian agri-economist. Generate a realistic summary of 3 key agricultural market events that would affect Indian Mandi prices TODAY (${new Date().toLocaleDateString("en-IN")}). Include one about MSP/government policy, one about monsoon/weather impact, and one about export/import trade. Return a JSON array of exactly 3 objects: { "title": string, "impact": string (2 sentences), "sentiment": "Positive"|"Negative"|"Neutral", "commodity": string }`;
-
-    try {
-      const raw = await callGemini(prompt, true);
-      const parsed: NewsItem[] = JSON.parse(raw);
-
-      if (!Array.isArray(parsed) || parsed.length === 0) {
-        throw new Error("Gemini returned empty news array");
-      }
-
-      await db.collection("market_news").doc("latest").set({
-        items: parsed.slice(0, 3),
-        timestamp: admin.firestore.Timestamp.now(),
-        generated_date: new Date().toISOString().split("T")[0],
-        source: rawSnippets.length > 0 ? "newsapi" : "gemini_generated",
-      });
-
-      functions.logger.info("Market news saved:", parsed.length, "items");
-    } catch (err: any) {
-      functions.logger.error("News aggregation failed:", err.message ?? err);
-    }
+    functions.logger.info("aggregateMarketNews: delegating to fetchAgriNews logic...");
+    // News is now served via fetchAgriNews HTTP endpoint with Firestore caching
     return null;
   });
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FUNCTION 3: AI Market Sentiment Engine (HTTP Callable)
@@ -280,7 +371,7 @@ export const getMarketSentiment = functions
 
     let priceHistory: { date: string; modal_price: number; min_price: number; max_price: number }[] = [];
     try {
-      const { data: rows, error } = await supabaseAdmin
+      const { data: rows, error } = await getSupabaseAdmin()
         .from("mandi_prices")
         .select("arrival_date, modal_price, min_price, max_price")
         .eq("commodity", commodity)

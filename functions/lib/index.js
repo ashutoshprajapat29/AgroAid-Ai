@@ -36,12 +36,23 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.proxyDataGov = exports.getMarketSentiment = exports.aggregateMarketNews = exports.ingestMandiPrices = void 0;
+exports.getMarketSentiment = exports.aggregateMarketNews = exports.syncMandiToSupabase = void 0;
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 const axios_1 = __importDefault(require("axios"));
+const supabase_js_1 = require("@supabase/supabase-js");
 admin.initializeApp();
 const db = admin.firestore();
+// ─── Supabase admin client (service_role for writes) ──────────────────────────
+// Lazily initialize to prevent "supabaseUrl is required" errors during Firebase deployment
+let supabaseAdmin = null;
+function getSupabaseAdmin() {
+    var _a, _b;
+    if (!supabaseAdmin) {
+        supabaseAdmin = (0, supabase_js_1.createClient)((_a = process.env.SUPABASE_URL) !== null && _a !== void 0 ? _a : "https://dummy.supabase.co", (_b = process.env.SUPABASE_SERVICE_ROLE_KEY) !== null && _b !== void 0 ? _b : "dummy_key");
+    }
+    return supabaseAdmin;
+}
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPER: Call Gemini REST API directly (no SDK in functions)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -61,104 +72,150 @@ async function callGemini(prompt, jsonMode = false) {
     return (_g = (_f = (_e = (_d = (_c = (_b = (_a = res.data) === null || _a === void 0 ? void 0 : _a.candidates) === null || _b === void 0 ? void 0 : _b[0]) === null || _c === void 0 ? void 0 : _c.content) === null || _d === void 0 ? void 0 : _d.parts) === null || _e === void 0 ? void 0 : _e[0]) === null || _f === void 0 ? void 0 : _f.text) !== null && _g !== void 0 ? _g : "";
 }
 // ─────────────────────────────────────────────────────────────────────────────
-// FUNCTION 1: Ingest Daily Mandi Prices from Data.gov.in / Agmarknet
-// Runs every day at 18:30 IST (13:00 UTC)
+// HELPER: Parse date from data.gov.in (handles DD/MM/YYYY and YYYY-MM-DD)
 // ─────────────────────────────────────────────────────────────────────────────
-exports.ingestMandiPrices = functions
-    .runWith({ timeoutSeconds: 300, memory: "512MB" })
-    .pubsub.schedule("0 13 * * *")
+function parseArrivalDate(dateStr) {
+    if (!dateStr)
+        return new Date().toISOString().split("T")[0];
+    // Handle "DD/MM/YYYY" format
+    if (dateStr.includes("/")) {
+        const parts = dateStr.split("/");
+        if (parts.length === 3) {
+            return `${parts[2]}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`;
+        }
+    }
+    // Already "YYYY-MM-DD"
+    return dateStr;
+}
+// ─────────────────────────────────────────────────────────────────────────────
+// Priority states for nightly sync (North India focus)
+// ─────────────────────────────────────────────────────────────────────────────
+const PRIORITY_STATES = [
+    "Madhya Pradesh", "Rajasthan", "Maharashtra", "Gujarat",
+    "Uttar Pradesh", "Bihar", "Haryana", "Punjab",
+    "Uttarakhand", "Himachal Pradesh", "Delhi", "Chandigarh",
+];
+// ─────────────────────────────────────────────────────────────────────────────
+// FUNCTION 1: Sync Mandi Prices to Supabase (replaces old Firestore ingestion)
+// Runs every day at 11:00 PM IST (17:30 UTC)
+// ─────────────────────────────────────────────────────────────────────────────
+exports.syncMandiToSupabase = functions
+    .runWith({ timeoutSeconds: 540, memory: "1GB" })
+    .pubsub.schedule("30 17 * * *")
     .timeZone("Asia/Kolkata")
     .onRun(async (_context) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r;
-    functions.logger.info("Starting Mandi price ingestion...");
-    const AGMARKNET_API = "https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070";
-    const API_KEY = (_a = process.env.DATA_GOV_API_KEY) !== null && _a !== void 0 ? _a : "579b464db66ec23bdd000001cdd3946e44ce4aab351d4b4ec1aa1c95";
-    const today = new Date().toISOString().split("T")[0];
-    let offset = 0;
-    const limit = 500;
-    let totalIngested = 0;
-    const batch = db.batch();
-    let batchCount = 0;
-    try {
-        // Paginate through all results for today
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m;
+    functions.logger.info("Starting Mandi → Supabase sync for priority states...");
+    const API_URL = "https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070";
+    const API_KEY = (_a = process.env.DATA_GOV_API_KEY) !== null && _a !== void 0 ? _a : "";
+    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        functions.logger.error("SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set. Aborting sync.");
+        return null;
+    }
+    let totalUpserted = 0;
+    let totalErrors = 0;
+    const startTime = Date.now();
+    for (const state of PRIORITY_STATES) {
+        let offset = 0;
+        const limit = 500;
+        const stateRecords = [];
+        // Paginate through all records for this state
         while (true) {
-            const response = await axios_1.default.get(AGMARKNET_API, {
-                params: {
-                    "api-key": API_KEY,
-                    format: "json",
-                    limit,
-                    offset,
-                    filters: `[Arrival_Date=${today}]`,
-                },
-                timeout: 20000,
-            });
-            const records = (_c = (_b = response.data) === null || _b === void 0 ? void 0 : _b.records) !== null && _c !== void 0 ? _c : [];
-            if (!records.length)
-                break;
-            for (const r of records) {
-                try {
-                    const state = ((_d = r["State"]) !== null && _d !== void 0 ? _d : "").trim();
-                    const district = ((_e = r["District"]) !== null && _e !== void 0 ? _e : "").trim();
-                    const market = ((_f = r["Market"]) !== null && _f !== void 0 ? _f : "").trim();
-                    const commodity = ((_g = r["Commodity"]) !== null && _g !== void 0 ? _g : "").trim();
-                    const variety = ((_h = r["Variety"]) !== null && _h !== void 0 ? _h : "").trim();
-                    const minPrice = parseFloat((_k = (_j = r["Min_x0020_Price"]) !== null && _j !== void 0 ? _j : r["Min Price"]) !== null && _k !== void 0 ? _k : "0");
-                    const maxPrice = parseFloat((_m = (_l = r["Max_x0020_Price"]) !== null && _l !== void 0 ? _l : r["Max Price"]) !== null && _m !== void 0 ? _m : "0");
-                    const modalPrice = parseFloat((_p = (_o = r["Modal_x0020_Price"]) !== null && _o !== void 0 ? _o : r["Modal Price"]) !== null && _p !== void 0 ? _p : "0");
-                    if (!state || !commodity || !modalPrice)
-                        continue;
-                    const docId = `${state}_${district}_${commodity}_${today}`
-                        .replace(/\s+/g, "_")
-                        .toLowerCase();
-                    const data = {
-                        state,
-                        district,
-                        market_name: market,
-                        commodity,
-                        variety,
-                        min_price: minPrice,
-                        max_price: maxPrice,
-                        modal_price: modalPrice,
-                        date: today,
-                        ingested_at: admin.firestore.Timestamp.now(),
+            try {
+                const response = await axios_1.default.get(API_URL, {
+                    params: {
+                        "api-key": API_KEY,
+                        format: "json",
+                        limit,
+                        offset,
+                        "filters[State]": state, // As per your API schema
+                    },
+                    timeout: 20000,
+                });
+                const records = (_c = (_b = response.data) === null || _b === void 0 ? void 0 : _b.records) !== null && _c !== void 0 ? _c : [];
+                if (!records.length)
+                    break;
+                for (const r of records) {
+                    // Mapping exactly from the API's PascalCase JSON to our lowercase Supabase schema
+                    const row = {
+                        state: ((_d = r.State) !== null && _d !== void 0 ? _d : "").trim(),
+                        district: ((_e = r.District) !== null && _e !== void 0 ? _e : "").trim(),
+                        market_name: ((_f = r.Market) !== null && _f !== void 0 ? _f : "").trim(),
+                        commodity: ((_g = r.Commodity) !== null && _g !== void 0 ? _g : "").trim(),
+                        variety: ((_h = r.Variety) !== null && _h !== void 0 ? _h : "").trim(),
+                        min_price: parseInt(r.Min_Price) || 0,
+                        max_price: parseInt(r.Max_Price) || 0,
+                        modal_price: parseInt(r.Modal_Price) || 0,
+                        arrival_date: parseArrivalDate((_j = r.Arrival_Date) !== null && _j !== void 0 ? _j : ""),
                     };
-                    // Full history collection
-                    batch.set(db.collection("mandi_prices").doc(docId), data, { merge: true });
-                    // Latest price per district-commodity (cheap reads for home feed)
-                    const latestDocId = `${state}_${district}_${commodity}`
-                        .replace(/\s+/g, "_")
-                        .toLowerCase();
-                    batch.set(db.collection("mandi_latest").doc(latestDocId), data, { merge: true });
-                    batchCount++;
-                    totalIngested++;
-                    // Firestore batch limit is 500
-                    if (batchCount >= 490) {
-                        await batch.commit();
-                        batchCount = 0;
+                    if (row.state && row.commodity && row.modal_price > 0) {
+                        stateRecords.push(row);
                     }
                 }
-                catch (rowErr) {
-                    functions.logger.warn("Skipping bad row:", rowErr);
+                if (records.length < limit)
+                    break;
+                offset += limit;
+            }
+            catch (err) {
+                functions.logger.warn(`Fetch failed for ${state} offset=${offset}:`, (_k = err.message) !== null && _k !== void 0 ? _k : err);
+                totalErrors++;
+                break;
+            }
+        }
+        // Batch upsert into Supabase (max 500 rows per call)
+        for (let i = 0; i < stateRecords.length; i += 500) {
+            const batch = stateRecords.slice(i, i + 500);
+            try {
+                const { error } = await getSupabaseAdmin()
+                    .from("mandi_prices")
+                    .upsert(batch, {
+                    onConflict: "state,district,market_name,commodity,variety,arrival_date",
+                });
+                if (error) {
+                    functions.logger.warn(`Upsert error for ${state}:`, error.message);
+                    totalErrors++;
+                }
+                else {
+                    totalUpserted += batch.length;
                 }
             }
-            if (records.length < limit)
-                break;
-            offset += limit;
+            catch (err) {
+                functions.logger.warn(`Upsert exception for ${state}:`, (_l = err.message) !== null && _l !== void 0 ? _l : err);
+                totalErrors++;
+            }
         }
-        if (batchCount > 0)
-            await batch.commit();
-        functions.logger.info(`Ingested ${totalIngested} mandi records for ${today}`);
+        functions.logger.info(`[${state}] ${stateRecords.length} records processed`);
+    }
+    // Purge records older than 30 days
+    try {
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - 30);
+        const cutoffStr = cutoff.toISOString().split("T")[0];
+        const { error, count } = await getSupabaseAdmin()
+            .from("mandi_prices")
+            .delete()
+            .lt("arrival_date", cutoffStr);
+        if (error) {
+            functions.logger.warn("Purge error:", error.message);
+        }
+        else {
+            functions.logger.info(`Purged ${count !== null && count !== void 0 ? count : "?"} rows older than ${cutoffStr}`);
+        }
     }
     catch (err) {
-        functions.logger.error("Mandi ingestion failed:", (_q = err.message) !== null && _q !== void 0 ? _q : err);
-        // Store error status in Firestore for monitoring
-        await db.collection("system_logs").doc("mandi_ingestion").set({
-            last_run: admin.firestore.Timestamp.now(),
-            status: "error",
-            error: (_r = err.message) !== null && _r !== void 0 ? _r : "Unknown error",
-            date: today,
-        });
+        functions.logger.warn("Purge exception:", (_m = err.message) !== null && _m !== void 0 ? _m : err);
     }
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+    functions.logger.info(`Sync complete: ${totalUpserted} rows upserted, ${totalErrors} errors, ${duration}s`);
+    // Log sync status to Firestore for monitoring
+    await db.collection("system_logs").doc("mandi_sync").set({
+        last_run: admin.firestore.Timestamp.now(),
+        status: totalErrors === 0 ? "success" : "partial",
+        total_upserted: totalUpserted,
+        total_errors: totalErrors,
+        duration_seconds: parseFloat(duration),
+        states: PRIORITY_STATES.length,
+    });
     return null;
 });
 // ─────────────────────────────────────────────────────────────────────────────
@@ -226,28 +283,33 @@ exports.getMarketSentiment = functions
         throw new functions.https.HttpsError("invalid-argument", "commodity and state are required");
     }
     functions.logger.info(`Sentiment request: ${commodity} in ${state}/${district}`);
-    // 1. Fetch last 30 days of modal prices from Firestore
+    // 1. Fetch last 30 days of modal prices from Supabase
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const cutoffDate = thirtyDaysAgo.toISOString().split("T")[0];
     let priceHistory = [];
     try {
-        const q = db.collection("mandi_prices")
-            .where("commodity", "==", commodity)
-            .where("state", "==", state)
-            .where("date", ">=", cutoffDate)
-            .orderBy("date", "asc")
+        const { data: rows, error } = await getSupabaseAdmin()
+            .from("mandi_prices")
+            .select("arrival_date, modal_price, min_price, max_price")
+            .eq("commodity", commodity)
+            .eq("state", state)
+            .gte("arrival_date", cutoffDate)
+            .order("arrival_date", { ascending: true })
             .limit(30);
-        const snap = await q.get();
-        priceHistory = snap.docs.map((d) => {
-            const r = d.data();
-            return { date: r.date, modal_price: r.modal_price, min_price: r.min_price, max_price: r.max_price };
-        });
+        if (!error && rows) {
+            priceHistory = rows.map((r) => ({
+                date: r.arrival_date,
+                modal_price: r.modal_price,
+                min_price: r.min_price,
+                max_price: r.max_price,
+            }));
+        }
     }
     catch (e) {
-        functions.logger.warn("Firestore price history query failed:", e);
+        functions.logger.warn("Supabase price history query failed:", e);
     }
-    // 2. Fetch latest news summaries
+    // 2. Fetch latest news summaries from Firestore
     let newsItems = [];
     try {
         const newsDoc = await db.collection("market_news").doc("latest").get();
@@ -302,34 +364,6 @@ Return valid JSON: { "sentiment": "Bullish"|"Bearish"|"Stable", "confidence": nu
             priceHistory,
             newsItems,
         };
-    }
-});
-// ─────────────────────────────────────────────────────────────────────────────
-// FUNCTION 6: Proxy for data.gov.in API (Solves CORS)
-// ─────────────────────────────────────────────────────────────────────────────
-exports.proxyDataGov = functions.https.onRequest(async (req, res) => {
-    res.set("Access-Control-Allow-Origin", "*");
-    res.set("Access-Control-Allow-Methods", "GET, OPTIONS");
-    if (req.method === "OPTIONS") {
-        res.status(204).send("");
-        return;
-    }
-    try {
-        const targetPath = req.originalUrl.replace(/^\/api\/datagov/, "");
-        const targetUrl = `https://api.data.gov.in${targetPath}`;
-        const response = await axios_1.default.get(targetUrl, {
-            responseType: 'stream',
-            validateStatus: () => true,
-        });
-        res.status(response.status);
-        if (response.headers["content-type"]) {
-            res.set("Content-Type", response.headers["content-type"]);
-        }
-        response.data.pipe(res);
-    }
-    catch (error) {
-        console.error("Proxy error:", error);
-        res.status(500).json({ error: "Failed to proxy request" });
     }
 });
 //# sourceMappingURL=index.js.map

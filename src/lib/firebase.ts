@@ -2,6 +2,7 @@ import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import { getMessaging, isSupported } from "firebase/messaging";
+import { getFunctions } from "firebase/functions";
 import firebaseConfig from "../../firebase-applet-config.json";
 
 // 1. Initialize the app with your config
@@ -24,5 +25,8 @@ isSupported().then((supported) => {
 }).catch(console.error);
 
 export const getMessagingInstance = () => messagingInstance;
+
+// 5. Initialize Cloud Functions
+export const functions = getFunctions(app);
 
 export default app;

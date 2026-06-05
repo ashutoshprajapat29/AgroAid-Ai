@@ -47,6 +47,7 @@ CREATE INDEX IF NOT EXISTS idx_mandi_market_ilike
 ALTER TABLE mandi_prices ENABLE ROW LEVEL SECURITY;
 
 -- Allow public (anon key) to read
+DROP POLICY IF EXISTS "Public read access" ON mandi_prices;
 CREATE POLICY "Public read access"
   ON mandi_prices FOR SELECT
   USING (true);
@@ -67,7 +68,6 @@ LANGUAGE sql STABLE
 AS $$
   SELECT DISTINCT mp.state
   FROM mandi_prices mp
-  WHERE mp.arrival_date >= CURRENT_DATE - INTERVAL '7 days'
   ORDER BY mp.state;
 $$;
 
@@ -80,7 +80,6 @@ AS $$
   SELECT DISTINCT mp.district
   FROM mandi_prices mp
   WHERE mp.state = p_state
-    AND mp.arrival_date >= CURRENT_DATE - INTERVAL '7 days'
   ORDER BY mp.district;
 $$;
 
@@ -94,7 +93,6 @@ AS $$
   FROM mandi_prices mp
   WHERE mp.state = p_state
     AND mp.district = p_district
-    AND mp.arrival_date >= CURRENT_DATE - INTERVAL '7 days'
   ORDER BY mp.market_name;
 $$;
 
@@ -201,7 +199,10 @@ $$;
 
 -- ─── 7. Nearby markets (same commodity, same district, different market) ─────
 
+DROP FUNCTION IF EXISTS get_nearby_markets(TEXT, TEXT, TEXT);
+
 CREATE OR REPLACE FUNCTION get_nearby_markets(
+  p_state TEXT,
   p_district TEXT,
   p_commodity TEXT,
   p_exclude_market TEXT DEFAULT NULL
@@ -224,15 +225,21 @@ AS $$
     mp.max_price,
     mp.arrival_date
   FROM mandi_prices mp
-  WHERE mp.district = p_district
+  WHERE mp.state = p_state
+    AND mp.district = p_district
     AND UPPER(mp.commodity) = UPPER(p_commodity)
     AND (p_exclude_market IS NULL OR mp.market_name != p_exclude_market)
   ORDER BY mp.market_name, mp.arrival_date DESC;
 $$;
 
--- ─── 8. Search commodities / markets ─────────────────────────────────────────
+-- ─── 8. Search commodities / markets ───────────────────────────────────
 
-CREATE OR REPLACE FUNCTION search_mandi(p_query TEXT)
+DROP FUNCTION IF EXISTS search_mandi(TEXT);
+
+CREATE OR REPLACE FUNCTION search_mandi(
+  p_query TEXT,
+  p_search_type TEXT DEFAULT 'commodity'  -- 'commodity' | 'market'
+)
 RETURNS TABLE(
   state TEXT,
   district TEXT,
@@ -258,8 +265,12 @@ AS $$
     mp.arrival_date
   FROM mandi_prices mp
   WHERE (
-    mp.commodity ILIKE '%' || p_query || '%'
-    OR mp.market_name ILIKE '%' || p_query || '%'
+    CASE
+      WHEN p_search_type = 'market'    THEN mp.market_name ILIKE '%' || p_query || '%'
+      WHEN p_search_type = 'commodity' THEN mp.commodity    ILIKE '%' || p_query || '%'
+      ELSE mp.commodity ILIKE '%' || p_query || '%'
+           OR mp.market_name ILIKE '%' || p_query || '%'
+    END
   )
   AND mp.arrival_date >= CURRENT_DATE - INTERVAL '7 days'
   ORDER BY mp.commodity, mp.market_name, mp.arrival_date DESC
