@@ -53,53 +53,100 @@ async function run() {
     let offset = 0;
     const limit = 500;
     const stateRecords = [];
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const cutoffDateStr = thirtyDaysAgo.toISOString().split("T")[0];
 
     while (true) {
-      try {
-        console.log(`Fetching ${state} offset ${offset}...`);
-        const response = await axios.get(API_URL, {
-          params: {
-            "api-key": dataGovKey,
-            format: "json",
-            limit,
-            offset,
-            "filters[State]": state,
-          },
-          timeout: 20000,
-        });
+      let retries = 3;
+      let success = false;
+      let records = [];
 
-        const records = response.data?.records || [];
-        if (!records.length) break;
+      while (retries > 0 && !success) {
+        try {
+          console.log(`Fetching ${state} offset ${offset}...`);
+          const response = await axios.get(API_URL, {
+            params: {
+              "api-key": dataGovKey,
+              format: "json",
+              limit,
+              offset,
+              "filters[State]": state,
+              "sort[Arrival_Date]": "desc" // Ensure newest first
+            },
+            timeout: 45000,
+          });
 
-        for (const r of records) {
-          const row = {
-            state: (r.State || "").trim(),
-            district: (r.District || "").trim(),
-            market_name: (r.Market || "").trim(),
-            commodity: (r.Commodity || "").trim(),
-            variety: (r.Variety || "").trim(),
-            min_price: parseInt(r.Min_Price) || 0,
-            max_price: parseInt(r.Max_Price) || 0,
-            modal_price: parseInt(r.Modal_Price) || 0,
-            arrival_date: parseArrivalDate(r.Arrival_Date || ""),
-          };
-
-          if (row.state && row.commodity && row.modal_price > 0) {
-            stateRecords.push(row);
-          }
+          records = response.data?.records || [];
+          success = true;
+        } catch (err) {
+          retries--;
+          console.error(`Fetch failed for ${state} offset=${offset}:`, err.message);
+          if (retries === 0) break;
+          console.log("Waiting 5 seconds before retrying...");
+          await new Promise((resolve) => setTimeout(resolve, 5000));
         }
+      }
 
-        if (records.length < limit) break;
-        offset += limit;
-      } catch (err) {
-        console.error(`Fetch failed for ${state} offset=${offset}:`, err.message);
+      if (!success) {
+        console.error(`Giving up on ${state} due to repeated network errors.`);
         break;
       }
+
+      if (!records.length) break;
+
+      let reachedOlderData = false;
+
+      for (const r of records) {
+        const arrivalStr = parseArrivalDate(r.Arrival_Date || "");
+        
+        // Stop processing if we reach data older than our 30 day window
+        if (arrivalStr < cutoffDateStr) {
+            reachedOlderData = true;
+            continue; // Skip appending old data
+        }
+
+        const row = {
+          state: (r.State || "").trim(),
+          district: (r.District || "").trim(),
+          market_name: (r.Market || "").trim(),
+          commodity: (r.Commodity || "").trim(),
+          variety: (r.Variety || "").trim(),
+          min_price: parseInt(r.Min_Price) || 0,
+          max_price: parseInt(r.Max_Price) || 0,
+          modal_price: parseInt(r.Modal_Price) || 0,
+          arrival_date: arrivalStr,
+        };
+
+        if (row.state && row.commodity && row.modal_price > 0) {
+          stateRecords.push(row);
+        }
+      }
+      
+      // If we saw data older than 30 days, we don't need to fetch the next page!
+      if (reachedOlderData) {
+        console.log(`Reached data older than 30 days for ${state}. Stopping pagination.`);
+        break;
+      }
+
+      if (records.length < limit) break;
+      offset += limit;
+      
+      // Add a 1 second delay to prevent 429 Rate Limit from data.gov.in
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     }
 
+    // Deduplicate records to prevent "ON CONFLICT DO UPDATE command cannot affect row a second time"
+    const uniqueRecordsMap = new Map();
+    for (const r of stateRecords) {
+      const key = `${r.state}|${r.district}|${r.market_name}|${r.commodity}|${r.variety}|${r.arrival_date}`;
+      uniqueRecordsMap.set(key, r);
+    }
+    const uniqueStateRecords = Array.from(uniqueRecordsMap.values());
+
     // Batch upsert into Supabase (max 500 rows per call)
-    for (let i = 0; i < stateRecords.length; i += 500) {
-      const batch = stateRecords.slice(i, i + 500);
+    for (let i = 0; i < uniqueStateRecords.length; i += 500) {
+      const batch = uniqueStateRecords.slice(i, i + 500);
       try {
         const { error } = await supabaseAdmin
           .from("mandi_prices")

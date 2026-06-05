@@ -75,11 +75,11 @@ const PRIORITY_STATES = [
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FUNCTION 1: Sync Mandi Prices to Supabase (replaces old Firestore ingestion)
-// Runs every day at 11:00 PM IST (17:30 UTC)
+// Runs every day at 11:00 PM IST
 // ─────────────────────────────────────────────────────────────────────────────
 export const syncMandiToSupabase = functions
   .runWith({ timeoutSeconds: 540, memory: "1GB" })
-  .pubsub.schedule("30 17 * * *")
+  .pubsub.schedule("0 23 * * *")
   .timeZone("Asia/Kolkata")
   .onRun(async (_context) => {
     functions.logger.info("Starting Mandi → Supabase sync for priority states...");
@@ -101,7 +101,11 @@ export const syncMandiToSupabase = functions
       const limit = 500;
       const stateRecords: Record<string, unknown>[] = [];
 
-      // Paginate through all records for this state
+      const twoDaysAgo = new Date();
+      twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+      const cutoffDateStr = twoDaysAgo.toISOString().split("T")[0];
+
+      // Paginate through records for this state
       while (true) {
         try {
           const response = await axios.get(API_URL, {
@@ -110,7 +114,8 @@ export const syncMandiToSupabase = functions
               format: "json",
               limit,
               offset,
-              "filters[State]": state, // As per your API schema
+              "filters[State]": state,
+              "sort[Arrival_Date]": "desc" // Ensure newest first
             },
             timeout: 20000,
           });
@@ -118,8 +123,17 @@ export const syncMandiToSupabase = functions
           const records: any[] = response.data?.records ?? [];
           if (!records.length) break;
 
+          let reachedOlderData = false;
+
           for (const r of records) {
-            // Mapping exactly from the API's PascalCase JSON to our lowercase Supabase schema
+            const arrivalStr = parseArrivalDate(r.Arrival_Date ?? "");
+            
+            // Stop processing if we reach data older than our 2 day window
+            if (arrivalStr < cutoffDateStr) {
+                reachedOlderData = true;
+                continue;
+            }
+
             const row = {
               state: (r.State ?? "").trim(),
               district: (r.District ?? "").trim(),
@@ -129,7 +143,7 @@ export const syncMandiToSupabase = functions
               min_price: parseInt(r.Min_Price) || 0,
               max_price: parseInt(r.Max_Price) || 0,
               modal_price: parseInt(r.Modal_Price) || 0,
-              arrival_date: parseArrivalDate(r.Arrival_Date ?? ""),
+              arrival_date: arrivalStr,
             };
 
             if (row.state && row.commodity && row.modal_price > 0) {
@@ -137,8 +151,16 @@ export const syncMandiToSupabase = functions
             }
           }
 
+          if (reachedOlderData) {
+            functions.logger.info(`Reached data older than 2 days for ${state}. Stopping pagination.`);
+            break;
+          }
+
           if (records.length < limit) break;
           offset += limit;
+          
+          // Add a 1 second delay to prevent 429 Rate Limit
+          await new Promise((resolve) => setTimeout(resolve, 1000));
         } catch (err: any) {
           functions.logger.warn(`Fetch failed for ${state} offset=${offset}:`, err.message ?? err);
           totalErrors++;
@@ -146,9 +168,17 @@ export const syncMandiToSupabase = functions
         }
       }
 
+      // Deduplicate records to prevent "ON CONFLICT DO UPDATE command cannot affect row a second time"
+      const uniqueRecordsMap = new Map();
+      for (const r of stateRecords) {
+        const key = `${r.state}|${r.district}|${r.market_name}|${r.commodity}|${r.variety}|${r.arrival_date}`;
+        uniqueRecordsMap.set(key, r);
+      }
+      const uniqueStateRecords = Array.from(uniqueRecordsMap.values());
+
       // Batch upsert into Supabase (max 500 rows per call)
-      for (let i = 0; i < stateRecords.length; i += 500) {
-        const batch = stateRecords.slice(i, i + 500);
+      for (let i = 0; i < uniqueStateRecords.length; i += 500) {
+        const batch = uniqueStateRecords.slice(i, i + 500);
         try {
           const { error } = await getSupabaseAdmin()
             .from("mandi_prices")
