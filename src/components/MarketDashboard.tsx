@@ -240,7 +240,7 @@ function PriceCard({ item, selected, onClick, sentiment }: {
             </span>
           </div>
           <span className="text-[9px] font-semibold" style={{ color: "var(--text-subtle)" }}>
-            Data as of {new Date(item.arrival_date).toLocaleDateString("en-IN", { day: 'numeric', month: 'short' })}
+            Data as of {new Date(item.date).toLocaleDateString("en-IN", { day: 'numeric', month: 'short' })}
           </span>
         </div>
       </div>
@@ -400,7 +400,13 @@ export default function MarketDashboard() {
     setIsSearching(true);
     setShowSearchResults(true);
     try {
-      const results = await searchMandiPrices(searchQuery.trim(), searchType);
+      const results = await searchMandiPrices(
+        searchQuery.trim(), 
+        searchType,
+        selectedState,
+        selectedDistrict,
+        selectedMarket
+      );
       setSearchResults(results);
     } catch (e) {
       console.error("Search failed:", e);

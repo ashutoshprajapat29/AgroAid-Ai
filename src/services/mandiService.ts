@@ -82,7 +82,7 @@ const ai = new GoogleGenAI({ apiKey: GEN_AI_KEY ?? GEN_AI_KEY2 ?? "" });
 
 async function geminiGenerate(prompt: string): Promise<string> {
   const resp = await ai.models.generateContent({
-    model: "gemini-2.0-flash",
+    model: "gemini-1.5-flash",
     contents: [{ parts: [{ text: prompt }] }],
     config: { responseMimeType: "application/json" },
   });
@@ -192,9 +192,12 @@ export async function fetchLatestPrices(
 // ─── 5. Search Commodities/Markets ───────────────────────────────────────────
 export async function searchMandiPrices(
   searchQuery: string,
-  searchType: "commodity" | "market" = "commodity"
+  searchType: "commodity" | "market" = "commodity",
+  state?: string,
+  district?: string,
+  market?: string
 ): Promise<MandiPrice[]> {
-  const cacheKey = `mandi_search_${searchType}_${searchQuery}`.replace(/\s+/g, "_").toLowerCase();
+  const cacheKey = `mandi_search_${searchType}_${searchQuery}_${state}_${district}_${market}`.replace(/\s+/g, "_").toLowerCase();
 
   return cachedApiCall(
     cacheKey,
@@ -205,6 +208,9 @@ export async function searchMandiPrices(
       const { data, error } = await supabase.rpc("search_mandi", {
         p_query: searchQuery,
         p_search_type: searchType,
+        p_state: state,
+        p_district: district,
+        p_market: market && market !== "All" ? market : undefined
       });
       if (error) throw error;
       return (data ?? []).map((r: any): MandiPrice => ({

@@ -343,7 +343,7 @@ export async function extractFarmUpdates(userQuery: string, botResponse: string,
 
   try {
     const response = await getAIClient().models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-1.5-flash",
       contents: [{ parts: [{ text: prompt }] }],
       config: {
         responseMimeType: "application/json",
@@ -428,7 +428,7 @@ export async function getMarketPrices(location: string = "India", language: stri
 
   try {
     const response = await getAIClient().models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-1.5-flash",
       contents: [{ parts: [{ text: prompt }] }],
       config: {
         responseMimeType: "application/json",

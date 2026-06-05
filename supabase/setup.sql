@@ -238,7 +238,10 @@ DROP FUNCTION IF EXISTS search_mandi(TEXT);
 
 CREATE OR REPLACE FUNCTION search_mandi(
   p_query TEXT,
-  p_search_type TEXT DEFAULT 'commodity'  -- 'commodity' | 'market'
+  p_search_type TEXT DEFAULT 'commodity',  -- 'commodity' | 'market'
+  p_state TEXT DEFAULT NULL,
+  p_district TEXT DEFAULT NULL,
+  p_market TEXT DEFAULT NULL
 )
 RETURNS TABLE(
   state TEXT,
@@ -272,7 +275,10 @@ AS $$
            OR mp.market_name ILIKE '%' || p_query || '%'
     END
   )
-  AND mp.arrival_date >= CURRENT_DATE - INTERVAL '7 days'
+  AND (p_state IS NULL OR mp.state = p_state)
+  AND (p_district IS NULL OR mp.district = p_district)
+  AND (p_market IS NULL OR mp.market_name = p_market)
+  AND mp.arrival_date >= CURRENT_DATE - INTERVAL '30 days'
   ORDER BY mp.commodity, mp.market_name, mp.arrival_date DESC
   LIMIT 50;
 $$;
