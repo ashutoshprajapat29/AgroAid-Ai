@@ -424,7 +424,7 @@ export default function MarketDashboard() {
 
   // ── Load prices ─────────────────────────────────────────────────────────────
   const loadPrices = useCallback(async (forceRefresh = false) => {
-    const locationKey = `${selectedState}_${selectedDistrict}`;
+    const locationKey = `${selectedState}_${selectedDistrict}_${selectedMarket}`;
     if (!forceRefresh && prevLocation.current === locationKey && prices.length > 0) return;
     prevLocation.current = locationKey;
 
@@ -433,12 +433,13 @@ export default function MarketDashboard() {
     setPriceError("");
     try {
       if (forceRefresh) {
-        localStorage.removeItem(`agroaid_cache_mandi_latest_${selectedState}_${selectedDistrict}_all`.replace(/\s+/g, "_").toLowerCase());
+        const mKey = selectedMarket && selectedMarket !== "All" ? selectedMarket : "all";
+        localStorage.removeItem(`agroaid_cache_mandi_latest_${selectedState}_${selectedDistrict}_${mKey}`.replace(/\s+/g, "_").toLowerCase());
         localStorage.removeItem(`agroaid_cache_mandi_db_markets_${selectedState}_${selectedDistrict}`.replace(/\s+/g, "_").toLowerCase());
         // Refetch markets so dropdown updates immediately
         fetchMarkets(selectedState, selectedDistrict).then(setAvailableMarkets).catch(() => {});
       }
-      const data = await fetchLatestPrices(selectedState, selectedDistrict, undefined, language);
+      const data = await fetchLatestPrices(selectedState, selectedDistrict, selectedMarket, language);
       setPrices(data);
       setLastFetched(new Date());
       if (data.length > 0 && !selectedCommodity) setSelectedCommodity(data[0].commodity);
@@ -455,7 +456,7 @@ export default function MarketDashboard() {
       setLoadingPrices(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedState, selectedDistrict, language, isHindi]);
+  }, [selectedState, selectedDistrict, selectedMarket, language, isHindi]);
 
   // ── Load news ─────────────────────────────────────────────────────────────
   const loadNews = useCallback(async () => {
@@ -1147,26 +1148,26 @@ export default function MarketDashboard() {
                       </p>
                     </div>
                   ) : (
-                    <ResponsiveContainer width="100%" height={Math.max(260, barChartData.length * 38)}>
-                      <BarChart data={barChartData} layout="vertical" margin={{ top: 0, right: 40, left: 10, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(34,197,94,0.06)" horizontal={false} />
+                    <ResponsiveContainer width="100%" height={260}>
+                      <BarChart data={barChartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(34,197,94,0.06)" vertical={false} />
                         <XAxis
+                          type="category"
+                          dataKey="shortName"
+                          tick={{ fontSize: 9, fill: "var(--text-main)", fontWeight: 700 }}
+                          tickLine={false}
+                          axisLine={false}
+                        />
+                        <YAxis
                           type="number"
                           tick={{ fontSize: 9, fill: "var(--text-subtle)", fontWeight: 600 }}
                           tickLine={false}
                           axisLine={false}
                           tickFormatter={(v) => `₹${(v / 1000).toFixed(1)}k`}
-                        />
-                        <YAxis
-                          type="category"
-                          dataKey="shortName"
-                          tick={{ fontSize: 10, fill: "var(--text-main)", fontWeight: 700 }}
-                          tickLine={false}
-                          axisLine={false}
-                          width={100}
+                          width={48}
                         />
                         <Tooltip content={<MarketBarTooltip />} cursor={{ fill: "rgba(34,197,94,0.04)" }} />
-                        <Bar dataKey="modal_price" radius={[0, 8, 8, 0]} barSize={22}>
+                        <Bar dataKey="modal_price" radius={[8, 8, 0, 0]} barSize={22}>
                           {barChartData.map((_, idx) => (
                             <Cell key={idx} fill={BAR_COLORS[idx % BAR_COLORS.length]} fillOpacity={0.85} />
                           ))}
