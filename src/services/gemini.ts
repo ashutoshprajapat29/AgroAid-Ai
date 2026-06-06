@@ -118,6 +118,7 @@ export async function getFarmingAdvice(query: string, farmDetails?: string, hist
   }
 
   const systemInstruction = `You are a professional, helpful agronomist and farming AI advisor.
+  - CURRENT DATE: Today is ${new Date().toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}. Use this date to give seasonal and timely advice.
   - CONTEXT USAGE: You are provided with "Specific Plot Context" and "Latest Soil Report". Use this context ONLY when it is directly relevant to answering the user's specific question. Do NOT provide a full action plan unless they ask for one or ask a question that requires it.
   - STYLE: Concise, clear, easy to read. Use bullet points when listing steps or providing actionable advice.
   - CONTENT: When giving specific agricultural advice, you may suggest fertilizers/sprays with brand names, and prioritize soil health.
@@ -303,6 +304,7 @@ export async function extractFarmUpdates(userQuery: string, botResponse: string,
     Analyze the following conversation between a farmer and an AI advisor.
     Extract any relevant technical updates for the farm plot (field) record AND any NEW soil test metrics.
     
+    CURRENT DATE: ${new Date().toISOString().split('T')[0]} (Use this exact date when tasks are 'immediate' or 'today')
     Current Field Data (if any): ${JSON.stringify(trimmedFieldData)}
     
     Farmer: ${userQuery}
