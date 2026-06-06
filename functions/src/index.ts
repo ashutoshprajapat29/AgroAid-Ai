@@ -79,7 +79,7 @@ const PRIORITY_STATES = [
 // ─────────────────────────────────────────────────────────────────────────────
 export const syncMandiToSupabase = functions
   .runWith({ timeoutSeconds: 540, memory: "1GB" })
-  .pubsub.schedule("0 23 * * *")
+  .pubsub.schedule("0 4 * * *")
   .timeZone("Asia/Kolkata")
   .onRun(async (_context) => {
     functions.logger.info("Starting Mandi → Supabase sync for priority states...");
