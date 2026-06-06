@@ -60,17 +60,23 @@ ${JSON.stringify(words)}`;
 async function run() {
   console.log("Fetching unique commodities and markets from Supabase...");
   
-  // Fetch distinct commodities
-  const { data: commData, error: commError } = await supabase.from("mandi_prices").select("commodity");
-  if (commError) throw commError;
-  
-  // Fetch distinct markets
-  const { data: mktData, error: mktError } = await supabase.from("mandi_prices").select("market_name");
-  if (mktError) throw mktError;
+  let allRows = [];
+  let from = 0;
+  const PAGE_SIZE = 1000;
+  while (true) {
+    const { data, error } = await supabase.from("mandi_prices").select("commodity, market_name, variety").range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    allRows = allRows.concat(data);
+    if (data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
 
   const uniqueTerms = new Set([
-    ...commData.map(r => r.commodity?.trim()).filter(Boolean),
-    ...mktData.map(r => r.market_name?.trim()).filter(Boolean)
+    "Average",
+    ...allRows.map(r => r.commodity?.trim()).filter(Boolean),
+    ...allRows.map(r => r.market_name?.trim()).filter(Boolean),
+    ...allRows.map(r => r.variety?.trim()).filter(Boolean)
   ]);
 
   const termsToTranslate = Array.from(uniqueTerms).filter(t => !existingTranslations[t]);
