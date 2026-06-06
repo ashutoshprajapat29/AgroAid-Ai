@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getMarketSentiment = exports.aggregateMarketNews = exports.syncMandiToSupabase = void 0;
+exports.getMarketSentiment = exports.aggregateMarketNews = exports.fetchAgriNews = exports.syncMandiToSupabase = void 0;
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 const axios_1 = __importDefault(require("axios"));
@@ -97,11 +97,11 @@ const PRIORITY_STATES = [
 ];
 // ─────────────────────────────────────────────────────────────────────────────
 // FUNCTION 1: Sync Mandi Prices to Supabase (replaces old Firestore ingestion)
-// Runs every day at 11:00 PM IST (17:30 UTC)
+// Runs every day at 11:00 PM IST
 // ─────────────────────────────────────────────────────────────────────────────
 exports.syncMandiToSupabase = functions
     .runWith({ timeoutSeconds: 540, memory: "1GB" })
-    .pubsub.schedule("30 17 * * *")
+    .pubsub.schedule("0 4 * * *")
     .timeZone("Asia/Kolkata")
     .onRun(async (_context) => {
     var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m;
@@ -119,7 +119,10 @@ exports.syncMandiToSupabase = functions
         let offset = 0;
         const limit = 500;
         const stateRecords = [];
-        // Paginate through all records for this state
+        const twoDaysAgo = new Date();
+        twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+        const cutoffDateStr = twoDaysAgo.toISOString().split("T")[0];
+        // Paginate through records for this state
         while (true) {
             try {
                 const response = await axios_1.default.get(API_URL, {
@@ -128,33 +131,46 @@ exports.syncMandiToSupabase = functions
                         format: "json",
                         limit,
                         offset,
-                        "filters[State]": state, // As per your API schema
+                        "filters[State]": state,
+                        "sort[Arrival_Date]": "desc" // Ensure newest first
                     },
                     timeout: 20000,
                 });
                 const records = (_c = (_b = response.data) === null || _b === void 0 ? void 0 : _b.records) !== null && _c !== void 0 ? _c : [];
                 if (!records.length)
                     break;
+                let reachedOlderData = false;
                 for (const r of records) {
-                    // Mapping exactly from the API's PascalCase JSON to our lowercase Supabase schema
+                    const arrivalStr = parseArrivalDate((_d = r.Arrival_Date) !== null && _d !== void 0 ? _d : "");
+                    // Stop processing if we reach data older than our 2 day window
+                    if (arrivalStr < cutoffDateStr) {
+                        reachedOlderData = true;
+                        continue;
+                    }
                     const row = {
-                        state: ((_d = r.State) !== null && _d !== void 0 ? _d : "").trim(),
-                        district: ((_e = r.District) !== null && _e !== void 0 ? _e : "").trim(),
-                        market_name: ((_f = r.Market) !== null && _f !== void 0 ? _f : "").trim(),
-                        commodity: ((_g = r.Commodity) !== null && _g !== void 0 ? _g : "").trim(),
-                        variety: ((_h = r.Variety) !== null && _h !== void 0 ? _h : "").trim(),
+                        state: ((_e = r.State) !== null && _e !== void 0 ? _e : "").trim(),
+                        district: ((_f = r.District) !== null && _f !== void 0 ? _f : "").trim(),
+                        market_name: ((_g = r.Market) !== null && _g !== void 0 ? _g : "").trim(),
+                        commodity: ((_h = r.Commodity) !== null && _h !== void 0 ? _h : "").trim(),
+                        variety: ((_j = r.Variety) !== null && _j !== void 0 ? _j : "").trim(),
                         min_price: parseInt(r.Min_Price) || 0,
                         max_price: parseInt(r.Max_Price) || 0,
                         modal_price: parseInt(r.Modal_Price) || 0,
-                        arrival_date: parseArrivalDate((_j = r.Arrival_Date) !== null && _j !== void 0 ? _j : ""),
+                        arrival_date: arrivalStr,
                     };
                     if (row.state && row.commodity && row.modal_price > 0) {
                         stateRecords.push(row);
                     }
                 }
+                if (reachedOlderData) {
+                    functions.logger.info(`Reached data older than 2 days for ${state}. Stopping pagination.`);
+                    break;
+                }
                 if (records.length < limit)
                     break;
                 offset += limit;
+                // Add a 1 second delay to prevent 429 Rate Limit
+                await new Promise((resolve) => setTimeout(resolve, 1000));
             }
             catch (err) {
                 functions.logger.warn(`Fetch failed for ${state} offset=${offset}:`, (_k = err.message) !== null && _k !== void 0 ? _k : err);
@@ -162,9 +178,16 @@ exports.syncMandiToSupabase = functions
                 break;
             }
         }
+        // Deduplicate records to prevent "ON CONFLICT DO UPDATE command cannot affect row a second time"
+        const uniqueRecordsMap = new Map();
+        for (const r of stateRecords) {
+            const key = `${r.state}|${r.district}|${r.market_name}|${r.commodity}|${r.variety}|${r.arrival_date}`;
+            uniqueRecordsMap.set(key, r);
+        }
+        const uniqueStateRecords = Array.from(uniqueRecordsMap.values());
         // Batch upsert into Supabase (max 500 rows per call)
-        for (let i = 0; i < stateRecords.length; i += 500) {
-            const batch = stateRecords.slice(i, i + 500);
+        for (let i = 0; i < uniqueStateRecords.length; i += 500) {
+            const batch = uniqueStateRecords.slice(i, i + 500);
             try {
                 const { error } = await getSupabaseAdmin()
                     .from("mandi_prices")
@@ -219,55 +242,139 @@ exports.syncMandiToSupabase = functions
     return null;
 });
 // ─────────────────────────────────────────────────────────────────────────────
-// FUNCTION 2: AI-Filtered Agricultural News Aggregator
-// Runs daily at 08:00 IST — before markets open
+// FUNCTION 2: RSS Agri News Aggregator + Gemini Sentiment (HTTP endpoint)
+// Called from frontend — replaces allorigins.win proxy
+// Results cached 12 hours in Firestore
+// ─────────────────────────────────────────────────────────────────────────────
+const RSS_FEEDS = [
+    { url: "https://www.krishijagran.com/rss/news.xml", source: "Krishi Jagran" },
+    { url: "https://economictimes.indiatimes.com/news/economy/agriculture/rssfeeds/68880913.cms", source: "ET Agriculture" },
+];
+async function fetchRSSFeedServer(feedUrl, source) {
+    var _a, _b, _c, _d, _e;
+    try {
+        const resp = await axios_1.default.get(feedUrl, {
+            timeout: 10000,
+            headers: { "User-Agent": "AgroAid-AI/1.0 (+https://agroaid.app)" },
+        });
+        const text = resp.data;
+        const articles = [];
+        const itemRegex = /<item>([\s\S]*?)<\/item>/gi;
+        let match;
+        while ((match = itemRegex.exec(text)) !== null && articles.length < 5) {
+            const item = match[1];
+            const title = ((_a = item.match(/<title><!\[CDATA\[(.*?)\]\]>|<title>(.*?)<\/title>/)) === null || _a === void 0 ? void 0 : _a[1]) || ((_b = item.match(/<title>(.*?)<\/title>/)) === null || _b === void 0 ? void 0 : _b[1]) || "";
+            const desc = ((_c = item.match(/<description><!\[CDATA\[(.*?)\]\]>|<description>(.*?)<\/description>/)) === null || _c === void 0 ? void 0 : _c[1]) || ((_d = item.match(/<description>(.*?)<\/description>/)) === null || _d === void 0 ? void 0 : _d[1]) || "";
+            const link = ((_e = item.match(/<link>(.*?)<\/link>/)) === null || _e === void 0 ? void 0 : _e[1]) || "";
+            if (title.trim()) {
+                articles.push({
+                    title: title.replace(/<[^>]+>/g, "").trim(),
+                    description: desc.replace(/<[^>]+>/g, "").trim().slice(0, 200),
+                    link: link.trim(),
+                    source,
+                });
+            }
+        }
+        return articles;
+    }
+    catch (e) {
+        functions.logger.warn(`RSS feed ${source} failed:`, e);
+        return [];
+    }
+}
+exports.fetchAgriNews = functions
+    .runWith({ timeoutSeconds: 60, memory: "256MB" })
+    .https.onCall(async (data, context) => {
+    var _a, _b;
+    const language = data.language || "English";
+    const cacheDocId = `news_${language.toLowerCase()}`;
+    // Check Firestore cache (12hr)
+    try {
+        const doc = await db.collection("agri_news_cache").doc(cacheDocId).get();
+        if (doc.exists) {
+            const cacheData = doc.data();
+            const ageMs = Date.now() - ((_b = (_a = cacheData.cached_at) === null || _a === void 0 ? void 0 : _a.toMillis()) !== null && _b !== void 0 ? _b : 0);
+            if (ageMs < 12 * 60 * 60 * 1000) {
+                return { items: cacheData.items, cached: true };
+            }
+        }
+    }
+    catch (e) {
+        functions.logger.warn("Cache read failed:", e);
+    }
+    // Fetch RSS feeds in parallel
+    const feedResults = await Promise.allSettled(RSS_FEEDS.map((f) => fetchRSSFeedServer(f.url, f.source)));
+    const allArticles = [];
+    for (const result of feedResults) {
+        if (result.status === "fulfilled")
+            allArticles.push(...result.value);
+    }
+    let items = [];
+    if (allArticles.length > 0) {
+        const top = allArticles.slice(0, 5);
+        const langNote = language === "Hindi"
+            ? "Translate title and impact to Hindi (Devanagari script)."
+            : "Keep in English.";
+        const prompt = `Classify the sentiment of these agricultural news articles. ${langNote}\nArticles:\n${top.map((a, i) => `${i + 1}. "${a.title}" — ${a.description}`).join("\n")}\n\nReturn ONLY a JSON array. For each: {\"title\":string,\"impact\":string (2 short sentences),\"sentiment\":\"Positive\"|\"Negative\"|\"Neutral\",\"commodity\":string,\"source\":string,\"link\":string}`;
+        try {
+            const raw = await callGemini(prompt, true);
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+                items = parsed.map((item, i) => {
+                    var _a, _b, _c, _d, _e, _f;
+                    return (Object.assign(Object.assign({}, item), { source: (_c = (_b = (_a = top[i]) === null || _a === void 0 ? void 0 : _a.source) !== null && _b !== void 0 ? _b : item.source) !== null && _c !== void 0 ? _c : "", link: (_f = (_e = (_d = top[i]) === null || _d === void 0 ? void 0 : _d.link) !== null && _e !== void 0 ? _e : item.link) !== null && _f !== void 0 ? _f : "" }));
+                }).slice(0, 4);
+            }
+        }
+        catch (e) {
+            functions.logger.warn("Gemini classification failed, using raw articles");
+            items = top.slice(0, 4).map((a) => ({
+                title: a.title,
+                impact: a.description,
+                sentiment: "Neutral",
+                commodity: "General",
+                source: a.source,
+                link: a.link,
+            }));
+        }
+    }
+    // Fallback: AI-generated news
+    if (items.length === 0) {
+        const langNote = language === "Hindi" ? "Write in Hindi (Devanagari)." : "Write in English.";
+        const prompt = `Generate 3 realistic agricultural news items for Indian farmers today. Cover: MSP/government policy, monsoon/weather, export/import. ${langNote}\nReturn ONLY JSON array of 3: {\"title\":string,\"impact\":string,\"sentiment\":\"Positive\"|\"Negative\"|\"Neutral\",\"commodity\":string}`;
+        try {
+            const raw = await callGemini(prompt, true);
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed))
+                items = parsed.slice(0, 3);
+        }
+        catch (e) {
+            functions.logger.error("Fallback news generation failed:", e);
+        }
+    }
+    // Cache result
+    try {
+        await db.collection("agri_news_cache").doc(cacheDocId).set({
+            items,
+            cached_at: admin.firestore.Timestamp.now(),
+            language,
+        });
+    }
+    catch (e) {
+        functions.logger.warn("Cache write failed:", e);
+    }
+    return { items, cached: false };
+});
+// ─────────────────────────────────────────────────────────────────────────────
+// FUNCTION 3 (legacy): AI Market News — kept for backwards compat
 // ─────────────────────────────────────────────────────────────────────────────
 exports.aggregateMarketNews = functions
     .runWith({ timeoutSeconds: 180, memory: "256MB" })
-    .pubsub.schedule("30 2 * * *") // 08:00 IST = 02:30 UTC
+    .pubsub.schedule("30 2 * * *")
     .timeZone("Asia/Kolkata")
     .onRun(async (_context) => {
-    var _a, _b, _c;
-    functions.logger.info("Starting market news aggregation...");
-    // Seed news from public RSS / government portals
-    const RAW_SOURCES = [
-        "https://newsapi.org/v2/everything?q=India+mandi+prices+agriculture&language=en&pageSize=10",
-        // Fallback: we always generate AI news as well
-    ];
-    let rawSnippets = [];
-    // Try NewsAPI if key is set
-    const newsApiKey = process.env.NEWS_API_KEY;
-    if (newsApiKey) {
-        try {
-            const newsResp = await axios_1.default.get(RAW_SOURCES[0] + `&apiKey=${newsApiKey}`, { timeout: 10000 });
-            const articles = (_b = (_a = newsResp.data) === null || _a === void 0 ? void 0 : _a.articles) !== null && _b !== void 0 ? _b : [];
-            rawSnippets = articles.slice(0, 10).map((a) => { var _a, _b; return `${a.title}: ${(_b = (_a = a.description) !== null && _a !== void 0 ? _a : a.content) !== null && _b !== void 0 ? _b : ""}`; });
-        }
-        catch (e) {
-            functions.logger.warn("NewsAPI failed, using Gemini-generated news context");
-        }
-    }
-    // If no real news fetched, have Gemini generate today's key agricultural events
-    const prompt = rawSnippets.length > 0
-        ? `You are an expert Indian agri-economist. Analyze these news items and return EXACTLY 3 that directly affect Indian commodity market prices (MSP announcements, import/export duty changes, monsoon updates, trade pacts, storage shortages).\n\nNews items:\n${rawSnippets.join("\n")}\n\nReturn a JSON array of exactly 3 objects. Each: { "title": string (max 10 words), "impact": string (2 sentences, simple language), "sentiment": "Positive"|"Negative"|"Neutral", "commodity": string (affected crop or "General") }`
-        : `You are an expert Indian agri-economist. Generate a realistic summary of 3 key agricultural market events that would affect Indian Mandi prices TODAY (${new Date().toLocaleDateString("en-IN")}). Include one about MSP/government policy, one about monsoon/weather impact, and one about export/import trade. Return a JSON array of exactly 3 objects: { "title": string, "impact": string (2 sentences), "sentiment": "Positive"|"Negative"|"Neutral", "commodity": string }`;
-    try {
-        const raw = await callGemini(prompt, true);
-        const parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed) || parsed.length === 0) {
-            throw new Error("Gemini returned empty news array");
-        }
-        await db.collection("market_news").doc("latest").set({
-            items: parsed.slice(0, 3),
-            timestamp: admin.firestore.Timestamp.now(),
-            generated_date: new Date().toISOString().split("T")[0],
-            source: rawSnippets.length > 0 ? "newsapi" : "gemini_generated",
-        });
-        functions.logger.info("Market news saved:", parsed.length, "items");
-    }
-    catch (err) {
-        functions.logger.error("News aggregation failed:", (_c = err.message) !== null && _c !== void 0 ? _c : err);
-    }
+    functions.logger.info("aggregateMarketNews: delegating to fetchAgriNews logic...");
+    // News is now served via fetchAgriNews HTTP endpoint with Firestore caching
     return null;
 });
 // ─────────────────────────────────────────────────────────────────────────────

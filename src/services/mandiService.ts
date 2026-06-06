@@ -82,7 +82,7 @@ const ai = new GoogleGenAI({ apiKey: GEN_AI_KEY ?? GEN_AI_KEY2 ?? "" });
 
 async function geminiGenerate(prompt: string): Promise<string> {
   const resp = await ai.models.generateContent({
-    model: "gemini-1.5-flash",
+    model: "gemini-2.5-flash",
     contents: [{ parts: [{ text: prompt }] }],
     config: { responseMimeType: "application/json" },
   });
@@ -422,6 +422,8 @@ function mapToDataGovState(rawState: string): string {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import { httpsCallable } from "firebase/functions";
+import { checkNightlySync } from "./newsService";
+import dynamicTranslations from "../lib/mandi_translations.json";
 import { functions } from "../lib/firebase";
 
 export async function fetchMarketNews(language = "English"): Promise<NewsItem[]> {
@@ -536,7 +538,8 @@ export const COMMON_COMMODITIES = [
 ];
 
 export const COMMON_COMMODITIES_HI: Record<string, string> = {
-  "Wheat": "गेहूं", "Rice": "चावल", "Tomato": "टमाटर", "Onion": "प्याज",
+  ...dynamicTranslations,
+  "Wheat": "गेहूं", "Rice": "चावल", "Tomato": "टमाटर", "Onion": " प्याज",
   "Potato": "आलू", "Cotton": "कपास", "Maize": "मक्का", "Soybean": "सोयाबीन",
   "Sugarcane": "गन्ना", "Chilli": "मिर्च", "Garlic": "लहसुन",
   "Groundnut": "मूंगफली", "Mustard": "सरसों", "Turmeric": "हल्दी",

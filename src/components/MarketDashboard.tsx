@@ -64,6 +64,7 @@ function PriceTooltip({ active, payload, label }: any) {
 
 // ─── Bar Chart Tooltip (Market Comparison) ────────────────────────────────────
 function MarketBarTooltip({ active, payload }: any) {
+  const { t } = useLanguage();
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
   return (
@@ -82,17 +83,17 @@ function MarketBarTooltip({ active, payload }: any) {
       <div className="space-y-1">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-emerald-400" />
-          <span className="text-xs" style={{ color: "var(--text-muted)" }}>Modal:</span>
+          <span className="text-xs" style={{ color: "var(--text-muted)" }}>{t("market.modal")}:</span>
           <span className="text-xs font-bold text-emerald-400">₹{d.modal_price?.toLocaleString("en-IN")}</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-blue-400" />
-          <span className="text-xs" style={{ color: "var(--text-muted)" }}>Min:</span>
+          <span className="text-xs" style={{ color: "var(--text-muted)" }}>{t("market.min")}:</span>
           <span className="text-xs font-bold text-blue-400">₹{d.min_price?.toLocaleString("en-IN")}</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-rose-400" />
-          <span className="text-xs" style={{ color: "var(--text-muted)" }}>Max:</span>
+          <span className="text-xs" style={{ color: "var(--text-muted)" }}>{t("market.max")}:</span>
           <span className="text-xs font-bold text-rose-400">₹{d.max_price?.toLocaleString("en-IN")}</span>
         </div>
       </div>
@@ -174,6 +175,7 @@ function PriceCard({ item, selected, onClick, sentiment }: {
   onClick: () => void;
   sentiment?: SentimentResult;
 }) {
+  const { t } = useLanguage();
   const change = item.max_price - item.min_price;
   const changePercent = item.min_price > 0 ? ((change / item.min_price) * 100).toFixed(1) : "0";
   const formatName = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
@@ -217,9 +219,9 @@ function PriceCard({ item, selected, onClick, sentiment }: {
 
         <div className="grid grid-cols-3 gap-2 pt-3 border-t" style={{ borderColor: "var(--border-card)" }}>
           {[
-            { label: "Min", value: item.min_price, color: "text-blue-400" },
-            { label: "Modal", value: item.modal_price, color: "text-emerald-400" },
-            { label: "Max", value: item.max_price, color: "text-rose-400" },
+            { label: t("market.min"), value: item.min_price, color: "text-blue-400" },
+            { label: t("market.modal"), value: item.modal_price, color: "text-emerald-400" },
+            { label: t("market.max"), value: item.max_price, color: "text-rose-400" },
           ].map((m) => (
             <div key={m.label} className="text-center">
               <p className="text-[8px] font-black uppercase tracking-widest mb-0.5" style={{ color: "var(--text-subtle)" }}>{m.label}</p>
@@ -236,11 +238,11 @@ function PriceCard({ item, selected, onClick, sentiment }: {
               <Minus size={12} style={{ color: "var(--text-subtle)" }} />
             )}
             <span className="text-[10px] font-bold" style={{ color: "var(--text-muted)" }}>
-              Spread ₹{change.toLocaleString("en-IN")} · {changePercent}%
+              {t("market.spread")} ₹{change.toLocaleString("en-IN")} · {changePercent}%
             </span>
           </div>
           <span className="text-[9px] font-semibold" style={{ color: "var(--text-subtle)" }}>
-            Data as of {new Date(item.date).toLocaleDateString("en-IN", { day: 'numeric', month: 'short' })}
+            {t("market.data_as_of")} {new Date(item.date).toLocaleDateString("en-IN", { day: 'numeric', month: 'short' })}
           </span>
         </div>
       </div>
@@ -304,7 +306,7 @@ const BAR_COLORS = [
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function MarketDashboard() {
-  const { isHindi, language } = useLanguage();
+  const { isHindi, language, t } = useLanguage();
 
   // Filters
   const [selectedState, setSelectedState] = useState(() => {
@@ -571,15 +573,7 @@ export default function MarketDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detailCommodity, timeRange, selectedState, selectedDistrict]);
 
-  // ── Auto-trigger sentiment once history finishes loading ──────────────────
-  useEffect(() => {
-    if (!detailCommodity || loadingHistory || sentiment || loadingSentiment) return;
-    if (priceHistory.length === 0) return; // no data to analyse yet
-    // Auto-run on first load of a commodity detail (sentiment not yet fetched)
-    runSentimentAnalysis();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadingHistory, detailCommodity]);
-
+  // ── Auto-trigger sentiment disabled as per user request ──────────────────
   // ── Manual sentiment trigger ──────────────────────────────────────────────
   const runSentimentAnalysis = async () => {
     if (!selectedCommodity || loadingSentiment) return;
@@ -916,9 +910,9 @@ export default function MarketDashboard() {
                   {/* Stat pills */}
                   <div className="flex gap-2 flex-wrap mt-4">
                     {[
-                      { label: "Min", value: `₹${detailCommodity.min_price.toLocaleString("en-IN")}`, color: "text-blue-400" },
-                      { label: "Modal", value: `₹${detailCommodity.modal_price.toLocaleString("en-IN")}`, color: "text-emerald-400" },
-                      { label: "Max", value: `₹${detailCommodity.max_price.toLocaleString("en-IN")}`, color: "text-rose-400" },
+                      { label: t("market.min"), value: `₹${detailCommodity.min_price.toLocaleString("en-IN")}`, color: "text-blue-400" },
+                      { label: t("market.modal"), value: `₹${detailCommodity.modal_price.toLocaleString("en-IN")}`, color: "text-emerald-400" },
+                      { label: t("market.max"), value: `₹${detailCommodity.max_price.toLocaleString("en-IN")}`, color: "text-rose-400" },
                       ...(avgModal > 0 ? [{ label: isHindi ? "औसत" : "Avg", value: `₹${avgModal.toLocaleString("en-IN")}`, color: "text-amber-400" }] : []),
                       ...(priceHistory.length >= 2 ? [{
                         label: isHindi ? "बदलाव" : "Change",
@@ -979,15 +973,15 @@ export default function MarketDashboard() {
                               </div>
                               <div className="flex items-center gap-4">
                                 <div className="text-center">
-                                  <p className="text-[8px] font-black uppercase" style={{ color: "var(--text-subtle)" }}>Min</p>
+                                  <p className="text-[8px] font-black uppercase" style={{ color: "var(--text-subtle)" }}>{t("market.min")}</p>
                                   <p className="text-xs font-bold text-blue-400">₹{v.min_price.toLocaleString("en-IN")}</p>
                                 </div>
                                 <div className="text-center">
-                                  <p className="text-[8px] font-black uppercase" style={{ color: "var(--text-subtle)" }}>Modal</p>
+                                  <p className="text-[8px] font-black uppercase" style={{ color: "var(--text-subtle)" }}>{t("market.modal")}</p>
                                   <p className="text-xs font-bold text-emerald-400">₹{v.modal_price.toLocaleString("en-IN")}</p>
                                 </div>
                                 <div className="text-center">
-                                  <p className="text-[8px] font-black uppercase" style={{ color: "var(--text-subtle)" }}>Max</p>
+                                  <p className="text-[8px] font-black uppercase" style={{ color: "var(--text-subtle)" }}>{t("market.max")}</p>
                                   <p className="text-xs font-bold text-rose-400">₹{v.max_price.toLocaleString("en-IN")}</p>
                                 </div>
                               </div>

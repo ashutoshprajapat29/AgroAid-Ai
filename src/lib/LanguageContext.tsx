@@ -129,6 +129,14 @@ export const translations: Record<string, { English: string; Hindi: string }> = 
   "market.category.vegetables":{ English: "Vegetables",   Hindi: "सब्जियाँ" },
   "market.category.fruits":{ English: "Fruits",            Hindi: "फल" },
   "market.category.cash": { English: "Cash Crops",         Hindi: "नकदी फसलें" },
+  "market.spread":        { English: "Spread",             Hindi: "अंतर" },
+  "market.data_as_of":    { English: "Data as of",         Hindi: "डेटा की तारीख" },
+  "market.min":           { English: "Min",                Hindi: "न्यूनतम" },
+  "market.modal":         { English: "Modal",              Hindi: "मोडल" },
+  "market.max":           { English: "Max",                Hindi: "अधिकतम" },
+  "market.state":         { English: "State",              Hindi: "राज्य" },
+  "market.district":      { English: "District",           Hindi: "ज़िला" },
+  "market.mandi":         { English: "Market",             Hindi: "मंडी" },
 
   // FieldManager / Plots
   "plots.title":          { English: "Farm Plots & Soil",  Hindi: "खेत और मिट्टी" },

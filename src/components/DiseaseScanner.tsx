@@ -12,7 +12,7 @@ import { useLanguage } from "../lib/LanguageContext";
 
 export default function DiseaseScanner() {
   const { user } = useAuth();
-  const { t } = useLanguage();
+  const { t, isHindi } = useLanguage();
   const [image, setImage]           = useState<string | null>(null);
   const [loading, setLoading]       = useState(false);
   const [result, setResult]         = useState<string | null>(null);
@@ -71,7 +71,7 @@ export default function DiseaseScanner() {
     try {
       const base64 = image.split(",")[1];
       const mime   = image.split(",")[0].split(":")[1].split(";")[0];
-      const analysis = await detectPlantDisease(base64, mime);
+      const analysis = await detectPlantDisease(base64, mime, isHindi ? "Hindi" : "English");
       setResult(analysis);
 
       // Save to history

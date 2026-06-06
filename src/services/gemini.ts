@@ -234,8 +234,8 @@ export async function analyzeFarmingImage(images: { data: string, mimeType: stri
   }
 }
 
-export async function detectPlantDisease(base64Image: string, mimeType: string) {
-  const prompt = "Identify the plant and check for diseases. Be supportive and direct. If diseased, name it, cause, and immediate treatment. If healthy, skip explanations and give one growth tip. Use bullet points. End by asking if the user has noticed this on other parts of the plant or in other plots.";
+export async function detectPlantDisease(base64Image: string, mimeType: string, language: string = "English") {
+  const prompt = `Identify the plant and check for diseases. Be supportive and direct. If diseased, name it, cause, and immediate treatment. If healthy, skip explanations and give one growth tip. Use bullet points. End by asking if the user has noticed this on other parts of the plant or in other plots. Respond strictly in ${language}.`;
 
   const imagePart = {
     inlineData: {
@@ -343,7 +343,7 @@ export async function extractFarmUpdates(userQuery: string, botResponse: string,
 
   try {
     const response = await getAIClient().models.generateContent({
-      model: "gemini-1.5-flash",
+      model: "gemini-2.5-flash",
       contents: [{ parts: [{ text: prompt }] }],
       config: {
         responseMimeType: "application/json",
@@ -428,7 +428,7 @@ export async function getMarketPrices(location: string = "India", language: stri
 
   try {
     const response = await getAIClient().models.generateContent({
-      model: "gemini-1.5-flash",
+      model: "gemini-2.5-flash",
       contents: [{ parts: [{ text: prompt }] }],
       config: {
         responseMimeType: "application/json",
