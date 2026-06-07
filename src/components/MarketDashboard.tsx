@@ -28,10 +28,35 @@ import mandiTranslations from "../lib/mandi_translations.json";
 type TimeRange = "1D" | "7D" | "30D" | "1Y";
 
 // ─── Translation Helper ───────────────────────────────────────────────────────
+const normalizedTranslations: Record<string, string> = {};
+const buildTranslations = () => {
+  const sources = [
+    mandiTranslations as Record<string, string>,
+    COMMON_LOCATIONS_HI,
+    COMMON_COMMODITIES_HI
+  ];
+  for (const src of sources) {
+    if (!src) continue;
+    for (const [k, v] of Object.entries(src)) {
+      normalizedTranslations[k.toLowerCase()] = v;
+    }
+  }
+};
+buildTranslations();
+
 function translateName(name: string, isHindi: boolean): string {
   if (!isHindi || !name) return name;
   const dict = mandiTranslations as Record<string, string>;
-  return dict[name] ?? COMMON_LOCATIONS_HI[name] ?? COMMON_COMMODITIES_HI[name] ?? name;
+  // 1. Exact match
+  if (dict[name]) return dict[name];
+  if (COMMON_LOCATIONS_HI[name]) return COMMON_LOCATIONS_HI[name];
+  if (COMMON_COMMODITIES_HI[name]) return COMMON_COMMODITIES_HI[name];
+  
+  // 2. Case-insensitive match
+  const lower = name.toLowerCase();
+  if (normalizedTranslations[lower]) return normalizedTranslations[lower];
+  
+  return name;
 }
 
 const TIME_RANGES: { key: TimeRange; label: string; labelHi: string }[] = [

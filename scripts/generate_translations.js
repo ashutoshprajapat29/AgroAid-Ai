@@ -31,30 +31,35 @@ if (fs.existsSync(TRANSLATIONS_FILE)) {
   existingTranslations = JSON.parse(fs.readFileSync(TRANSLATIONS_FILE, "utf-8"));
 }
 
-async function translateBatch(words) {
+async function translateBatch(words, retries = 3) {
   const prompt = `You are an expert in Indian agriculture. Translate the following English agricultural terms (crop names and market names) into Hindi. Ensure the translation is accurate and commonly used in Indian Mandis. 
 Respond ONLY with a valid JSON object where the keys are the original English words and the values are the Hindi translations. Do not include markdown formatting or extra text.
 
 Terms to translate:
 ${JSON.stringify(words)}`;
 
-  try {
-    const resp = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: [{ parts: [{ text: prompt }] }],
-      config: { responseMimeType: "application/json" }
-    });
-    
-    let text = resp.text || "{}";
-    // Strip markdown code blocks if present
-    if (text.startsWith("```json")) text = text.replace(/```json/g, "").replace(/```/g, "");
-    else if (text.startsWith("```")) text = text.replace(/```/g, "");
-    
-    return JSON.parse(text);
-  } catch (err) {
-    console.error("Gemini Translation Error:", err);
-    return {};
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const resp = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [{ parts: [{ text: prompt }] }],
+        config: { responseMimeType: "application/json" }
+      });
+      
+      let text = resp.text || "{}";
+      // Strip markdown code blocks if present
+      if (text.startsWith("```json")) text = text.replace(/```json/g, "").replace(/```/g, "");
+      else if (text.startsWith("```")) text = text.replace(/```/g, "");
+      
+      return JSON.parse(text);
+    } catch (err) {
+      console.error(`Gemini Translation Error (Attempt ${attempt}):`, err.message || err);
+      if (attempt === retries) return {};
+      // Wait before retrying (exponential backoff)
+      await new Promise(res => setTimeout(res, attempt * 3000));
+    }
   }
+  return {};
 }
 
 async function run() {
@@ -64,7 +69,7 @@ async function run() {
   let from = 0;
   const PAGE_SIZE = 1000;
   while (true) {
-    const { data, error } = await supabase.from("mandi_prices").select("commodity, market_name, variety").range(from, from + PAGE_SIZE - 1);
+    const { data, error } = await supabase.from("mandi_prices").select("commodity, market_name, variety, district, state").range(from, from + PAGE_SIZE - 1);
     if (error) throw error;
     if (!data || data.length === 0) break;
     allRows = allRows.concat(data);
@@ -76,7 +81,9 @@ async function run() {
     "Average",
     ...allRows.map(r => r.commodity?.trim()).filter(Boolean),
     ...allRows.map(r => r.market_name?.trim()).filter(Boolean),
-    ...allRows.map(r => r.variety?.trim()).filter(Boolean)
+    ...allRows.map(r => r.variety?.trim()).filter(Boolean),
+    ...allRows.map(r => r.district?.trim()).filter(Boolean),
+    ...allRows.map(r => r.state?.trim()).filter(Boolean)
   ]);
 
   const termsToTranslate = Array.from(uniqueTerms).filter(t => !existingTranslations[t]);
