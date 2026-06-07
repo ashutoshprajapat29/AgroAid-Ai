@@ -17,14 +17,23 @@ import {
   fetchMarketComparison, fetchStates, fetchDistricts, fetchMarkets,
   fetchCommodityVarieties,
   INDIA_STATES_DISTRICTS,
-  COMMON_COMMODITIES, COMMON_COMMODITIES_HI,
+  COMMON_COMMODITIES, COMMON_COMMODITIES_HI, COMMON_LOCATIONS_HI,
   MandiPrice, PriceHistory, NewsItem, SentimentResult, MarketCompare,
   VarietyPrice,
 } from "../services/mandiService";
 import { useLanguage } from "../lib/LanguageContext";
+import mandiTranslations from "../lib/mandi_translations.json";
 
 // ─── Time Range type ──────────────────────────────────────────────────────────
 type TimeRange = "1D" | "7D" | "30D" | "1Y";
+
+// ─── Translation Helper ───────────────────────────────────────────────────────
+function translateName(name: string, isHindi: boolean): string {
+  if (!isHindi || !name) return name;
+  const dict = mandiTranslations as Record<string, string>;
+  return dict[name] ?? COMMON_LOCATIONS_HI[name] ?? COMMON_COMMODITIES_HI[name] ?? name;
+}
+
 const TIME_RANGES: { key: TimeRange; label: string; labelHi: string }[] = [
   { key: "1D", label: "1D", labelHi: "1दिन" },
   { key: "7D", label: "7D", labelHi: "7दिन" },
@@ -175,7 +184,7 @@ function PriceCard({ item, selected, onClick, sentiment }: {
   onClick: () => void;
   sentiment?: SentimentResult;
 }) {
-  const { t } = useLanguage();
+  const { t, isHindi } = useLanguage();
   const change = item.max_price - item.min_price;
   const changePercent = item.min_price > 0 ? ((change / item.min_price) * 100).toFixed(1) : "0";
   const formatName = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
@@ -200,10 +209,10 @@ function PriceCard({ item, selected, onClick, sentiment }: {
         <div className="flex justify-between items-start mb-3">
           <div>
             <h3 className="font-black text-base tracking-tight" style={{ color: "var(--text-main)" }}>
-              {formatName(item.commodity)}
+              {isHindi ? translateName(formatName(item.commodity), isHindi) : formatName(item.commodity)}
             </h3>
             <p className="text-[10px] font-semibold uppercase tracking-wider mt-0.5" style={{ color: "var(--text-muted)" }}>
-              {item.market_name || item.variety || item.district}
+              {isHindi ? translateName(item.market_name || item.variety || item.district || "", isHindi) : (item.market_name || item.variety || item.district)}
             </p>
           </div>
           {sentiment && <SentimentBadge s={sentiment} isHindi={false} />}
@@ -269,6 +278,7 @@ function Dropdown({ label, value, options, onChange, icon: Icon }: {
   label: string; value: string; options: string[];
   onChange: (v: string) => void; icon: React.ElementType;
 }) {
+  const { isHindi } = useLanguage();
   return (
     <div className="relative">
       <div className="flex items-center gap-1.5 mb-1">
@@ -287,7 +297,7 @@ function Dropdown({ label, value, options, onChange, icon: Icon }: {
           }}
         >
           {options.map((o) => (
-            <option key={o} value={o}>{o}</option>
+            <option key={o} value={o}>{isHindi ? translateName(o, isHindi) : o}</option>
           ))}
         </select>
         <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-subtle)" }} />
@@ -841,7 +851,7 @@ export default function MarketDashboard() {
               className={`shrink-0 px-3 py-1.5 rounded-xl text-[11px] font-bold border transition-all hover:border-emerald-500/30 hover:text-emerald-400`}
               style={{ background: "var(--bg-input)", borderColor: "var(--border-input)", color: "var(--text-muted)" }}
             >
-              {isHindi ? (COMMON_COMMODITIES_HI[c] ?? c) : c}
+              {isHindi ? translateName(c, isHindi) : c}
             </button>
           ))}
         </div>
@@ -904,10 +914,12 @@ export default function MarketDashboard() {
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                       <h2 className="text-2xl font-black tracking-tight" style={{ color: "var(--text-main)" }}>
-                        {isHindi ? (COMMON_COMMODITIES_HI[detailCommodity.commodity] ?? formatCommodityName(detailCommodity.commodity)) : formatCommodityName(detailCommodity.commodity)}
+                        {isHindi ? translateName(formatCommodityName(detailCommodity.commodity), isHindi) : formatCommodityName(detailCommodity.commodity)}
                       </h2>
                       <p className="text-xs font-medium mt-1" style={{ color: "var(--text-muted)" }}>
-                        {detailCommodity.market_name} · {detailCommodity.district}, {detailCommodity.state}
+                        {isHindi ? translateName(detailCommodity.market_name, isHindi) : detailCommodity.market_name} ·{" "}
+                        {isHindi ? translateName(detailCommodity.district, isHindi) : detailCommodity.district},{" "}
+                        {isHindi ? translateName(detailCommodity.state, isHindi) : detailCommodity.state}
                       </p>
                     </div>
                     <div className="flex items-baseline gap-1">
@@ -980,7 +992,7 @@ export default function MarketDashboard() {
                               <div className="flex items-center gap-2">
                                 {isBest && <span className="text-emerald-400 text-xs">✨</span>}
                                 <span className="text-sm font-bold" style={{ color: "var(--text-main)" }}>
-                                  {v.variety || "Standard"}
+                                  {isHindi ? translateName(v.variety || "Standard", isHindi) : (v.variety || "Standard")}
                                 </span>
                               </div>
                               <div className="flex items-center gap-4">
