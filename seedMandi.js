@@ -10,8 +10,6 @@ const getEnv = (key) => {
 };
 
 const supabaseUrl = getEnv("VITE_SUPABASE_URL");
-// For admin writes, we ideally use the service_role key, but since RLS is loose right now or we are just testing,
-// Let's grab the service role from functions/.env
 const funcEnvFile = fs.readFileSync("functions/.env", "utf-8");
 const getFuncEnv = (key) => {
   const match = funcEnvFile.match(new RegExp(`${key}="(.*?)"`));
@@ -26,6 +24,8 @@ if (!supabaseUrl || !supabaseServiceKey || !dataGovKey) {
 }
 
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
+// Historical endpoint — data persists permanently, uses PascalCase field names
 const API_URL = "https://api.data.gov.in/resource/35985678-0d79-46b4-9ed6-6f13308a1d24";
 
 const PRIORITY_STATES = [
@@ -45,97 +45,104 @@ function parseArrivalDate(dateStr) {
   return dateStr;
 }
 
+// Generate last N days in DD/MM/YYYY format (what the historical API expects)
+function getLastNDaysFormatted(n) {
+  const dates = [];
+  for (let i = 0; i < n; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const year = d.getFullYear();
+    dates.push(`${day}/${month}/${year}`);
+  }
+  return dates;
+}
+
 async function run() {
-  console.log("Starting instant manual sync to Supabase...");
+  // Default: fetch last 3 days. Pass a number as CLI arg to override.
+  const daysToFetch = parseInt(process.argv[2]) || 3;
+  const targetDates = getLastNDaysFormatted(daysToFetch);
+
+  console.log(`Starting manual sync to Supabase...`);
+  console.log(`Fetching data for dates: ${targetDates.join(", ")}`);
   let totalUpserted = 0;
 
   for (const state of PRIORITY_STATES) {
-    let offset = 0;
-    const limit = 500;
     const stateRecords = [];
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const cutoffDateStr = thirtyDaysAgo.toISOString().split("T")[0];
 
-    while (true) {
-      let retries = 3;
-      let success = false;
-      let records = [];
+    for (const targetDate of targetDates) {
+      let offset = 0;
+      const limit = 500;
 
-      while (retries > 0 && !success) {
-        try {
-          console.log(`Fetching ${state} offset ${offset}...`);
-          const response = await axios.get(API_URL, {
-            params: {
-              "api-key": dataGovKey,
-              format: "json",
-              limit,
-              offset,
-              "filters[state]": state
-            },
-            timeout: 45000,
-          });
+      while (true) {
+        let retries = 3;
+        let success = false;
+        let records = [];
 
-          records = response.data?.records || [];
-          success = true;
-        } catch (err) {
-          retries--;
-          console.error(`Fetch failed for ${state} offset=${offset}:`, err.message);
-          if (retries === 0) break;
-          console.log("Waiting 5 seconds before retrying...");
-          await new Promise((resolve) => setTimeout(resolve, 5000));
-        }
-      }
+        while (retries > 0 && !success) {
+          try {
+            console.log(`Fetching ${state} date=${targetDate} offset=${offset}...`);
+            const response = await axios.get(API_URL, {
+              params: {
+                "api-key": dataGovKey,
+                format: "json",
+                limit,
+                offset,
+                "filters[State]": state,
+                "filters[Arrival_Date]": targetDate,
+              },
+              timeout: 45000,
+            });
 
-      if (!success) {
-        console.error(`Giving up on ${state} due to repeated network errors.`);
-        break;
-      }
-
-      if (!records.length) break;
-
-      let reachedOlderData = false;
-
-      for (const r of records) {
-        const arrivalStr = parseArrivalDate(r.arrival_date || r.Arrival_Date || "");
-        
-        // Stop processing if we reach data older than our 30 day window
-        if (arrivalStr < cutoffDateStr) {
-            reachedOlderData = true;
-            continue; // Skip appending old data
+            records = response.data?.records || [];
+            success = true;
+          } catch (err) {
+            retries--;
+            console.error(`Fetch failed for ${state} date=${targetDate} offset=${offset}:`, err.message);
+            if (retries === 0) break;
+            console.log("Waiting 5 seconds before retrying...");
+            await new Promise((resolve) => setTimeout(resolve, 5000));
+          }
         }
 
-        const row = {
-          state: (r.state || r.State || "").trim(),
-          district: (r.district || r.District || "").trim(),
-          market_name: (r.market || r.Market || "").trim(),
-          commodity: (r.commodity || r.Commodity || "").trim(),
-          variety: (r.variety || r.Variety || "").trim(),
-          min_price: parseInt(r.min_price || r.Min_Price) || 0,
-          max_price: parseInt(r.max_price || r.Max_Price) || 0,
-          modal_price: parseInt(r.modal_price || r.Modal_Price) || 0,
-          arrival_date: arrivalStr,
-        };
-
-        if (row.state && row.commodity && row.modal_price > 0) {
-          stateRecords.push(row);
+        if (!success) {
+          console.error(`Giving up on ${state} date=${targetDate} due to repeated network errors.`);
+          break;
         }
-      }
-      
-      // If we saw data older than 30 days, we don't need to fetch the next page!
-      if (reachedOlderData) {
-        console.log(`Reached data older than 30 days for ${state}. Stopping pagination.`);
-        break;
-      }
 
-      if (records.length < limit) break;
-      offset += limit;
-      
-      // Add a 1 second delay to prevent 429 Rate Limit from data.gov.in
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+        if (!records.length) break;
+
+        for (const r of records) {
+          // Historical endpoint uses PascalCase keys
+          const arrivalStr = parseArrivalDate(r.Arrival_Date || r.arrival_date || "");
+
+          const row = {
+            state: (r.State || r.state || "").trim(),
+            district: (r.District || r.district || "").trim(),
+            market_name: (r.Market || r.market || "").trim(),
+            commodity: (r.Commodity || r.commodity || "").trim(),
+            variety: (r.Variety || r.variety || "").trim(),
+            min_price: parseInt(r.Min_Price || r.min_price) || 0,
+            max_price: parseInt(r.Max_Price || r.max_price) || 0,
+            modal_price: parseInt(r.Modal_Price || r.modal_price) || 0,
+            arrival_date: arrivalStr,
+          };
+
+          if (row.state && row.commodity && row.modal_price > 0) {
+            stateRecords.push(row);
+          }
+        }
+
+        if (records.length < limit) break;
+        offset += limit;
+
+        // Rate limit delay
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
     }
 
-    // Deduplicate records to prevent "ON CONFLICT DO UPDATE command cannot affect row a second time"
+    // Deduplicate
     const uniqueRecordsMap = new Map();
     for (const r of stateRecords) {
       const key = `${r.state}|${r.district}|${r.market_name}|${r.commodity}|${r.variety}|${r.arrival_date}`;
@@ -163,7 +170,7 @@ async function run() {
       }
     }
 
-    console.log(`[${state}] ${stateRecords.length} records processed.`);
+    console.log(`[${state}] ${uniqueStateRecords.length} records processed.`);
   }
 
   console.log(`Sync complete! ${totalUpserted} rows pushed to Supabase.`);

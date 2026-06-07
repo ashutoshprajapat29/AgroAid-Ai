@@ -610,10 +610,22 @@ export default function MarketDashboard() {
     : "0";
 
   // Display prices — show search results or regular prices (filtered by market)
-  const filteredPrices = selectedMarket !== "All"
+  const filteredPrices = (selectedMarket !== "All"
     ? prices.filter((p) => p.market_name === selectedMarket)
-    : prices;
-  const displayPrices = showSearchResults ? searchResults : filteredPrices;
+    : prices
+  ).sort((a, b) => {
+    // Sort by date descending (latest first), then by commodity name
+    const dateCompare = (b.date || "").localeCompare(a.date || "");
+    if (dateCompare !== 0) return dateCompare;
+    return (a.commodity || "").localeCompare(b.commodity || "");
+  });
+  const displayPrices = showSearchResults
+    ? [...searchResults].sort((a, b) => {
+        const dateCompare = (b.date || "").localeCompare(a.date || "");
+        if (dateCompare !== 0) return dateCompare;
+        return (a.commodity || "").localeCompare(b.commodity || "");
+      })
+    : filteredPrices;
   const displayTitle = showSearchResults
     ? (isHindi ? `"${searchQuery}" के परिणाम` : `Results for "${searchQuery}"`)
     : selectedMarket !== "All"

@@ -106,7 +106,8 @@ exports.syncMandiToSupabase = functions
     .onRun(async (_context) => {
     var _a, _b, _c, _d, _e, _f;
     functions.logger.info("Starting Mandi → Supabase sync for priority states...");
-    const API_URL = "https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070";
+    // Historical endpoint — data persists permanently, uses PascalCase field names
+    const API_URL = "https://api.data.gov.in/resource/35985678-0d79-46b4-9ed6-6f13308a1d24";
     const API_KEY = (_a = process.env.DATA_GOV_API_KEY) !== null && _a !== void 0 ? _a : "";
     if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
         functions.logger.error("SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set. Aborting sync.");
@@ -115,66 +116,68 @@ exports.syncMandiToSupabase = functions
     let totalUpserted = 0;
     let totalErrors = 0;
     const startTime = Date.now();
+    // Generate last 3 days in DD/MM/YYYY format (what the historical API expects)
+    const targetDates = [];
+    for (let i = 0; i < 3; i++) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const day = String(d.getDate()).padStart(2, "0");
+        const month = String(d.getMonth() + 1).padStart(2, "0");
+        const year = d.getFullYear();
+        targetDates.push(`${day}/${month}/${year}`);
+    }
+    functions.logger.info(`Target dates: ${targetDates.join(", ")}`);
     for (const state of PRIORITY_STATES) {
-        let offset = 0;
-        const limit = 500;
         const stateRecords = [];
-        const twoDaysAgo = new Date();
-        twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
-        const cutoffDateStr = twoDaysAgo.toISOString().split("T")[0];
-        // Paginate through records for this state
-        while (true) {
-            try {
-                const response = await axios_1.default.get(API_URL, {
-                    params: {
-                        "api-key": API_KEY,
-                        format: "json",
-                        limit,
-                        offset,
-                        "filters[state]": state
-                    },
-                    timeout: 20000,
-                });
-                const records = (_c = (_b = response.data) === null || _b === void 0 ? void 0 : _b.records) !== null && _c !== void 0 ? _c : [];
-                if (!records.length)
-                    break;
-                let reachedOlderData = false;
-                for (const r of records) {
-                    const arrivalStr = parseArrivalDate(r.arrival_date || r.Arrival_Date || "");
-                    // Stop processing if we reach data older than our 2 day window
-                    if (arrivalStr < cutoffDateStr) {
-                        reachedOlderData = true;
-                        continue;
+        for (const targetDate of targetDates) {
+            let offset = 0;
+            const limit = 500;
+            // Paginate through records for this state + date
+            while (true) {
+                try {
+                    const response = await axios_1.default.get(API_URL, {
+                        params: {
+                            "api-key": API_KEY,
+                            format: "json",
+                            limit,
+                            offset,
+                            "filters[State]": state,
+                            "filters[Arrival_Date]": targetDate,
+                        },
+                        timeout: 30000,
+                    });
+                    const records = (_c = (_b = response.data) === null || _b === void 0 ? void 0 : _b.records) !== null && _c !== void 0 ? _c : [];
+                    if (!records.length)
+                        break;
+                    for (const r of records) {
+                        // Historical endpoint uses PascalCase keys
+                        const arrivalStr = parseArrivalDate(r.Arrival_Date || r.arrival_date || "");
+                        const row = {
+                            state: (r.State || r.state || "").trim(),
+                            district: (r.District || r.district || "").trim(),
+                            market_name: (r.Market || r.market || "").trim(),
+                            commodity: (r.Commodity || r.commodity || "").trim(),
+                            variety: (r.Variety || r.variety || "").trim(),
+                            min_price: parseInt(r.Min_Price || r.min_price) || 0,
+                            max_price: parseInt(r.Max_Price || r.max_price) || 0,
+                            modal_price: parseInt(r.Modal_Price || r.modal_price) || 0,
+                            arrival_date: arrivalStr,
+                        };
+                        if (row.state && row.commodity && row.modal_price > 0) {
+                            stateRecords.push(row);
+                        }
                     }
-                    const row = {
-                        state: (r.state || r.State || "").trim(),
-                        district: (r.district || r.District || "").trim(),
-                        market_name: (r.market || r.Market || "").trim(),
-                        commodity: (r.commodity || r.Commodity || "").trim(),
-                        variety: (r.variety || r.Variety || "").trim(),
-                        min_price: parseInt(r.min_price || r.Min_Price) || 0,
-                        max_price: parseInt(r.max_price || r.Max_Price) || 0,
-                        modal_price: parseInt(r.modal_price || r.Modal_Price) || 0,
-                        arrival_date: arrivalStr,
-                    };
-                    if (row.state && row.commodity && row.modal_price > 0) {
-                        stateRecords.push(row);
-                    }
+                    if (records.length < limit)
+                        break;
+                    offset += limit;
+                    // Rate limit delay
+                    await new Promise((resolve) => setTimeout(resolve, 500));
                 }
-                if (reachedOlderData) {
-                    functions.logger.info(`Reached data older than 2 days for ${state}. Stopping pagination.`);
+                catch (err) {
+                    functions.logger.warn(`Fetch failed for ${state} date=${targetDate} offset=${offset}:`, (_d = err.message) !== null && _d !== void 0 ? _d : err);
+                    totalErrors++;
                     break;
                 }
-                if (records.length < limit)
-                    break;
-                offset += limit;
-                // Add a 1 second delay to prevent 429 Rate Limit
-                await new Promise((resolve) => setTimeout(resolve, 1000));
-            }
-            catch (err) {
-                functions.logger.warn(`Fetch failed for ${state} offset=${offset}:`, (_d = err.message) !== null && _d !== void 0 ? _d : err);
-                totalErrors++;
-                break;
             }
         }
         // Deduplicate records to prevent "ON CONFLICT DO UPDATE command cannot affect row a second time"
@@ -206,7 +209,7 @@ exports.syncMandiToSupabase = functions
                 totalErrors++;
             }
         }
-        functions.logger.info(`[${state}] ${stateRecords.length} records processed`);
+        functions.logger.info(`[${state}] ${uniqueStateRecords.length} records processed`);
     }
     // Purge records older than 30 days
     try {
