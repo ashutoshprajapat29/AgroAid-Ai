@@ -104,7 +104,7 @@ exports.syncMandiToSupabase = functions
     .pubsub.schedule("0 4 * * *")
     .timeZone("Asia/Kolkata")
     .onRun(async (_context) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m;
+    var _a, _b, _c, _d, _e, _f;
     functions.logger.info("Starting Mandi → Supabase sync for priority states...");
     const API_URL = "https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070";
     const API_KEY = (_a = process.env.DATA_GOV_API_KEY) !== null && _a !== void 0 ? _a : "";
@@ -131,8 +131,7 @@ exports.syncMandiToSupabase = functions
                         format: "json",
                         limit,
                         offset,
-                        "filters[State]": state,
-                        "sort[Arrival_Date]": "desc" // Ensure newest first
+                        "filters[state]": state
                     },
                     timeout: 20000,
                 });
@@ -141,21 +140,21 @@ exports.syncMandiToSupabase = functions
                     break;
                 let reachedOlderData = false;
                 for (const r of records) {
-                    const arrivalStr = parseArrivalDate((_d = r.Arrival_Date) !== null && _d !== void 0 ? _d : "");
+                    const arrivalStr = parseArrivalDate(r.arrival_date || r.Arrival_Date || "");
                     // Stop processing if we reach data older than our 2 day window
                     if (arrivalStr < cutoffDateStr) {
                         reachedOlderData = true;
                         continue;
                     }
                     const row = {
-                        state: ((_e = r.State) !== null && _e !== void 0 ? _e : "").trim(),
-                        district: ((_f = r.District) !== null && _f !== void 0 ? _f : "").trim(),
-                        market_name: ((_g = r.Market) !== null && _g !== void 0 ? _g : "").trim(),
-                        commodity: ((_h = r.Commodity) !== null && _h !== void 0 ? _h : "").trim(),
-                        variety: ((_j = r.Variety) !== null && _j !== void 0 ? _j : "").trim(),
-                        min_price: parseInt(r.Min_Price) || 0,
-                        max_price: parseInt(r.Max_Price) || 0,
-                        modal_price: parseInt(r.Modal_Price) || 0,
+                        state: (r.state || r.State || "").trim(),
+                        district: (r.district || r.District || "").trim(),
+                        market_name: (r.market || r.Market || "").trim(),
+                        commodity: (r.commodity || r.Commodity || "").trim(),
+                        variety: (r.variety || r.Variety || "").trim(),
+                        min_price: parseInt(r.min_price || r.Min_Price) || 0,
+                        max_price: parseInt(r.max_price || r.Max_Price) || 0,
+                        modal_price: parseInt(r.modal_price || r.Modal_Price) || 0,
                         arrival_date: arrivalStr,
                     };
                     if (row.state && row.commodity && row.modal_price > 0) {
@@ -173,7 +172,7 @@ exports.syncMandiToSupabase = functions
                 await new Promise((resolve) => setTimeout(resolve, 1000));
             }
             catch (err) {
-                functions.logger.warn(`Fetch failed for ${state} offset=${offset}:`, (_k = err.message) !== null && _k !== void 0 ? _k : err);
+                functions.logger.warn(`Fetch failed for ${state} offset=${offset}:`, (_d = err.message) !== null && _d !== void 0 ? _d : err);
                 totalErrors++;
                 break;
             }
@@ -203,7 +202,7 @@ exports.syncMandiToSupabase = functions
                 }
             }
             catch (err) {
-                functions.logger.warn(`Upsert exception for ${state}:`, (_l = err.message) !== null && _l !== void 0 ? _l : err);
+                functions.logger.warn(`Upsert exception for ${state}:`, (_e = err.message) !== null && _e !== void 0 ? _e : err);
                 totalErrors++;
             }
         }
@@ -226,7 +225,7 @@ exports.syncMandiToSupabase = functions
         }
     }
     catch (err) {
-        functions.logger.warn("Purge exception:", (_m = err.message) !== null && _m !== void 0 ? _m : err);
+        functions.logger.warn("Purge exception:", (_f = err.message) !== null && _f !== void 0 ? _f : err);
     }
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
     functions.logger.info(`Sync complete: ${totalUpserted} rows upserted, ${totalErrors} errors, ${duration}s`);

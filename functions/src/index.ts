@@ -114,8 +114,7 @@ export const syncMandiToSupabase = functions
               format: "json",
               limit,
               offset,
-              "filters[State]": state,
-              "sort[Arrival_Date]": "desc" // Ensure newest first
+              "filters[state]": state
             },
             timeout: 20000,
           });
@@ -126,7 +125,7 @@ export const syncMandiToSupabase = functions
           let reachedOlderData = false;
 
           for (const r of records) {
-            const arrivalStr = parseArrivalDate(r.Arrival_Date ?? "");
+            const arrivalStr = parseArrivalDate(r.arrival_date || r.Arrival_Date || "");
             
             // Stop processing if we reach data older than our 2 day window
             if (arrivalStr < cutoffDateStr) {
@@ -135,14 +134,14 @@ export const syncMandiToSupabase = functions
             }
 
             const row = {
-              state: (r.State ?? "").trim(),
-              district: (r.District ?? "").trim(),
-              market_name: (r.Market ?? "").trim(),
-              commodity: (r.Commodity ?? "").trim(),
-              variety: (r.Variety ?? "").trim(),
-              min_price: parseInt(r.Min_Price) || 0,
-              max_price: parseInt(r.Max_Price) || 0,
-              modal_price: parseInt(r.Modal_Price) || 0,
+              state: (r.state || r.State || "").trim(),
+              district: (r.district || r.District || "").trim(),
+              market_name: (r.market || r.Market || "").trim(),
+              commodity: (r.commodity || r.Commodity || "").trim(),
+              variety: (r.variety || r.Variety || "").trim(),
+              min_price: parseInt(r.min_price || r.Min_Price) || 0,
+              max_price: parseInt(r.max_price || r.Max_Price) || 0,
+              modal_price: parseInt(r.modal_price || r.Modal_Price) || 0,
               arrival_date: arrivalStr,
             };
 
