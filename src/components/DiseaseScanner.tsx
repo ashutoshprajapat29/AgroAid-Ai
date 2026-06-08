@@ -136,6 +136,7 @@ export default function DiseaseScanner() {
           <div className="flex items-center gap-2 border px-4 py-2.5 rounded-2xl w-full md:w-60" style={{ background: 'var(--bg-input)', borderColor: 'var(--border-input)' }}>
             <Sprout size={16} className="text-emerald-400 shrink-0" />
             <select
+              aria-label="Select field for analysis"
               value={selectedFieldId}
               onChange={e => setSelectedFieldId(e.target.value)}
               className="bg-transparent text-sm font-semibold focus:outline-none appearance-none cursor-pointer flex-1 text-bento-text-main"
@@ -175,7 +176,7 @@ export default function DiseaseScanner() {
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
                 <div className="absolute bottom-0 inset-x-0 p-4 flex justify-between items-center">
                   <span className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--text-main)' }}>{t("disease.image_loaded")}</span>
-                  <button onClick={reset} className="p-2 border transition-all rounded-xl" style={{ background: 'var(--bg-input)', borderColor: 'var(--border-input)', color: 'var(--text-main)' }}>
+                  <button onClick={reset} title="Reset Image" aria-label="Reset Image" className="p-2 border transition-all rounded-xl" style={{ background: 'var(--bg-input)', borderColor: 'var(--border-input)', color: 'var(--text-main)' }}>
                     <RefreshCw size={16} />
                   </button>
                 </div>

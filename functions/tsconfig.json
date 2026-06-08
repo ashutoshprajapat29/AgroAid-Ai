@@ -8,6 +8,7 @@
     "strict": true,
     "target": "es2017",
     "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
     "lib": ["es2017", "DOM"]
   },
   "compileOnSave": true,
