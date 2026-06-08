@@ -312,6 +312,7 @@ function Dropdown({ label, value, options, onChange, icon: Icon }: {
       </div>
       <div className="relative">
         <select
+          aria-label={label}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           className="w-full appearance-none rounded-xl px-3 py-2.5 pr-8 text-sm font-semibold border focus:outline-none focus:border-emerald-500/50 transition-colors"
@@ -821,7 +822,7 @@ export default function MarketDashboard() {
                 style={{ background: "var(--bg-input)", borderColor: "var(--border-input)", color: "var(--text-main)" }}
               />
               {searchQuery && (
-                <button onClick={clearSearch} className="absolute right-3 top-1/2 -translate-y-1/2">
+                <button aria-label="Clear search" title="Clear search" onClick={clearSearch} className="absolute right-3 top-1/2 -translate-y-1/2">
                   <X size={14} style={{ color: "var(--text-subtle)" }} />
                 </button>
               )}

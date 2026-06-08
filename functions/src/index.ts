@@ -75,7 +75,7 @@ const PRIORITY_STATES = [
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FUNCTION 1: Sync Mandi Prices to Supabase (replaces old Firestore ingestion)
-// Runs every day at 11:00 PM IST
+// Runs every day at 4:00 AM IST
 // ─────────────────────────────────────────────────────────────────────────────
 export const syncMandiToSupabase = functions
   .runWith({ timeoutSeconds: 540, memory: "1GB" })
@@ -97,16 +97,22 @@ export const syncMandiToSupabase = functions
     let totalErrors = 0;
     const startTime = Date.now();
 
-    // Generate last 3 days in DD/MM/YYYY format (what the historical API expects)
+    // Fetch only yesterday's date (relative to IST) because today's 4:00 AM sync targets yesterday's trading data
     const targetDates: string[] = [];
-    for (let i = 0; i < 3; i++) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const day = String(d.getDate()).padStart(2, "0");
-      const month = String(d.getMonth() + 1).padStart(2, "0");
-      const year = d.getFullYear();
-      targetDates.push(`${day}/${month}/${year}`);
-    }
+    const now = new Date();
+    
+    // Explicitly calculate "yesterday in IST" to be completely safe against timezone and schedule changes
+    // 1. Get current time in UTC
+    // 2. Add 5.5 hours to get IST time
+    // 3. Subtract 1 day to get yesterday
+    const istYesterday = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+    istYesterday.setUTCDate(istYesterday.getUTCDate() - 1);
+
+    const day = String(istYesterday.getUTCDate()).padStart(2, "0");
+    const month = String(istYesterday.getUTCMonth() + 1).padStart(2, "0");
+    const year = istYesterday.getUTCFullYear();
+    
+    targetDates.push(`${day}/${month}/${year}`);
     functions.logger.info(`Target dates: ${targetDates.join(", ")}`);
 
     for (const state of PRIORITY_STATES) {
@@ -118,53 +124,70 @@ export const syncMandiToSupabase = functions
 
         // Paginate through records for this state + date
         while (true) {
-          try {
-            const response = await axios.get(API_URL, {
-              params: {
-                "api-key": API_KEY,
-                format: "json",
-                limit,
-                offset,
-                "filters[State]": state,
-                "filters[Arrival_Date]": targetDate,
-              },
-              timeout: 30000,
-            });
+          let retries = 3;
+          let success = false;
+          let records: any[] = [];
 
-            const records: any[] = response.data?.records ?? [];
-            if (!records.length) break;
+          while (retries > 0 && !success) {
+            try {
+              const response = await axios.get(API_URL, {
+                params: {
+                  "api-key": API_KEY,
+                  format: "json",
+                  limit,
+                  offset,
+                  "filters[State]": state,
+                  "filters[Arrival_Date]": targetDate,
+                },
+                timeout: 30000,
+              });
 
-            for (const r of records) {
-              // Historical endpoint uses PascalCase keys
-              const arrivalStr = parseArrivalDate(r.Arrival_Date || r.arrival_date || "");
-
-              const row = {
-                state: (r.State || r.state || "").trim(),
-                district: (r.District || r.district || "").trim(),
-                market_name: (r.Market || r.market || "").trim(),
-                commodity: (r.Commodity || r.commodity || "").trim(),
-                variety: (r.Variety || r.variety || "").trim(),
-                min_price: parseInt(r.Min_Price || r.min_price) || 0,
-                max_price: parseInt(r.Max_Price || r.max_price) || 0,
-                modal_price: parseInt(r.Modal_Price || r.modal_price) || 0,
-                arrival_date: arrivalStr,
-              };
-
-              if (row.state && row.commodity && row.modal_price > 0) {
-                stateRecords.push(row);
+              records = response.data?.records ?? [];
+              success = true;
+            } catch (err: any) {
+              retries--;
+              functions.logger.warn(`Fetch failed for ${state} date=${targetDate} offset=${offset}. Retries left: ${retries}. Error:`, err.message ?? err);
+              if (retries === 0) {
+                  totalErrors++;
+                  break;
               }
+              // Wait 5 seconds before retrying
+              await new Promise((resolve) => setTimeout(resolve, 5000));
             }
-
-            if (records.length < limit) break;
-            offset += limit;
-
-            // Rate limit delay
-            await new Promise((resolve) => setTimeout(resolve, 500));
-          } catch (err: any) {
-            functions.logger.warn(`Fetch failed for ${state} date=${targetDate} offset=${offset}:`, err.message ?? err);
-            totalErrors++;
-            break;
           }
+
+          if (!success) {
+              break; // Skip pagination for this state/date if all retries failed
+          }
+
+          if (!records.length) break;
+
+          for (const r of records) {
+            // Historical endpoint uses PascalCase keys
+            const arrivalStr = parseArrivalDate(r.Arrival_Date || r.arrival_date || "");
+
+            const row = {
+              state: (r.State || r.state || "").trim(),
+              district: (r.District || r.district || "").trim(),
+              market_name: (r.Market || r.market || "").trim(),
+              commodity: (r.Commodity || r.commodity || "").trim(),
+              variety: (r.Variety || r.variety || "").trim(),
+              min_price: parseInt(r.Min_Price || r.min_price) || 0,
+              max_price: parseInt(r.Max_Price || r.max_price) || 0,
+              modal_price: parseInt(r.Modal_Price || r.modal_price) || 0,
+              arrival_date: arrivalStr,
+            };
+
+            if (row.state && row.commodity && row.modal_price > 0) {
+              stateRecords.push(row);
+            }
+          }
+
+          if (records.length < limit) break;
+          offset += limit;
+
+          // Rate limit delay between successful pagination requests
+          await new Promise((resolve) => setTimeout(resolve, 500));
         }
       }
 
@@ -201,34 +224,37 @@ export const syncMandiToSupabase = functions
       functions.logger.info(`[${state}] ${uniqueStateRecords.length} records processed`);
     }
 
-    // Purge records older than 30 days
+    // Purge records older than 45 days to keep DB size in check
+    let purgedRows = 0;
     try {
       const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - 30);
+      cutoff.setDate(cutoff.getDate() - 45);
       const cutoffStr = cutoff.toISOString().split("T")[0];
 
       const { error, count } = await getSupabaseAdmin()
         .from("mandi_prices")
-        .delete()
+        .delete({ count: "exact" })
         .lt("arrival_date", cutoffStr);
 
       if (error) {
         functions.logger.warn("Purge error:", error.message);
       } else {
-        functions.logger.info(`Purged ${count ?? "?"} rows older than ${cutoffStr}`);
+        purgedRows = count ?? 0;
+        functions.logger.info(`Purged ${purgedRows} rows older than ${cutoffStr}`);
       }
     } catch (err: any) {
       functions.logger.warn("Purge exception:", err.message ?? err);
     }
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-    functions.logger.info(`Sync complete: ${totalUpserted} rows upserted, ${totalErrors} errors, ${duration}s`);
+    functions.logger.info(`Sync complete: ${totalUpserted} rows upserted, ${purgedRows} purged, ${totalErrors} errors, ${duration}s`);
 
     // Log sync status to Firestore for monitoring
     await db.collection("system_logs").doc("mandi_sync").set({
       last_run: admin.firestore.Timestamp.now(),
       status: totalErrors === 0 ? "success" : "partial",
       total_upserted: totalUpserted,
+      total_purged: purgedRows,
       total_errors: totalErrors,
       duration_seconds: parseFloat(duration),
       states: PRIORITY_STATES.length,

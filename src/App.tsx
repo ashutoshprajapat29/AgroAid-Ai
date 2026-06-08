@@ -17,7 +17,7 @@ const DiseaseScanner  = lazy(() => import("./components/DiseaseScanner"));
 const Profile         = lazy(() => import("./components/Profile"));
 const WeatherWidget   = lazy(() => import("./components/WeatherWidget"));
 const WeatherAdvisoryBanner = lazy(() => import("./components/WeatherAdvisoryBanner"));
-const LiveVoiceAdvisor = lazy(() => import("./components/LiveVoiceAdvisor"));
+// const LiveVoiceAdvisor = lazy(() => import("./components/LiveVoiceAdvisor"));
 const FieldManager    = lazy(() => import("./components/FieldManager"));
 const TaskManager     = lazy(() => import("./components/TaskManager"));
 const MarketDashboard = lazy(() => import("./components/MarketDashboard"));
@@ -30,7 +30,7 @@ const NAV_CONFIG: { id: TabType; icon: React.ElementType; labelKey: string }[] =
   { id: 'fields',   icon: Compass,       labelKey: 'nav.plots'    },
   { id: 'tasks',    icon: CheckCircle2,  labelKey: 'nav.tasks'    },
   { id: 'market',   icon: Activity,      labelKey: 'nav.market'   },
-  { id: 'voice',    icon: Mic,           labelKey: 'nav.voice'    },
+  // { id: 'voice',    icon: Mic,           labelKey: 'nav.voice'    },
   { id: 'profile',  icon: UserIcon,      labelKey: 'nav.profile'  },
 ];
 
@@ -148,11 +148,11 @@ function AuthenticatedApp() {
                   <MarketDashboard />
                 </motion.div>
               )}
-              {activeTab === 'voice' && (
+              {/* activeTab === 'voice' && (
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className="h-full overflow-y-auto p-3 md:p-6">
                   <LiveVoiceAdvisor />
                 </motion.div>
-              )}
+              ) */}
             </Suspense>
           </div>
         </main>
