@@ -37,7 +37,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getMarketSentiment = exports.fetchAgriNews = exports.syncMandiToSupabase = void 0;
-const functions = __importStar(require("firebase-functions"));
+const functions = __importStar(require("firebase-functions/v1"));
 const admin = __importStar(require("firebase-admin"));
 const axios_1 = __importDefault(require("axios"));
 const supabase_js_1 = require("@supabase/supabase-js");
@@ -61,7 +61,7 @@ async function callGemini(prompt, jsonMode = false) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey)
         throw new Error("GEMINI_API_KEY not set in function environment");
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`;
     const body = {
         contents: [{ parts: [{ text: prompt }] }],
     };
@@ -103,7 +103,7 @@ exports.syncMandiToSupabase = functions
     .runWith({ timeoutSeconds: 540, memory: "1GB" })
     .pubsub.schedule("30 11 * * *")
     .timeZone("Asia/Kolkata")
-    .onRun(async (_context) => {
+    .onRun(async (context) => {
     var _a, _b, _c, _d, _e, _f;
     functions.logger.info("Starting Mandi → Supabase sync for priority states...");
     // Historical endpoint — data persists permanently, uses PascalCase field names
@@ -422,7 +422,7 @@ exports.getMarketSentiment = functions
     // 2. Fetch latest news summaries from Firestore
     let newsItems = [];
     try {
-        const newsDoc = await db.collection("market_news").doc("latest").get();
+        const newsDoc = await db.collection("agri_news_cache").doc("news_english").get();
         if (newsDoc.exists) {
             newsItems = (_b = (_a = newsDoc.data()) === null || _a === void 0 ? void 0 : _a.items) !== null && _b !== void 0 ? _b : [];
         }

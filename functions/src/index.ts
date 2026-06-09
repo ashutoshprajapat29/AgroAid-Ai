@@ -1,4 +1,4 @@
-import * as functions from "firebase-functions";
+import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
 import axios from "axios";
 import { createClient } from "@supabase/supabase-js";
@@ -81,7 +81,7 @@ export const syncMandiToSupabase = functions
   .runWith({ timeoutSeconds: 540, memory: "1GB" })
   .pubsub.schedule("30 11 * * *")
   .timeZone("Asia/Kolkata")
-  .onRun(async (_context) => {
+  .onRun(async (context: functions.EventContext) => {
     functions.logger.info("Starting Mandi → Supabase sync for priority states...");
 
     // Historical endpoint — data persists permanently, uses PascalCase field names
@@ -429,7 +429,7 @@ export const getMarketSentiment = functions
     // 2. Fetch latest news summaries from Firestore
     let newsItems: NewsItem[] = [];
     try {
-      const newsDoc = await db.collection("market_news").doc("latest").get();
+      const newsDoc = await db.collection("agri_news_cache").doc("news_english").get();
       if (newsDoc.exists) {
         newsItems = newsDoc.data()?.items ?? [];
       }

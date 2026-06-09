@@ -6,3 +6,21 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Debug & scratch scripts
+check_fetch.js
+check_fetch_exact.js
+check_latest_date.js
+check_latest_output.txt
+checkDbDates.js
+checkMP.js
+check_db.js
+testApi.js
+testDb.js
+test_api.js
+test_json_user_key.cjs
+sync_june8.js
+seedMandi.js
+result.csv
+functions/check_api.js
+functions/check_supabase.js

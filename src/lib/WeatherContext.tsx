@@ -41,19 +41,30 @@ export function WeatherProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
 
   const generateAdvisory = (current: any, daily: any) => {
+    const lang = localStorage.getItem('preferredLanguage') || 'English';
+    const isHindi = lang === 'Hindi';
+
     // Check for rain in next 5 days
     const willRain = daily.weather_code.slice(0, 5).some((code: number) => [51, 53, 55, 61, 63, 65, 80, 81, 82, 95, 96, 99].includes(code));
     const isHot = daily.temperature_2m_max.slice(0, 3).some((temp: number) => temp > 35);
     const isCold = daily.temperature_2m_min.slice(0, 3).some((temp: number) => temp < 10);
 
-    let msg = "Conditions look excellent for farming today.";
+    let msg = isHindi
+      ? "आज खेती के लिए मौसम उत्तम है।"
+      : "Conditions look excellent for farming today.";
     
     if (willRain) {
-      msg = "Warning: There are chances of rain in the upcoming 5 days. Secure your harvest.";
+      msg = isHindi
+        ? "चेतावनी: अगले 5 दिनों में बारिश की संभावना है। अपनी फसल सुरक्षित करें।"
+        : "Warning: There are chances of rain in the upcoming 5 days. Secure your harvest.";
     } else if (isHot) {
-      msg = "Heavy heat alert! Move sensitive livestock to shade and irrigate more.";
+      msg = isHindi
+        ? "भीषण गर्मी की चेतावनी! पशुओं को छाया में रखें और अधिक सिंचाई करें।"
+        : "Heavy heat alert! Move sensitive livestock to shade and irrigate more.";
     } else if (isCold) {
-      msg = "Frost warning in effect. Protect sensitive crops tonight.";
+      msg = isHindi
+        ? "पाला चेतावनी! आज रात संवेदनशील फसलों को सुरक्षित करें।"
+        : "Frost warning in effect. Protect sensitive crops tonight.";
     }
 
     setAdvisory(msg);

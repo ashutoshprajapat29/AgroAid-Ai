@@ -82,7 +82,7 @@ const ai = new GoogleGenAI({ apiKey: GEN_AI_KEY ?? GEN_AI_KEY2 ?? "" });
 
 async function geminiGenerate(prompt: string): Promise<string> {
   const resp = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
+    model: "gemini-2.5-flash-lite",
     contents: [{ parts: [{ text: prompt }] }],
     config: { responseMimeType: "application/json" },
   });
@@ -422,7 +422,6 @@ function mapToDataGovState(rawState: string): string {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import { httpsCallable } from "firebase/functions";
-import { checkNightlySync } from "./newsService";
 import dynamicTranslations from "../lib/mandi_translations.json";
 import { functions } from "../lib/firebase";
 
