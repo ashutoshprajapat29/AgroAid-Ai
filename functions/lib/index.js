@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getMarketSentiment = exports.aggregateMarketNews = exports.fetchAgriNews = exports.syncMandiToSupabase = void 0;
+exports.getMarketSentiment = exports.fetchAgriNews = exports.syncMandiToSupabase = void 0;
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 const axios_1 = __importDefault(require("axios"));
@@ -97,11 +97,11 @@ const PRIORITY_STATES = [
 ];
 // ─────────────────────────────────────────────────────────────────────────────
 // FUNCTION 1: Sync Mandi Prices to Supabase (replaces old Firestore ingestion)
-// Runs every day at 4:00 AM IST
+// Runs every day at 11:30 AM IST (data.gov.in publishes previous day's data by morning)
 // ─────────────────────────────────────────────────────────────────────────────
 exports.syncMandiToSupabase = functions
     .runWith({ timeoutSeconds: 540, memory: "1GB" })
-    .pubsub.schedule("0 4 * * *")
+    .pubsub.schedule("30 11 * * *")
     .timeZone("Asia/Kolkata")
     .onRun(async (_context) => {
     var _a, _b, _c, _d, _e, _f;
@@ -116,86 +116,79 @@ exports.syncMandiToSupabase = functions
     let totalUpserted = 0;
     let totalErrors = 0;
     const startTime = Date.now();
-    // Fetch only yesterday's date (relative to IST) because today's 4:00 AM sync targets yesterday's trading data
-    const targetDates = [];
+    // Calculate yesterday's date in IST (the sync targets previous day's trading data)
     const now = new Date();
-    // Explicitly calculate "yesterday in IST" to be completely safe against timezone and schedule changes
-    // 1. Get current time in UTC
-    // 2. Add 5.5 hours to get IST time
-    // 3. Subtract 1 day to get yesterday
     const istYesterday = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
     istYesterday.setUTCDate(istYesterday.getUTCDate() - 1);
     const day = String(istYesterday.getUTCDate()).padStart(2, "0");
     const month = String(istYesterday.getUTCMonth() + 1).padStart(2, "0");
     const year = istYesterday.getUTCFullYear();
-    targetDates.push(`${day}/${month}/${year}`);
-    functions.logger.info(`Target dates: ${targetDates.join(", ")}`);
+    const targetDate = `${day}/${month}/${year}`;
+    functions.logger.info(`Target date: ${targetDate}`);
     for (const state of PRIORITY_STATES) {
         const stateRecords = [];
-        for (const targetDate of targetDates) {
-            let offset = 0;
-            const limit = 500;
-            // Paginate through records for this state + date
-            while (true) {
-                let retries = 3;
-                let success = false;
-                let records = [];
-                while (retries > 0 && !success) {
-                    try {
-                        const response = await axios_1.default.get(API_URL, {
-                            params: {
-                                "api-key": API_KEY,
-                                format: "json",
-                                limit,
-                                offset,
-                                "filters[State]": state,
-                                "filters[Arrival_Date]": targetDate,
-                            },
-                            timeout: 30000,
-                        });
-                        records = (_c = (_b = response.data) === null || _b === void 0 ? void 0 : _b.records) !== null && _c !== void 0 ? _c : [];
-                        success = true;
-                    }
-                    catch (err) {
-                        retries--;
-                        functions.logger.warn(`Fetch failed for ${state} date=${targetDate} offset=${offset}. Retries left: ${retries}. Error:`, (_d = err.message) !== null && _d !== void 0 ? _d : err);
-                        if (retries === 0) {
-                            totalErrors++;
-                            break;
-                        }
-                        // Wait 5 seconds before retrying
-                        await new Promise((resolve) => setTimeout(resolve, 5000));
-                    }
+        let offset = 0;
+        const limit = 500;
+        // Paginate through records for this state + date
+        while (true) {
+            let retries = 3;
+            let success = false;
+            let records = [];
+            while (retries > 0 && !success) {
+                try {
+                    const response = await axios_1.default.get(API_URL, {
+                        params: {
+                            "api-key": API_KEY,
+                            format: "json",
+                            limit,
+                            offset,
+                            "filters[State]": state,
+                            "filters[Arrival_Date]": targetDate,
+                        },
+                        timeout: 120000,
+                    });
+                    records = (_c = (_b = response.data) === null || _b === void 0 ? void 0 : _b.records) !== null && _c !== void 0 ? _c : [];
+                    success = true;
                 }
-                if (!success) {
-                    break; // Skip pagination for this state/date if all retries failed
-                }
-                if (!records.length)
-                    break;
-                for (const r of records) {
-                    // Historical endpoint uses PascalCase keys
-                    const arrivalStr = parseArrivalDate(r.Arrival_Date || r.arrival_date || "");
-                    const row = {
-                        state: (r.State || r.state || "").trim(),
-                        district: (r.District || r.district || "").trim(),
-                        market_name: (r.Market || r.market || "").trim(),
-                        commodity: (r.Commodity || r.commodity || "").trim(),
-                        variety: (r.Variety || r.variety || "").trim(),
-                        min_price: parseInt(r.Min_Price || r.min_price) || 0,
-                        max_price: parseInt(r.Max_Price || r.max_price) || 0,
-                        modal_price: parseInt(r.Modal_Price || r.modal_price) || 0,
-                        arrival_date: arrivalStr,
-                    };
-                    if (row.state && row.commodity && row.modal_price > 0) {
-                        stateRecords.push(row);
+                catch (err) {
+                    retries--;
+                    functions.logger.warn(`Fetch failed for ${state} date=${targetDate} offset=${offset}. Retries left: ${retries}. Error:`, (_d = err.message) !== null && _d !== void 0 ? _d : err);
+                    if (retries === 0) {
+                        totalErrors++;
+                        break;
                     }
+                    // Wait 5 seconds before retrying
+                    await new Promise((resolve) => setTimeout(resolve, 5000));
                 }
-                if (records.length < limit)
-                    break;
-                offset += limit;
-                // Rate limit delay between successful pagination requests
-                await new Promise((resolve) => setTimeout(resolve, 500));
             }
+            if (!success) {
+                break; // Skip pagination for this state/date if all retries failed
+            }
+            if (!records.length)
+                break;
+            for (const r of records) {
+                // Historical endpoint uses PascalCase keys
+                const arrivalStr = parseArrivalDate(r.Arrival_Date || r.arrival_date || "");
+                const row = {
+                    state: (r.State || r.state || "").trim(),
+                    district: (r.District || r.district || "").trim(),
+                    market_name: (r.Market || r.market || "").trim(),
+                    commodity: (r.Commodity || r.commodity || "").trim(),
+                    variety: (r.Variety || r.variety || "").trim(),
+                    min_price: parseInt(r.Min_Price || r.min_price) || 0,
+                    max_price: parseInt(r.Max_Price || r.max_price) || 0,
+                    modal_price: parseInt(r.Modal_Price || r.modal_price) || 0,
+                    arrival_date: arrivalStr,
+                };
+                if (row.state && row.commodity && row.modal_price > 0) {
+                    stateRecords.push(row);
+                }
+            }
+            if (records.length < limit)
+                break;
+            offset += limit;
+            // Rate limit delay between successful pagination requests
+            await new Promise((resolve) => setTimeout(resolve, 500));
         }
         // Deduplicate records to prevent "ON CONFLICT DO UPDATE command cannot affect row a second time"
         const uniqueRecordsMap = new Map();
@@ -386,18 +379,6 @@ exports.fetchAgriNews = functions
         functions.logger.warn("Cache write failed:", e);
     }
     return { items, cached: false };
-});
-// ─────────────────────────────────────────────────────────────────────────────
-// FUNCTION 3 (legacy): AI Market News — kept for backwards compat
-// ─────────────────────────────────────────────────────────────────────────────
-exports.aggregateMarketNews = functions
-    .runWith({ timeoutSeconds: 180, memory: "256MB" })
-    .pubsub.schedule("30 2 * * *")
-    .timeZone("Asia/Kolkata")
-    .onRun(async (_context) => {
-    functions.logger.info("aggregateMarketNews: delegating to fetchAgriNews logic...");
-    // News is now served via fetchAgriNews HTTP endpoint with Firestore caching
-    return null;
 });
 // ─────────────────────────────────────────────────────────────────────────────
 // FUNCTION 3: AI Market Sentiment Engine (HTTP Callable)

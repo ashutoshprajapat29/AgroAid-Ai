@@ -94,11 +94,19 @@ async function run() {
     process.exit(0);
   }
 
+  // HARD LIMIT: Only translate a maximum of 100 terms per run to prevent massive API token burn.
+  const MAX_TERMS_PER_RUN = 100;
+  const termsToProcess = termsToTranslate.slice(0, MAX_TERMS_PER_RUN);
+  if (termsToTranslate.length > MAX_TERMS_PER_RUN) {
+    console.warn(`\n⚠️ WARNING: Capping translation to ${MAX_TERMS_PER_RUN} terms to prevent high API costs.`);
+    console.warn(`Run the script again later to translate the remaining ${termsToTranslate.length - MAX_TERMS_PER_RUN} terms.\n`);
+  }
+
   // Batch into chunks of 50
   const BATCH_SIZE = 50;
-  for (let i = 0; i < termsToTranslate.length; i += BATCH_SIZE) {
-    const batch = termsToTranslate.slice(i, i + BATCH_SIZE);
-    console.log(`Translating batch ${Math.floor(i / BATCH_SIZE) + 1} of ${Math.ceil(termsToTranslate.length / BATCH_SIZE)}...`);
+  for (let i = 0; i < termsToProcess.length; i += BATCH_SIZE) {
+    const batch = termsToProcess.slice(i, i + BATCH_SIZE);
+    console.log(`Translating batch ${Math.floor(i / BATCH_SIZE) + 1} of ${Math.ceil(termsToProcess.length / BATCH_SIZE)}...`);
     
     const translatedBatch = await translateBatch(batch);
     

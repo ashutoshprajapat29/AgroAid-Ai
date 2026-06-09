@@ -133,7 +133,7 @@ export async function getFarmingAdvice(query: string, farmDetails?: string, hist
 
   try {
     const apiCall = getAIClient().models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-2.5-flash-lite",
       contents,
       config: {
         systemInstruction,
@@ -207,7 +207,7 @@ export async function analyzeFarmingImage(images: { data: string, mimeType: stri
 
   try {
     const apiCall = getAIClient().models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-2.5-flash-lite",
       contents: { parts: [...imageParts, { text: userQuery }] },
       config: {
         systemInstruction,
@@ -247,7 +247,7 @@ export async function detectPlantDisease(base64Image: string, mimeType: string, 
 
   try {
     const response = await getAIClient().models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-2.5-flash-lite",
       contents: { parts: [imagePart, { text: prompt }] },
     });
 
@@ -345,7 +345,7 @@ export async function extractFarmUpdates(userQuery: string, botResponse: string,
 
   try {
     const response = await getAIClient().models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-2.5-flash-lite",
       contents: [{ parts: [{ text: prompt }] }],
       config: {
         responseMimeType: "application/json",
@@ -430,7 +430,7 @@ export async function getMarketPrices(location: string = "India", language: stri
 
   try {
     const response = await getAIClient().models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-2.5-flash-lite",
       contents: [{ parts: [{ text: prompt }] }],
       config: {
         responseMimeType: "application/json",

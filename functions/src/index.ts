@@ -36,7 +36,7 @@ async function callGemini(prompt: string, jsonMode = false): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY not set in function environment");
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`;
   const body: Record<string, unknown> = {
     contents: [{ parts: [{ text: prompt }] }],
   };
@@ -75,11 +75,11 @@ const PRIORITY_STATES = [
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FUNCTION 1: Sync Mandi Prices to Supabase (replaces old Firestore ingestion)
-// Runs every day at 4:00 AM IST
+// Runs every day at 11:30 AM IST (data.gov.in publishes previous day's data by morning)
 // ─────────────────────────────────────────────────────────────────────────────
 export const syncMandiToSupabase = functions
   .runWith({ timeoutSeconds: 540, memory: "1GB" })
-  .pubsub.schedule("0 4 * * *")
+  .pubsub.schedule("30 11 * * *")
   .timeZone("Asia/Kolkata")
   .onRun(async (_context) => {
     functions.logger.info("Starting Mandi → Supabase sync for priority states...");
@@ -97,28 +97,19 @@ export const syncMandiToSupabase = functions
     let totalErrors = 0;
     const startTime = Date.now();
 
-    // Fetch only yesterday's date (relative to IST) because today's 4:00 AM sync targets yesterday's trading data
-    const targetDates: string[] = [];
+    // Calculate yesterday's date in IST (the sync targets previous day's trading data)
     const now = new Date();
-    
-    // Explicitly calculate "yesterday in IST" to be completely safe against timezone and schedule changes
-    // 1. Get current time in UTC
-    // 2. Add 5.5 hours to get IST time
-    // 3. Subtract 1 day to get yesterday
     const istYesterday = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
     istYesterday.setUTCDate(istYesterday.getUTCDate() - 1);
 
     const day = String(istYesterday.getUTCDate()).padStart(2, "0");
     const month = String(istYesterday.getUTCMonth() + 1).padStart(2, "0");
     const year = istYesterday.getUTCFullYear();
-    
-    targetDates.push(`${day}/${month}/${year}`);
-    functions.logger.info(`Target dates: ${targetDates.join(", ")}`);
+    const targetDate = `${day}/${month}/${year}`;
+    functions.logger.info(`Target date: ${targetDate}`);
 
     for (const state of PRIORITY_STATES) {
       const stateRecords: Record<string, unknown>[] = [];
-
-      for (const targetDate of targetDates) {
         let offset = 0;
         const limit = 500;
 
@@ -139,7 +130,7 @@ export const syncMandiToSupabase = functions
                   "filters[State]": state,
                   "filters[Arrival_Date]": targetDate,
                 },
-                timeout: 30000,
+                timeout: 120000,
               });
 
               records = response.data?.records ?? [];
@@ -183,12 +174,11 @@ export const syncMandiToSupabase = functions
             }
           }
 
-          if (records.length < limit) break;
-          offset += limit;
+        if (records.length < limit) break;
+        offset += limit;
 
-          // Rate limit delay between successful pagination requests
-          await new Promise((resolve) => setTimeout(resolve, 500));
-        }
+        // Rate limit delay between successful pagination requests
+        await new Promise((resolve) => setTimeout(resolve, 500));
       }
 
       // Deduplicate records to prevent "ON CONFLICT DO UPDATE command cannot affect row a second time"
@@ -392,18 +382,6 @@ export const fetchAgriNews = functions
     return { items, cached: false };
   });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// FUNCTION 3 (legacy): AI Market News — kept for backwards compat
-// ─────────────────────────────────────────────────────────────────────────────
-export const aggregateMarketNews = functions
-  .runWith({ timeoutSeconds: 180, memory: "256MB" })
-  .pubsub.schedule("30 2 * * *")
-  .timeZone("Asia/Kolkata")
-  .onRun(async (_context) => {
-    functions.logger.info("aggregateMarketNews: delegating to fetchAgriNews logic...");
-    // News is now served via fetchAgriNews HTTP endpoint with Firestore caching
-    return null;
-  });
 
 
 // ─────────────────────────────────────────────────────────────────────────────
