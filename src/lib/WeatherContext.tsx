@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useLanguage } from './LanguageContext';
 
 interface WeatherForecast {
   date: string;
@@ -40,14 +41,15 @@ export function WeatherProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const generateAdvisory = (current: any, daily: any) => {
-    const lang = localStorage.getItem('preferredLanguage') || 'English';
-    const isHindi = lang === 'Hindi';
+  const { isHindi } = useLanguage();
 
+  useEffect(() => {
+    if (!weather) return;
+    
     // Check for rain in next 5 days
-    const willRain = daily.weather_code.slice(0, 5).some((code: number) => [51, 53, 55, 61, 63, 65, 80, 81, 82, 95, 96, 99].includes(code));
-    const isHot = daily.temperature_2m_max.slice(0, 3).some((temp: number) => temp > 35);
-    const isCold = daily.temperature_2m_min.slice(0, 3).some((temp: number) => temp < 10);
+    const willRain = weather.forecast.some((day: any) => [51, 53, 55, 61, 63, 65, 80, 81, 82, 95, 96, 99].includes(day.code));
+    const isHot = weather.forecast.slice(0, 3).some((day: any) => day.tempMax > 35);
+    const isCold = weather.forecast.slice(0, 3).some((day: any) => day.tempMin < 10);
 
     let msg = isHindi
       ? "आज खेती के लिए मौसम उत्तम है।"
@@ -68,7 +70,8 @@ export function WeatherProvider({ children }: { children: ReactNode }) {
     }
 
     setAdvisory(msg);
-  };
+  }, [weather, isHindi]);
+
 
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -117,7 +120,6 @@ export function WeatherProvider({ children }: { children: ReactNode }) {
           };
 
           setWeather(data);
-          generateAdvisory(weatherData.current, weatherData.daily);
         } catch (err) {
           setError("Failed to sync climate data");
         } finally {
