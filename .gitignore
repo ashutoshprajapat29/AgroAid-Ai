@@ -26,3 +26,13 @@ functions/check_api.js
 functions/check_supabase.js
 run_sync_now.js
 retry_rajasthan.js
+dev-dist/
+
+# Firebase
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
+
+# Firebase Functions
+functions/lib/
+functions/node_modules/
