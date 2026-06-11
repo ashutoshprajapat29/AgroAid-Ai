@@ -345,6 +345,14 @@ export const translations: Record<string, { English: string; Hindi: string }> = 
   "plots.plot_link":       { English: "Plot Link", Hindi: "प्लॉट लिंक" },
   "plots.log_soil":        { English: "Log Soil Test Results", Hindi: "मिट्टी परीक्षण परिणाम दर्ज करें" },
 
+  // Merged Plots + Advisor UI
+  "plots.ask_ai":          { English: "Ask Farm AI",     Hindi: "Farm AI से पूछें" },
+  "plots.plot_details":    { English: "Plot Details",    Hindi: "प्लॉट विवरण" },
+  "plots.tab_details":     { English: "Details & Soil",  Hindi: "विवरण और मिट्टी" },
+  "plots.tab_advisor":     { English: "AI Advisor",      Hindi: "AI सलाहकार" },
+  "plots.back_to_plots":   { English: "Back to Plots",   Hindi: "प्लॉट पर वापस" },
+  "plots.general_ai":      { English: "General Farm AI", Hindi: "सामान्य Farm AI" },
+
   // Weather extras
   "weather.clear":         { English: "Clear sky", Hindi: "साफ़ आसमान" },
   "weather.partly_cloudy": { English: "Partly cloudy", Hindi: "आंशिक बादल" },

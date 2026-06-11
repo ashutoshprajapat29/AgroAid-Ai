@@ -22,8 +22,7 @@ import {
   Database,
   Volume2,
   Mic,
-  CheckCircle2,
-  Compass
+  CheckCircle2
 } from "lucide-react";
 import { collection, addDoc, query, where, orderBy, limit, getDocs, serverTimestamp, doc, updateDoc, onSnapshot, deleteDoc, writeBatch } from "firebase/firestore";
 import { db } from "../lib/firebase";
@@ -39,7 +38,19 @@ interface Message {
   imageUrls?: string[];
 }
 
-export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
+export default function FarmingAdvisor({ 
+  isActive, 
+  fieldId: propFieldId, 
+  hideHeader = false,
+  initialQuery = "",
+  onQueryClear
+}: { 
+  isActive?: boolean; 
+  fieldId?: string; 
+  hideHeader?: boolean;
+  initialQuery?: string;
+  onQueryClear?: () => void;
+}) {
   const { user, profile } = useAuth();
   const { t } = useLanguage();
   const defaultMessage: Message = useMemo(() => ({
@@ -56,15 +67,12 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
   const [loading, setLoading] = useState(false);
   const [fields, setFields] = useState<Field[]>([]);
   const [soilReports, setSoilReports] = useState<SoilReport[]>([]);
-  const [selectedFieldId, setSelectedFieldId] = useState<string>("");
+  // fieldId is now driven by parent prop; internal state for reset flow only
+  const selectedFieldId = propFieldId || "";
   const [isSpeaking, setIsSpeaking] = useState<number | null>(null);
   const [speechLoading, setSpeechLoading] = useState<number | null>(null);
   const [isListening, setIsListening] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
-
-  // Quick Plot Form
-  const [showAddPlot, setShowAddPlot] = useState(false);
-  const [newPlotName, setNewPlotName] = useState("");
   const [showConfirmReset, setShowConfirmReset] = useState(false);
 
   const messages = useMemo(() =>
@@ -99,14 +107,6 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
     const unsubscribeFields = onSnapshot(fieldsQuery, (snapshot) => {
       const fetchedFields = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Field));
       setFields(fetchedFields);
-
-      // If the currently selected field was deleted, reset to General AI
-      setSelectedFieldId(current => {
-        if (current && !fetchedFields.find(f => f.id === current)) {
-          return "";
-        }
-        return current;
-      });
     }, (err) => {
       handleFirestoreError(err, OperationType.GET, fieldsPath);
     });
@@ -289,28 +289,6 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
     window.speechSynthesis.speak(utterance);
   };
 
-  const saveNewPlot = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user || !newPlotName.trim()) return;
-    setLoading(true);
-    const path = `users/${user.uid}/fields`;
-    try {
-      const docRef = await addDoc(collection(db, path), {
-        name: newPlotName,
-        area: 1,
-        unit: 'Acres',
-        createdAt: serverTimestamp()
-      });
-      setNewPlotName("");
-      setShowAddPlot(false);
-      setSelectedFieldId(docRef.id);
-    } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, path);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length > 0) {
@@ -359,8 +337,9 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
     setSelectedImages(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleSend = async () => {
-    if ((!input.trim() && selectedImages.length === 0) || loading || !user || isProcessingRef.current) return;
+  const handleSend = async (overrideQuery?: string) => {
+    const queryText = overrideQuery !== undefined ? overrideQuery : input;
+    if ((!queryText.trim() && selectedImages.length === 0) || loading || !user || isProcessingRef.current) return;
     isProcessingRef.current = true;
     setLoading(true);
 
@@ -524,6 +503,16 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
     }
   };
 
+  useEffect(() => {
+    if (initialQuery) {
+      handleSend(initialQuery);
+      if (onQueryClear) {
+        onQueryClear();
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialQuery]);
+
   const resetChat = async () => {
     if (messages.length <= 1 || !user) return;
 
@@ -567,6 +556,9 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
     }
   };
 
+  // Determine mode label
+  const selectedField = fields.find(f => f.id === selectedFieldId);
+
   return (
     <div className="flex flex-col h-full border-none bg-transparent shadow-none px-2 pb-0 md:px-4 md:pb-0 relative overflow-hidden">
       <div className="sticky top-0 z-[40] backdrop-blur-xl pb-2 -mx-2 md:-mx-4 px-2 md:px-4" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-base) 95%, transparent)' }}>
@@ -580,61 +572,46 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
             >
               <div className="bg-emerald-500/90 backdrop-blur-md text-white px-6 py-2 rounded-full flex items-center gap-2 shadow-xl border border-emerald-400/30 text-[10px] md:text-xs font-bold uppercase tracking-widest mt-2 transform -translate-y-4">
                 <CheckCircle2 size={14} />
-                Records Synced
+                {t("advisor.records_synced")}
               </div>
             </motion.div>
           )}
         </AnimatePresence>
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5 shrink-0">
-            <div className="w-6 h-6 bg-emerald-500/15 border border-emerald-500/25 rounded-lg flex items-center justify-center text-emerald-400 shrink-0">
-              <MessageSquare size={12} />
-            </div>
-            <div className="min-w-0">
-              <h2 className="text-[11px] md:text-sm font-bold tracking-tight leading-none truncate" style={{ color: 'var(--text-main)' }}>{t("advisor.advisor_ai")}</h2>
-            </div>
+        {hideHeader ? (
+          <div className="flex justify-end pt-1 pb-1">
+            {showConfirmReset ? (
+              <div className="flex items-center gap-1 bg-rose-500/10 p-0.5 rounded-lg border border-rose-500/20">
+                <button onClick={resetChat} className="text-white bg-rose-500 font-bold text-[9px] px-2 py-1 rounded-md">Clear</button>
+                <button onClick={() => setShowConfirmReset(false)} style={{ color: 'var(--text-muted)', borderColor: 'var(--border-input)', background: 'var(--bg-input)' }} className="font-bold text-[9px] px-2 py-1 rounded-md border">X</button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowConfirmReset(true)}
+                className="w-7 h-7 rounded-lg hover:text-rose-400 hover:border-rose-500/20 transition-all flex items-center justify-center border"
+                style={{ background: 'var(--bg-input)', borderColor: 'var(--border-input)', color: 'var(--text-muted)' }}
+                title="Reset Chat"
+              >
+                <X size={12} />
+              </button>
+            )}
           </div>
-
-          <div className="flex items-center gap-2 w-full min-w-0">
-            <div className="flex-1 overflow-x-auto scrollbar-hide py-0.5">
-              <div className="flex p-0.5 rounded-xl w-max gap-0.5 border" style={{ background: 'var(--bg-input)', borderColor: 'var(--border-input)' }}>
-                <button
-                  onClick={() => setSelectedFieldId("")}
-                  style={!selectedFieldId ? {} : { color: 'var(--text-muted)' }}
-                  className={`whitespace-nowrap px-3 py-1.5 ${
-                    !selectedFieldId
-                      ? 'bg-emerald-500/15 border border-emerald-500/25 text-emerald-400 rounded-lg'
-                      : 'hover:text-emerald-500'
-                  } text-[9px] font-bold uppercase tracking-widest transition-all`}
-                >
-                  {t("advisor.general_tab")}
-                </button>
-                {fields.map(f => (
-                  <button
-                    key={f.id}
-                    onClick={() => setSelectedFieldId(f.id)}
-                    style={selectedFieldId !== f.id ? { color: 'var(--text-muted)' } : {}}
-                    className={`flex items-center gap-1 whitespace-nowrap px-3 py-1.5 ${
-                      selectedFieldId === f.id
-                        ? 'bg-teal-500/15 border border-teal-500/25 text-teal-400 rounded-lg'
-                        : 'hover:text-teal-500'
-                    } text-[9px] font-bold uppercase tracking-widest transition-all`}
-                  >
-                    <Compass size={9} /> {f.name}
-                  </button>
-                ))}
+        ) : (
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-7 h-7 bg-emerald-500/15 border border-emerald-500/25 rounded-lg flex items-center justify-center text-emerald-400 shrink-0">
+                <MessageSquare size={13} />
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-[11px] md:text-sm font-bold tracking-tight leading-none truncate" style={{ color: 'var(--text-main)' }}>
+                  {selectedField ? selectedField.name : t("advisor.advisor_ai")}
+                </h2>
+                {selectedField && (
+                  <p className="text-[9px] text-emerald-400 font-semibold uppercase tracking-widest">{t("plots.tab_advisor")}</p>
+                )}
               </div>
             </div>
 
             <div className="flex items-center gap-1 shrink-0">
-              <button
-                onClick={() => setShowAddPlot(true)}
-                className="w-7 h-7 bg-teal-500/10 text-teal-400 border border-teal-500/20 rounded-lg transition-all font-bold flex items-center justify-center hover:bg-teal-500/20"
-                title="Add New Plot"
-              >
-                +
-              </button>
-
               {showConfirmReset ? (
                 <div className="flex items-center gap-1 bg-rose-500/10 p-0.5 rounded-lg border border-rose-500/20">
                   <button onClick={resetChat} className="text-white bg-rose-500 font-bold text-[9px] px-2 py-1 rounded-md">Clear</button>
@@ -652,22 +629,8 @@ export default function FarmingAdvisor({ isActive }: { isActive?: boolean }) {
               )}
             </div>
           </div>
-        </div>
-      </div>
-
-      <AnimatePresence>
-        {showAddPlot && (
-          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="absolute z-40 top-20 left-0 right-0 glass-panel shadow-2xl p-4 border border-emerald-500/15 rounded-2xl mx-4 md:mx-8">
-            <h3 className="font-bold mb-3 text-sm pb-2 border-b" style={{ color: 'var(--text-main)', borderColor: 'var(--border-input)' }}>{t("advisor.quick_map")}</h3>
-            <form onSubmit={saveNewPlot} className="flex gap-2">
-              <input type="text" placeholder="e.g. North Plot" value={newPlotName} onChange={e => setNewPlotName(e.target.value)} required
-                className="flex-1 theme-input rounded-xl px-4 py-2 font-semibold text-sm" />
-              <button type="submit" disabled={loading} className="bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-sm px-5 py-2 rounded-xl transition-colors">{loading ? t("profile.saving") : t("common.add")}</button>
-              <button type="button" onClick={() => setShowAddPlot(false)} className="p-2 hover:text-rose-400 rounded-xl border transition-colors" style={{ color: 'var(--text-muted)', background: 'var(--bg-input)', borderColor: 'var(--border-input)' }}><X size={16} /></button>
-            </form>
-          </motion.div>
         )}
-      </AnimatePresence>
+      </div>
 
       <div
         ref={scrollRef}

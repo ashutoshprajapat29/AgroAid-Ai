@@ -10,8 +10,6 @@ import {
 } from "lucide-react";
 import ThemeToggle from "./components/ThemeToggle";
 import LanguageToggle from "./components/LanguageToggle";
-
-import FarmingAdvisor from "./components/FarmingAdvisor";
 import NotificationManager from "./components/NotificationManager";
 const DiseaseScanner  = lazy(() => import("./components/DiseaseScanner"));
 const Profile         = lazy(() => import("./components/Profile"));
@@ -21,10 +19,9 @@ const FieldManager    = lazy(() => import("./components/FieldManager"));
 const TaskManager     = lazy(() => import("./components/TaskManager"));
 const MarketDashboard = lazy(() => import("./components/MarketDashboard"));
 
-type TabType = 'advisor' | 'disease' | 'profile' | 'voice' | 'fields' | 'tasks' | 'market';
+type TabType = 'disease' | 'profile' | 'fields' | 'tasks' | 'market';
 
 const NAV_CONFIG: { id: TabType; icon: React.ElementType; labelKey: string }[] = [
-  { id: 'advisor',  icon: MessageSquare, labelKey: 'nav.advisor'  },
   { id: 'disease',  icon: Camera,        labelKey: 'nav.health'   },
   { id: 'fields',   icon: Compass,       labelKey: 'nav.plots'    },
   { id: 'tasks',    icon: CheckCircle2,  labelKey: 'nav.tasks'    },
@@ -46,7 +43,7 @@ function PageLoader() {
 
 /* ── Authenticated shell ───────────────────────────────────── */
 function AuthenticatedApp() {
-  const [activeTab, setActiveTab] = useState<TabType>('advisor');
+  const [activeTab, setActiveTab] = useState<TabType>('fields');
   const { t } = useLanguage();
   const NAV_ITEMS = NAV_CONFIG.map(item => ({ ...item, label: t(item.labelKey) }));
 
@@ -114,11 +111,6 @@ function AuthenticatedApp() {
         {/* Content */}
         <main className="flex-1 overflow-hidden relative">
           <div className="h-full max-w-7xl mx-auto relative">
-
-            {/* Advisor always mounted for perf */}
-            <div className={`h-full transition-opacity duration-200 ${activeTab === 'advisor' ? 'opacity-100 relative z-10' : 'opacity-0 absolute inset-0 pointer-events-none -z-10'}`}>
-              <FarmingAdvisor isActive={activeTab === 'advisor'} />
-            </div>
 
             <Suspense fallback={<PageLoader />}>
               {activeTab === 'disease' && (

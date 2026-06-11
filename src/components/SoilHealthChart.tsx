@@ -29,8 +29,8 @@ export default function SoilHealthChart({ data }: SoilHealthChartProps) {
         <h4 className="font-black text-lg text-[var(--text-main)] tracking-tight">{t("soilchart.title")}</h4>
         <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-widest mt-1">{t("soilchart.subtitle")}</p>
       </div>
-      <div className="h-64 w-full">
-        <ResponsiveContainer width="100%" height="100%">
+      <div className="h-64 w-full relative">
+        <ResponsiveContainer width="100%" height={256} minWidth={0}>
           <AreaChart
             data={chartData}
             margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
