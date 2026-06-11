@@ -27,7 +27,48 @@ functions/check_supabase.js
 run_sync_now.js
 retry_rajasthan.js
 dev-dist/
+check_mandi.js
+test_gemini.js
+test_supabase.js
+# Firebase
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
 
+# Firebase Functions
+functions/lib/
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+
+# Debug & scratch scripts
+check_fetch.js
+check_fetch_exact.js
+check_latest_date.js
+check_latest_output.txt
+checkDbDates.js
+checkMP.js
+check_db.js
+testApi.js
+testDb.js
+test_api.js
+test_json_user_key.cjs
+sync_june8.js
+seedMandi.js
+result.csv
+functions/check_api.js
+functions/check_supabase.js
+run_sync_now.js
+retry_rajasthan.js
+dev-dist/
+check_mandi.js
+test_gemini.js
+test_supabase.js
 # Firebase
 .firebase/
 firebase-debug.log
@@ -36,3 +77,13 @@ firebase-debug.*.log
 # Firebase Functions
 functions/lib/
 functions/node_modules/
+
+# Security - Service accounts & Keys
+*serviceAccountKey*.json
+*firebase-adminsdk*.json
+*.pem
+*.key
+*.cert
+
+# Agent Tools
+.agents/
