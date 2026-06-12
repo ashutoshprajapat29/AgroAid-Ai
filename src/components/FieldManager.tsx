@@ -80,6 +80,13 @@ function SoilMetric({ label, value, max, color, unit = '' }: { label: string, va
   );
 }
 
+const parseNumberSafe = (val: string): number | null => {
+  const trimmed = val.trim();
+  if (!trimmed) return null;
+  const parsed = parseFloat(trimmed);
+  return isNaN(parsed) ? null : parsed;
+};
+
 export default function FieldManager() {
   const { user, profile } = useAuth();
   const { t } = useLanguage();
@@ -196,9 +203,15 @@ export default function FieldManager() {
     e.preventDefault();
     if (!user) return;
     try {
+      const area = parseFloat(fieldFormData.area);
+      if (isNaN(area) || area <= 0) {
+        alert("Please enter a valid area size greater than 0.");
+        return;
+      }
+
       const fieldData = {
         name: fieldFormData.name,
-        area: parseFloat(fieldFormData.area),
+        area: area,
         unit: fieldFormData.unit,
         soilType: fieldFormData.soilType || null,
         location: fieldFormData.location || null,
@@ -219,6 +232,7 @@ export default function FieldManager() {
           });
         } catch (err) {
           handleFirestoreError(err, OperationType.UPDATE, fieldPath);
+          throw err;
         }
       } else {
         const fieldCollectionPath = `users/${user.uid}/fields`;
@@ -229,6 +243,7 @@ export default function FieldManager() {
           });
         } catch (err) {
           handleFirestoreError(err, OperationType.CREATE, fieldCollectionPath);
+          throw err;
         }
       }
       setIsAddingField(false);
@@ -296,14 +311,40 @@ export default function FieldManager() {
     e.preventDefault();
     if (!user) return;
     try {
+      const ph = parseNumberSafe(soilFormData.ph);
+      if (ph !== null && (ph < 0 || ph > 14)) {
+        alert("pH must be between 0 and 14.");
+        return;
+      }
+      const nitrogen = parseNumberSafe(soilFormData.nitrogen);
+      if (nitrogen !== null && nitrogen < 0) {
+        alert("Nitrogen level cannot be negative.");
+        return;
+      }
+      const phosphorus = parseNumberSafe(soilFormData.phosphorus);
+      if (phosphorus !== null && phosphorus < 0) {
+        alert("Phosphorus level cannot be negative.");
+        return;
+      }
+      const potassium = parseNumberSafe(soilFormData.potassium);
+      if (potassium !== null && potassium < 0) {
+        alert("Potassium level cannot be negative.");
+        return;
+      }
+      const organicCarbon = parseNumberSafe(soilFormData.organicCarbon);
+      if (organicCarbon !== null && organicCarbon < 0) {
+        alert("Organic Carbon level cannot be negative.");
+        return;
+      }
+
       const reportData = {
         testDate: soilFormData.testDate || new Date().toISOString().split('T')[0],
         fieldId: activeFieldForSoil,
-        ph: soilFormData.ph ? parseFloat(soilFormData.ph) : null,
-        nitrogen: soilFormData.nitrogen ? parseFloat(soilFormData.nitrogen) : null,
-        phosphorus: soilFormData.phosphorus ? parseFloat(soilFormData.phosphorus) : null,
-        potassium: soilFormData.potassium ? parseFloat(soilFormData.potassium) : null,
-        organicCarbon: soilFormData.organicCarbon ? parseFloat(soilFormData.organicCarbon) : null,
+        ph,
+        nitrogen,
+        phosphorus,
+        potassium,
+        organicCarbon,
         otherNotes: soilFormData.otherNotes
       };
 
@@ -316,6 +357,7 @@ export default function FieldManager() {
           });
         } catch (err) {
           handleFirestoreError(err, OperationType.UPDATE, soilReportPath);
+          throw err;
         }
       } else {
         const soilCollectionPath = `users/${user.uid}/soil_reports`;
@@ -327,6 +369,7 @@ export default function FieldManager() {
           });
         } catch (err) {
           handleFirestoreError(err, OperationType.CREATE, soilCollectionPath);
+          throw err;
         }
       }
       setIsAddingSoil(false);
@@ -438,7 +481,7 @@ export default function FieldManager() {
               initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }}
               className="bg-[var(--bg-card)] rounded-3xl p-6 md:p-8 w-full max-w-2xl shadow-2xl my-8 relative"
             >
-              <button onClick={() => setIsAddingField(false)} className="absolute top-6 right-6 p-2 text-[var(--text-subtle)] hover:text-[var(--text-main)] bg-[var(--bg-hover)] rounded-full transition-colors">
+              <button onClick={() => setIsAddingField(false)} className="absolute top-6 right-6 p-2 text-[var(--text-subtle)] hover:text-[var(--text-main)] bg-[var(--bg-hover)] rounded-full transition-colors" title="Close" aria-label="Close">
                 <X size={20} />
               </button>
               
@@ -464,7 +507,7 @@ export default function FieldManager() {
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-[var(--text-muted)] mb-2">{t('plots.unit')}*</label>
-                    <select required value={fieldFormData.unit} onChange={e => setFieldFormData({...fieldFormData, unit: e.target.value})} className="w-full bg-[var(--bg-input)] border-2 border-[var(--border-strong)] rounded-xl px-4 py-3 focus:outline-none focus:border-teal-500 font-medium">
+                    <select required value={fieldFormData.unit} onChange={e => setFieldFormData({...fieldFormData, unit: e.target.value})} className="w-full bg-[var(--bg-input)] border-2 border-[var(--border-strong)] rounded-xl px-4 py-3 focus:outline-none focus:border-teal-500 font-medium" title="Area unit">
                       <option value="Acres">{t("Hindi") === "Hindi" ? "एकड़ (Acres)" : "Acres"}</option>
                       <option value="Hectares">{t("Hindi") === "Hindi" ? "हेक्टेयर (Hectares)" : "Hectares"}</option>
                       <option value="Guntas">{t("Hindi") === "Hindi" ? "गुंटा (Guntas)" : "Guntas"}</option>
@@ -512,7 +555,7 @@ export default function FieldManager() {
                       </div>
                       <div>
                         <label className="block text-sm font-bold text-[var(--text-muted)] mb-2">{t('plots.planting_date')}</label>
-                        <input type="date" value={fieldFormData.plantingDate} onChange={e => setFieldFormData({...fieldFormData, plantingDate: e.target.value})} className="w-full bg-[var(--bg-input)] border-2 border-[var(--border-strong)] rounded-xl px-4 py-3 focus:outline-none focus:border-teal-500 font-medium text-[var(--text-muted)]" />
+                        <input type="date" value={fieldFormData.plantingDate} onChange={e => setFieldFormData({...fieldFormData, plantingDate: e.target.value})} className="w-full bg-[var(--bg-input)] border-2 border-[var(--border-strong)] rounded-xl px-4 py-3 focus:outline-none focus:border-teal-500 font-medium text-[var(--text-muted)]" title="Planting Date" placeholder="Select planting date" />
                       </div>
                       <div>
                         <label className="block text-sm font-bold text-[var(--text-muted)] mb-2">{t('plots.irrigation')}</label>
@@ -548,7 +591,7 @@ export default function FieldManager() {
               initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }}
               className="bg-[var(--bg-card)] rounded-3xl p-6 md:p-8 w-full max-w-3xl shadow-2xl my-8 relative"
             >
-              <button onClick={() => setIsAddingSoil(false)} className="absolute top-6 right-6 p-2 text-[var(--text-subtle)] hover:text-[var(--text-main)] bg-[var(--bg-hover)] rounded-full transition-colors">
+              <button onClick={() => setIsAddingSoil(false)} className="absolute top-6 right-6 p-2 text-[var(--text-subtle)] hover:text-[var(--text-main)] bg-[var(--bg-hover)] rounded-full transition-colors" title="Close" aria-label="Close">
                 <X size={20} />
               </button>
               
@@ -573,30 +616,30 @@ export default function FieldManager() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
                     <label className="block text-sm font-bold text-[var(--text-muted)] mb-2">{t('plots.ph_level')}</label>
-                    <input type="number" step="0.1" value={soilFormData.ph} onChange={e => setSoilFormData({...soilFormData, ph: e.target.value})} className="w-full bg-[var(--bg-input)] border-2 border-[var(--border-strong)] rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500 font-medium" placeholder="e.g. 6.5" />
+                    <input type="number" step="0.01" min="0" max="14" value={soilFormData.ph} onChange={e => setSoilFormData({...soilFormData, ph: e.target.value})} className="w-full bg-[var(--bg-input)] border-2 border-[var(--border-strong)] rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500 font-medium" placeholder="e.g. 6.5" />
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-[var(--text-muted)] mb-2">{t('plots.nitrogen')}</label>
-                    <input type="number" value={soilFormData.nitrogen} onChange={e => setSoilFormData({...soilFormData, nitrogen: e.target.value})} className="w-full bg-[var(--bg-input)] border-2 border-[var(--border-strong)] rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500 font-medium" placeholder="mg/kg" />
+                    <input type="number" min="0" value={soilFormData.nitrogen} onChange={e => setSoilFormData({...soilFormData, nitrogen: e.target.value})} className="w-full bg-[var(--bg-input)] border-2 border-[var(--border-strong)] rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500 font-medium" placeholder="mg/kg" />
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-[var(--text-muted)] mb-2">{t('plots.phosphorus')}</label>
-                    <input type="number" value={soilFormData.phosphorus} onChange={e => setSoilFormData({...soilFormData, phosphorus: e.target.value})} className="w-full bg-[var(--bg-input)] border-2 border-[var(--border-strong)] rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500 font-medium" placeholder="mg/kg" />
+                    <input type="number" min="0" value={soilFormData.phosphorus} onChange={e => setSoilFormData({...soilFormData, phosphorus: e.target.value})} className="w-full bg-[var(--bg-input)] border-2 border-[var(--border-strong)] rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500 font-medium" placeholder="mg/kg" />
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-[var(--text-muted)] mb-2">{t('plots.potassium')}</label>
-                    <input type="number" value={soilFormData.potassium} onChange={e => setSoilFormData({...soilFormData, potassium: e.target.value})} className="w-full bg-[var(--bg-input)] border-2 border-[var(--border-strong)] rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500 font-medium" placeholder="mg/kg" />
+                    <input type="number" min="0" value={soilFormData.potassium} onChange={e => setSoilFormData({...soilFormData, potassium: e.target.value})} className="w-full bg-[var(--bg-input)] border-2 border-[var(--border-strong)] rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500 font-medium" placeholder="mg/kg" />
                   </div>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-bold text-[var(--text-muted)] mb-2">{t('plots.organic_carbon')}</label>
-                    <input type="number" step="0.01" value={soilFormData.organicCarbon} onChange={e => setSoilFormData({...soilFormData, organicCarbon: e.target.value})} className="w-full bg-[var(--bg-input)] border-2 border-[var(--border-strong)] rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500 font-medium" placeholder="e.g. 1.2" />
+                    <input type="number" step="0.01" min="0" value={soilFormData.organicCarbon} onChange={e => setSoilFormData({...soilFormData, organicCarbon: e.target.value})} className="w-full bg-[var(--bg-input)] border-2 border-[var(--border-strong)] rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500 font-medium" placeholder="e.g. 1.2" />
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-[var(--text-muted)] mb-2">{t('plots.test_date')}*</label>
-                    <input type="date" required value={soilFormData.testDate} onChange={e => setSoilFormData({...soilFormData, testDate: e.target.value})} className="w-full bg-[var(--bg-input)] border-2 border-[var(--border-strong)] rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500 font-medium text-[var(--text-muted)]" />
+                    <input type="date" required value={soilFormData.testDate} onChange={e => setSoilFormData({...soilFormData, testDate: e.target.value})} className="w-full bg-[var(--bg-input)] border-2 border-[var(--border-strong)] rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500 font-medium text-[var(--text-muted)]" title="Test Date" placeholder="Select test date" />
                   </div>
                 </div>
 
@@ -786,14 +829,14 @@ export default function FieldManager() {
               {unassignedReports.map(report => (
                 <div key={report.id} className="bg-[var(--bg-card)] rounded-2xl p-6 shadow-xl border border-[var(--border-input)] relative group">
                    <div className="absolute top-4 right-4 flex gap-1 z-30 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={(e) => { e.stopPropagation(); openSoilModal(null, report); }} className="p-2 text-[var(--text-subtle)] hover:text-indigo-600 transition-colors"><Edit2 size={16} /></button>
+                      <button onClick={(e) => { e.stopPropagation(); openSoilModal(null, report); }} className="p-2 text-[var(--text-subtle)] hover:text-indigo-600 transition-colors" title="Edit soil report" aria-label="Edit soil report"><Edit2 size={16} /></button>
                       {deletingSoilId === report.id ? (
                         <div className="flex items-center gap-1 bg-rose-500/10 p-1 rounded-lg">
                           <button onClick={(e) => handleSoilDelete(e, report.id)} className="px-2 py-1 text-xs font-bold text-white bg-red-500 rounded">{t('common.delete')}</button>
                           <button onClick={(e) => { e.stopPropagation(); setDeletingSoilId(null); }} className="px-2 py-1 text-xs font-bold text-[var(--text-muted)] bg-[var(--bg-card)] rounded">{t('common.cancel')}</button>
                         </div>
                       ) : (
-                        <button onClick={(e) => { e.stopPropagation(); setDeletingSoilId(report.id); }} className="p-2 text-[var(--text-subtle)] hover:text-red-500 transition-colors"><Trash2 size={16} /></button>
+                        <button onClick={(e) => { e.stopPropagation(); setDeletingSoilId(report.id); }} className="p-2 text-[var(--text-subtle)] hover:text-red-500 transition-colors" title="Delete soil report" aria-label="Delete soil report"><Trash2 size={16} /></button>
                       )}
                    </div>
                    <div className="flex items-center gap-2 mb-4">
@@ -815,6 +858,8 @@ export default function FieldManager() {
                             onChange={(e) => handleAssignReport(report.id, e.target.value)}
                             className="w-full bg-[var(--bg-input)] border border-[var(--border-strong)] rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:border-teal-500"
                             defaultValue=""
+                            title="Assign report to plot"
+                            aria-label="Assign report to plot"
                           >
                             <option value="" disabled>{t('plots.assign_plot')}</option>
                             {fields.map(f => (
@@ -854,14 +899,15 @@ export default function FieldManager() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] flex flex-col"
-            style={{ background: 'var(--bg-base)' }}
+            className="fixed inset-0 z-[200] flex flex-col bg-theme-base"
           >
             {/* Modal Header */}
-            <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b glass-nav" style={{ borderColor: 'var(--border-input)' }}>
+            <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b glass-nav border-theme-input">
               <button
                 onClick={() => setSelectedPlotForDetail(null)}
                 className="p-2 rounded-xl hover:bg-[var(--bg-hover)] transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)]"
+                title="Back"
+                aria-label="Back"
               >
                 <ChevronLeft size={22} />
               </button>
@@ -873,7 +919,7 @@ export default function FieldManager() {
                 </p>
               </div>
               {/* Tab Pills */}
-              <div className="flex p-0.5 rounded-xl gap-0.5 border shrink-0" style={{ background: 'var(--bg-input)', borderColor: 'var(--border-input)' }}>
+              <div className="flex p-0.5 rounded-xl gap-0.5 border shrink-0 bg-theme-input border-theme-input">
                 <button
                   onClick={() => setDetailTab('details')}
                   className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg transition-all flex items-center gap-1 ${
@@ -1064,6 +1110,8 @@ export default function FieldManager() {
                                   <button 
                                     type="submit" 
                                     className="bg-emerald-500 text-white p-2.5 rounded-xl hover:bg-emerald-600 transition-colors shadow-lg shadow-emerald-500/10"
+                                    title="Send quick query"
+                                    aria-label="Send quick query"
                                   >
                                     <Send size={14} />
                                   </button>
@@ -1200,13 +1248,14 @@ export default function FieldManager() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 40 }}
             transition={{ type: 'spring', damping: 22, stiffness: 260 }}
-            className="fixed inset-0 z-[200] flex flex-col"
-            style={{ background: 'var(--bg-base)' }}
+            className="fixed inset-0 z-[200] flex flex-col bg-theme-base"
           >
-            <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b glass-nav" style={{ borderColor: 'var(--border-input)' }}>
+            <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b glass-nav border-theme-input">
               <button
                 onClick={() => setShowGeneralAI(false)}
                 className="p-2 rounded-xl hover:bg-[var(--bg-hover)] transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)]"
+                title="Back"
+                aria-label="Back"
               >
                 <ChevronLeft size={22} />
               </button>

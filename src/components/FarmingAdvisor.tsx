@@ -561,7 +561,7 @@ export default function FarmingAdvisor({
 
   return (
     <div className="flex flex-col h-full border-none bg-transparent shadow-none px-2 pb-0 md:px-4 md:pb-0 relative overflow-hidden">
-      <div className="sticky top-0 z-[40] backdrop-blur-xl pb-2 -mx-2 md:-mx-4 px-2 md:px-4" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-base) 95%, transparent)' }}>
+      <div className="sticky top-0 z-[40] backdrop-blur-xl pb-2 -mx-2 md:-mx-4 px-2 md:px-4 bg-theme-base-95">
         <AnimatePresence>
           {lastSaved && (
             <motion.div
@@ -582,13 +582,12 @@ export default function FarmingAdvisor({
             {showConfirmReset ? (
               <div className="flex items-center gap-1 bg-rose-500/10 p-0.5 rounded-lg border border-rose-500/20">
                 <button onClick={resetChat} className="text-white bg-rose-500 font-bold text-[9px] px-2 py-1 rounded-md">Clear</button>
-                <button onClick={() => setShowConfirmReset(false)} style={{ color: 'var(--text-muted)', borderColor: 'var(--border-input)', background: 'var(--bg-input)' }} className="font-bold text-[9px] px-2 py-1 rounded-md border">X</button>
+                <button onClick={() => setShowConfirmReset(false)} className="font-bold text-[9px] px-2 py-1 rounded-md border text-theme-muted border-theme-input bg-theme-input">X</button>
               </div>
             ) : (
               <button
                 onClick={() => setShowConfirmReset(true)}
-                className="w-7 h-7 rounded-lg hover:text-rose-400 hover:border-rose-500/20 transition-all flex items-center justify-center border"
-                style={{ background: 'var(--bg-input)', borderColor: 'var(--border-input)', color: 'var(--text-muted)' }}
+                className="w-7 h-7 rounded-lg hover:text-rose-400 hover:border-rose-500/20 transition-all flex items-center justify-center border bg-theme-input border-theme-input text-theme-muted"
                 title="Reset Chat"
               >
                 <X size={12} />
@@ -602,7 +601,7 @@ export default function FarmingAdvisor({
                 <MessageSquare size={13} />
               </div>
               <div className="min-w-0">
-                <h2 className="text-[11px] md:text-sm font-bold tracking-tight leading-none truncate" style={{ color: 'var(--text-main)' }}>
+                <h2 className="text-[11px] md:text-sm font-bold tracking-tight leading-none truncate text-theme-main">
                   {selectedField ? selectedField.name : t("advisor.advisor_ai")}
                 </h2>
                 {selectedField && (
@@ -615,13 +614,12 @@ export default function FarmingAdvisor({
               {showConfirmReset ? (
                 <div className="flex items-center gap-1 bg-rose-500/10 p-0.5 rounded-lg border border-rose-500/20">
                   <button onClick={resetChat} className="text-white bg-rose-500 font-bold text-[9px] px-2 py-1 rounded-md">Clear</button>
-                  <button onClick={() => setShowConfirmReset(false)} style={{ color: 'var(--text-muted)', borderColor: 'var(--border-input)', background: 'var(--bg-input)' }} className="font-bold text-[9px] px-2 py-1 rounded-md border">X</button>
+                  <button onClick={() => setShowConfirmReset(false)} className="font-bold text-[9px] px-2 py-1 rounded-md border text-theme-muted border-theme-input bg-theme-input">X</button>
                 </div>
               ) : (
                 <button
                   onClick={() => setShowConfirmReset(true)}
-                  className="w-7 h-7 rounded-lg hover:text-rose-400 hover:border-rose-500/20 transition-all flex items-center justify-center border"
-                  style={{ background: 'var(--bg-input)', borderColor: 'var(--border-input)', color: 'var(--text-muted)' }}
+                  className="w-7 h-7 rounded-lg hover:text-rose-400 hover:border-rose-500/20 transition-all flex items-center justify-center border bg-theme-input border-theme-input text-theme-muted"
                   title="Reset Chat"
                 >
                   <X size={12} />
@@ -634,8 +632,7 @@ export default function FarmingAdvisor({
 
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto space-y-2 mb-0 pr-1 md:pr-2 scrollbar-hide relative py-2 px-2 md:py-4 md:px-6 rounded-2xl md:rounded-[28px] border border-emerald-500/10"
-        style={{ background: 'color-mix(in srgb, var(--bg-base) 60%, transparent)' }}
+        className="flex-1 overflow-y-auto space-y-2 mb-0 pr-1 md:pr-2 scrollbar-hide relative py-2 px-2 md:py-4 md:px-6 rounded-2xl md:rounded-[28px] border border-emerald-500/10 bg-theme-base-60"
       >
         {messages.length === 1 && (
           <div className="min-h-full flex flex-col items-center justify-center py-4">
@@ -753,6 +750,8 @@ export default function FarmingAdvisor({
                 <button
                   onClick={() => removeImage(idx)}
                   className="absolute top-0.5 right-0.5 p-1 bg-black/70 text-white rounded-full hover:bg-rose-500 transition-colors"
+                  title="Remove Image"
+                  aria-label="Remove Image"
                 >
                   <X size={9} />
                 </button>
@@ -761,7 +760,7 @@ export default function FarmingAdvisor({
             <div className="flex flex-col justify-center px-1">
               <div className="flex items-center gap-1.5">
                 <p className="text-[10px] font-bold text-bento-text-main uppercase tracking-widest">{selectedImages.length} Photo{selectedImages.length > 1 ? 's' : ''}</p>
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" style={{ boxShadow: '0 0 4px rgba(34,197,94,0.8)' }} />
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0 shadow-[0_0_4px_rgba(34,197,94,0.8)]" />
               </div>
               <p className="text-[9px] text-bento-text-muted font-semibold uppercase tracking-widest mt-0.5">{t("advisor.multi_image")}</p>
             </div>
@@ -776,6 +775,8 @@ export default function FarmingAdvisor({
             accept="image/*"
             multiple
             className="hidden"
+            title="Upload crop image"
+            aria-label="Upload crop image"
           />
           <button
             type="button"
@@ -785,6 +786,8 @@ export default function FarmingAdvisor({
                 ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400 scale-105 shadow-lg shadow-emerald-500/15'
                 : 'bg-[var(--bg-input)] border-[var(--border-input)] text-bento-text-muted hover:text-emerald-400 hover:border-emerald-500/25 active:scale-95'
             }`}
+            title="Select crop image"
+            aria-label="Select crop image"
           >
             <Camera size={18} />
           </button>
@@ -814,9 +817,11 @@ export default function FarmingAdvisor({
           </div>
 
           <button
-            onClick={handleSend}
+            onClick={() => handleSend()}
             disabled={loading || (!input.trim() && selectedImages.length === 0)}
             className="p-2.5 md:px-5 md:py-3 bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl font-bold transition-all disabled:opacity-25 shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 shrink-0 active:scale-95 hover:-translate-y-0.5"
+            title="Send Message"
+            aria-label="Send Message"
           >
             {loading ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
           </button>

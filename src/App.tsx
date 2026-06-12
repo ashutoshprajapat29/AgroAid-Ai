@@ -48,7 +48,7 @@ function AuthenticatedApp() {
   const NAV_ITEMS = NAV_CONFIG.map(item => ({ ...item, label: t(item.labelKey) }));
 
   return (
-    <div className="h-screen h-[100dvh] flex flex-col overflow-hidden relative" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-main)' }}>
+    <div className="h-screen h-[100dvh] flex flex-col overflow-hidden relative bg-theme-base text-theme-main">
       {/* Ambient glow layer */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
         <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[700px] h-[500px] bg-emerald-500/5 rounded-full blur-[120px]" />
@@ -224,7 +224,7 @@ function Landing() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center overflow-y-auto relative" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-main)' }}>
+    <div className="min-h-screen flex flex-col items-center overflow-y-auto relative bg-theme-base text-theme-main">
       {/* Grid pattern */}
       <div className="fixed inset-0 bg-grid pointer-events-none" />
 
@@ -246,7 +246,7 @@ function Landing() {
           </span>
         </div>
         <div className="flex items-center gap-3">
-          <div className="hidden md:flex items-center gap-2 text-[11px] font-semibold" style={{ color: 'var(--text-muted)' }}>
+          <div className="hidden md:flex items-center gap-2 text-[11px] font-semibold text-theme-muted">
             <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse shadow-[0_0_4px_rgba(34,197,94,0.8)]" />
             {lang === 'Hindi' ? 'Gemini AI द्वारा · लाइव डेटा' : 'Powered by Gemini AI · Live Data'}
           </div>
@@ -283,7 +283,7 @@ function Landing() {
 
       {/* Language toggle */}
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }} className="relative z-10 mb-7">
-        <div className="flex p-1 rounded-full gap-1 border" style={{ background: 'var(--bg-input)', borderColor: 'var(--border-input)' }}>
+        <div className="flex p-1 rounded-full gap-1 border bg-theme-input border-theme-input">
           {(['Hindi', 'English'] as const).map(l => (
             <button
               key={l}
@@ -291,9 +291,8 @@ function Landing() {
               className={`px-6 py-2 rounded-full text-sm font-bold transition-all duration-300 ${
                 lang === l
                   ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30'
-                  : 'hover:text-emerald-400'
+                  : 'text-theme-muted hover:text-emerald-400'
               }`}
-              style={lang !== l ? { color: 'var(--text-muted)' } : undefined}
             >
               {l === 'Hindi' ? 'हिन्दी' : 'English'}
             </button>
@@ -330,9 +329,9 @@ function Landing() {
                 </button>
 
                 <div className="relative flex items-center py-4">
-                  <div className="flex-grow border-t" style={{ borderColor: 'var(--border-input)' }} />
+                  <div className="flex-grow border-t border-theme-input" />
                   <span className="mx-4 text-[11px] font-bold uppercase tracking-widest text-bento-text-muted">{t("common.or")}</span>
-                  <div className="flex-grow border-t" style={{ borderColor: 'var(--border-input)' }} />
+                  <div className="flex-grow border-t border-theme-input" />
                 </div>
 
                 <button
@@ -444,7 +443,7 @@ function MainWrapper() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--bg-base)' }}>
+      <div className="min-h-screen flex items-center justify-center bg-theme-base">
         <div className="flex flex-col items-center gap-4">
           <div className="relative">
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-green-700 flex items-center justify-center shadow-2xl shadow-emerald-500/30">
@@ -452,7 +451,7 @@ function MainWrapper() {
             </div>
             <div className="absolute inset-0 rounded-2xl border-2 border-emerald-500/30 animate-ping" />
           </div>
-          <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>{t("app.loading")}</p>
+          <p className="text-sm font-medium text-theme-muted">{t("app.loading")}</p>
         </div>
       </div>
     );
