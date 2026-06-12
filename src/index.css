@@ -207,6 +207,33 @@
 .border-theme-input { border-color: var(--border-input); }
 .text-theme-main    { color: var(--text-main); }
 .text-theme-muted   { color: var(--text-muted); }
+.text-theme-subtle  { color: var(--text-subtle); }
+
+/* ── Card/Panel surface utilities ── */
+/* bg + border together (most common pattern) */
+.card-surface {
+  background: var(--bg-card);
+  border-color: var(--border-card);
+}
+/* border only */
+.border-theme-card  { border-color: var(--border-card); }
+/* bg only variants */
+.bg-theme-card      { background: var(--bg-card); }
+
+/* ── Input surface utilities ── */
+/* bg + border together */
+.input-surface {
+  background: var(--bg-input);
+  border-color: var(--border-input);
+}
+
+/* ── Chart/Tooltip glass surface ── */
+.tooltip-surface {
+  background: var(--bg-card);
+  border-color: var(--border-card);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
 
 /* ╔══════════════════════════════════════════════════╗
    ║  ACTION CARDS                                    ║

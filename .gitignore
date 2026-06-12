@@ -87,3 +87,6 @@ functions/node_modules/
 
 # Agent Tools
 .agents/
+
+# IDE files
+.hintrc

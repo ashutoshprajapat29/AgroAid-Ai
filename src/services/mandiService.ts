@@ -297,7 +297,7 @@ export async function fetchPriceHistory(
         modal_price: r.avg_modal ?? 0,
         min_price: r.avg_min ?? 0,
         max_price: r.avg_max ?? 0,
-      })).filter((p) => p.modal_price > 0);
+      })).filter((p: PriceHistory) => p.modal_price > 0);
     },
     [] as PriceHistory[]
   );
@@ -338,7 +338,7 @@ export async function fetchMarketComparison(
         min_price: r.min_price ?? 0,
         max_price: r.max_price ?? 0,
         date: r.arrival_date ?? "",
-      })).sort((a, b) => b.modal_price - a.modal_price);
+      })).sort((a: MarketCompare, b: MarketCompare) => b.modal_price - a.modal_price);
     },
     [] as MarketCompare[]
   );
@@ -531,7 +531,7 @@ export const INDIA_STATES_DISTRICTS: Record<string, string[]> = {
 
 export const COMMON_COMMODITIES = [
   "Wheat", "Rice", "Tomato", "Onion", "Potato", "Cotton",
-  "Maize", "Soybean", "Sugarcane", "Chilli", "Garlic",
+  "Maize", "Soyabean", "Sugarcane", "Chilli", "Garlic",
   "Groundnut", "Mustard", "Turmeric", "Ginger", "Cabbage",
   "Cauliflower", "Brinjal", "Okra", "Peas",
 ];
@@ -575,7 +575,7 @@ export const COMMON_LOCATIONS_HI: Record<string, string> = {
 
 export const COMMON_COMMODITIES_HI: Record<string, string> = {
   ...dynamicTranslations,
-  "Wheat": "गेहूं", "Rice": "चावल", "Tomato": "टमाटर", "Onion": " प्याज",
+  "Wheat": "गेहूं", "Rice": "चावल", "Tomato": "टमाटर", "Onion": "प्याज",
   "Potato": "आलू", "Cotton": "कपास", "Maize": "मक्का", "Soybean": "सोयाबीन",
   "Sugarcane": "गन्ना", "Chilli": "मिर्च", "Garlic": "लहसुन",
   "Groundnut": "मूंगफली", "Mustard": "सरसों", "Turmeric": "हल्दी",

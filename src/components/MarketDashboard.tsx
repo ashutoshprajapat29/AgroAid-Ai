@@ -70,22 +70,15 @@ const TIME_RANGES: { key: TimeRange; label: string; labelHi: string }[] = [
 function PriceTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
-    <div
-      className="rounded-2xl p-4 border text-sm shadow-2xl"
-      style={{
-        background: "var(--bg-card)",
-        borderColor: "var(--border-card)",
-        backdropFilter: "blur(12px)",
-      }}
-    >
-      <p className="font-black text-xs uppercase tracking-widest mb-2" style={{ color: "var(--text-subtle)" }}>
+    <div className="rounded-2xl p-4 border text-sm shadow-2xl tooltip-surface">
+      <p className="font-black text-xs uppercase tracking-widest mb-2 text-theme-subtle">
         {label}
       </p>
       <div className="space-y-1">
         {payload.map((entry: any) => (
           <div key={entry.name} className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full" style={{ background: entry.color }} />
-            <span style={{ color: "var(--text-muted)" }} className="text-xs">{entry.name}:</span>
+            <span className="text-xs text-theme-muted">{entry.name}:</span>
             <span className="font-bold text-xs" style={{ color: entry.color }}>
               ₹{entry.value?.toLocaleString("en-IN")}
             </span>
@@ -102,32 +95,25 @@ function MarketBarTooltip({ active, payload }: any) {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
   return (
-    <div
-      className="rounded-2xl p-4 border text-sm shadow-2xl"
-      style={{
-        background: "var(--bg-card)",
-        borderColor: "var(--border-card)",
-        backdropFilter: "blur(12px)",
-      }}
-    >
-      <p className="font-black text-xs uppercase tracking-widest mb-2" style={{ color: "var(--text-main)" }}>
+    <div className="rounded-2xl p-4 border text-sm shadow-2xl tooltip-surface">
+      <p className="font-black text-xs uppercase tracking-widest mb-2 text-theme-main">
         {d.market_name}
       </p>
-      <p className="text-[9px] mb-2" style={{ color: "var(--text-subtle)" }}>{d.district}</p>
+      <p className="text-[9px] mb-2 text-theme-subtle">{d.district}</p>
       <div className="space-y-1">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-emerald-400" />
-          <span className="text-xs" style={{ color: "var(--text-muted)" }}>{t("market.modal")}:</span>
+          <span className="text-xs text-theme-muted">{t("market.modal")}:</span>
           <span className="text-xs font-bold text-emerald-400">₹{d.modal_price?.toLocaleString("en-IN")}</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-blue-400" />
-          <span className="text-xs" style={{ color: "var(--text-muted)" }}>{t("market.min")}:</span>
+          <span className="text-xs text-theme-muted">{t("market.min")}:</span>
           <span className="text-xs font-bold text-blue-400">₹{d.min_price?.toLocaleString("en-IN")}</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-rose-400" />
-          <span className="text-xs" style={{ color: "var(--text-muted)" }}>{t("market.max")}:</span>
+          <span className="text-xs text-theme-muted">{t("market.max")}:</span>
           <span className="text-xs font-bold text-rose-400">₹{d.max_price?.toLocaleString("en-IN")}</span>
         </div>
       </div>
@@ -156,11 +142,13 @@ function SentimentBadge({ s, isHindi }: { s: SentimentResult; isHindi: boolean }
 
 // ─── News Card ────────────────────────────────────────────────────────────────
 function NewsCard({ item, index }: { item: NewsItem; index: number }) {
-  const sentConf = {
+  // Guard: fallback for unexpected sentiment values to prevent crashes
+  const sentConf = ({
     Positive: { bg: "bg-emerald-500/10", border: "border-emerald-500/20", badge: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30", dot: "bg-emerald-400" },
     Negative: { bg: "bg-rose-500/10", border: "border-rose-500/20", badge: "bg-rose-500/20 text-rose-400 border-rose-500/30", dot: "bg-rose-400" },
     Neutral: { bg: "bg-amber-500/10", border: "border-amber-500/20", badge: "bg-amber-500/20 text-amber-400 border-amber-500/30", dot: "bg-amber-400" },
-  }[item.sentiment];
+  } as Record<string, { bg: string; border: string; badge: string; dot: string }>)[item.sentiment]
+    ?? { bg: "bg-slate-500/10", border: "border-slate-500/20", badge: "bg-slate-500/20 text-slate-400 border-slate-500/30", dot: "bg-slate-400" };
 
   return (
     <motion.div
@@ -175,20 +163,20 @@ function NewsCard({ item, index }: { item: NewsItem; index: number }) {
           {item.sentiment}
         </span>
         {item.commodity && item.commodity !== "General" && (
-          <span className="text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border" style={{ background: "var(--bg-input)", borderColor: "var(--border-input)", color: "var(--text-subtle)" }}>
+          <span className="text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border input-surface text-theme-subtle">
             {item.commodity}
           </span>
         )}
       </div>
-      <h4 className="text-sm font-bold leading-snug mb-1.5" style={{ color: "var(--text-main)" }}>
+      <h4 className="text-sm font-bold leading-snug mb-1.5 text-theme-main">
         {item.title}
       </h4>
-      <p className="text-xs leading-relaxed" style={{ color: "var(--text-muted)" }}>
+      <p className="text-xs leading-relaxed text-theme-muted">
         {item.impact}
       </p>
       {item.source && (
-        <div className="flex items-center justify-between mt-2 pt-2 border-t" style={{ borderColor: "var(--border-card)" }}>
-          <span className="text-[8px] font-bold uppercase tracking-widest" style={{ color: "var(--text-subtle)" }}>
+        <div className="flex items-center justify-between mt-2 pt-2 border-t border-theme-card">
+          <span className="text-[8px] font-bold uppercase tracking-widest text-theme-subtle">
             {item.source}
           </span>
           {item.link && (
@@ -222,9 +210,8 @@ function PriceCard({ item, selected, onClick, sentiment }: {
       whileTap={{ scale: 0.98 }}
       className={`relative w-full text-left rounded-[1.5rem] p-5 border transition-all duration-300 overflow-hidden ${selected
           ? "border-emerald-500/40 bg-emerald-500/8"
-          : "hover:border-emerald-500/20"
+          : "hover:border-emerald-500/20 card-surface"
         }`}
-      style={!selected ? { background: "var(--bg-card)", borderColor: "var(--border-card)" } : undefined}
     >
       {selected && (
         <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/6 to-transparent pointer-events-none" />
@@ -233,10 +220,10 @@ function PriceCard({ item, selected, onClick, sentiment }: {
       <div className="relative z-10">
         <div className="flex justify-between items-start mb-3">
           <div>
-            <h3 className="font-black text-base tracking-tight" style={{ color: "var(--text-main)" }}>
+            <h3 className="font-black text-base tracking-tight text-theme-main">
               {isHindi ? translateName(formatName(item.commodity), isHindi) : formatName(item.commodity)}
             </h3>
-            <p className="text-[10px] font-semibold uppercase tracking-wider mt-0.5" style={{ color: "var(--text-muted)" }}>
+            <p className="text-[10px] font-semibold uppercase tracking-wider mt-0.5 text-theme-muted">
               {isHindi ? translateName(item.market_name || item.variety || item.district || "", isHindi) : (item.market_name || item.variety || item.district)}
             </p>
           </div>
@@ -248,17 +235,17 @@ function PriceCard({ item, selected, onClick, sentiment }: {
           <span className="text-3xl font-extrabold text-emerald-400 tracking-tighter">
             {item.modal_price.toLocaleString("en-IN")}
           </span>
-          <span className="text-xs font-bold ml-1" style={{ color: "var(--text-subtle)" }}>/qtl</span>
+          <span className="text-xs font-bold ml-1 text-theme-subtle">/qtl</span>
         </div>
 
-        <div className="grid grid-cols-3 gap-2 pt-3 border-t" style={{ borderColor: "var(--border-card)" }}>
+        <div className="grid grid-cols-3 gap-2 pt-3 border-t border-theme-card">
           {[
             { label: t("market.min"), value: item.min_price, color: "text-blue-400" },
             { label: t("market.modal"), value: item.modal_price, color: "text-emerald-400" },
             { label: t("market.max"), value: item.max_price, color: "text-rose-400" },
           ].map((m) => (
             <div key={m.label} className="text-center">
-              <p className="text-[8px] font-black uppercase tracking-widest mb-0.5" style={{ color: "var(--text-subtle)" }}>{m.label}</p>
+              <p className="text-[8px] font-black uppercase tracking-widest mb-0.5 text-theme-subtle">{m.label}</p>
               <p className={`text-xs font-black ${m.color}`}>{m.value.toLocaleString("en-IN")}</p>
             </div>
           ))}
@@ -269,13 +256,13 @@ function PriceCard({ item, selected, onClick, sentiment }: {
             {parseFloat(changePercent) > 15 ? (
               <ArrowUpRight size={12} className="text-amber-400" />
             ) : (
-              <Minus size={12} style={{ color: "var(--text-subtle)" }} />
+              <Minus size={12} className="text-theme-subtle" />
             )}
-            <span className="text-[10px] font-bold" style={{ color: "var(--text-muted)" }}>
+            <span className="text-[10px] font-bold text-theme-muted">
               {t("market.spread")} ₹{change.toLocaleString("en-IN")} · {changePercent}%
             </span>
           </div>
-          <span className="text-[9px] font-semibold" style={{ color: "var(--text-subtle)" }}>
+          <span className="text-[9px] font-semibold text-theme-subtle">
             {t("market.data_as_of")} {new Date(item.date).toLocaleDateString("en-IN", { day: 'numeric', month: 'short' })}
           </span>
         </div>
@@ -287,7 +274,7 @@ function PriceCard({ item, selected, onClick, sentiment }: {
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
 function SkeletonPriceCard() {
   return (
-    <div className="rounded-[1.5rem] p-5 border" style={{ background: "var(--bg-card)", borderColor: "var(--border-card)" }}>
+    <div className="rounded-[1.5rem] p-5 border card-surface">
       <div className="w-24 h-4 skeleton rounded mb-2" />
       <div className="w-16 h-3 skeleton rounded mb-4" />
       <div className="w-32 h-8 skeleton rounded mb-4" />
@@ -307,26 +294,21 @@ function Dropdown({ label, value, options, onChange, icon: Icon }: {
   return (
     <div className="relative">
       <div className="flex items-center gap-1.5 mb-1">
-        <Icon size={11} style={{ color: "var(--text-subtle)" }} />
-        <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: "var(--text-subtle)" }}>{label}</span>
+        <Icon size={11} className="text-theme-subtle" />
+        <span className="text-[9px] font-black uppercase tracking-widest text-theme-subtle">{label}</span>
       </div>
       <div className="relative">
         <select
           aria-label={label}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full appearance-none rounded-xl px-3 py-2.5 pr-8 text-sm font-semibold border focus:outline-none focus:border-emerald-500/50 transition-colors"
-          style={{
-            background: "var(--bg-input)",
-            borderColor: "var(--border-input)",
-            color: "var(--text-main)",
-          }}
+          className="w-full appearance-none rounded-xl px-3 py-2.5 pr-8 text-sm font-semibold border focus:outline-none focus:border-emerald-500/50 transition-colors input-surface text-theme-main"
         >
           {options.map((o) => (
             <option key={o} value={o}>{isHindi ? translateName(o, isHindi) : o}</option>
           ))}
         </select>
-        <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-subtle)" }} />
+        <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-theme-subtle" />
       </div>
     </div>
   );
@@ -396,6 +378,7 @@ export default function MarketDashboard() {
 
   // Error state
   const [priceError, setPriceError] = useState("");
+  const [newsError, setNewsError] = useState(false);
 
   const districts = availableDistricts;
   const states = availableStates;
@@ -406,9 +389,14 @@ export default function MarketDashboard() {
   };
 
   // ── Geolocation: detect nearby mandis ─────────────────────────────────────
+  const [locationError, setLocationError] = useState("");
   const detectLocation = useCallback(async () => {
-    if (!navigator.geolocation) return;
+    if (!navigator.geolocation) {
+      setLocationError(isHindi ? "जीपीएस समर्थित नहीं है।" : "GPS not supported on this device.");
+      return;
+    }
     setLocating(true);
+    setLocationError("");
     try {
       const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
         navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 })
@@ -420,17 +408,18 @@ export default function MarketDashboard() {
       if (result.prices.length > 0) {
         setPrices(result.prices);
         setLastFetched(new Date());
-        if (result.prices.length > 0 && !selectedCommodity) {
+        if (!selectedCommodity) {
           setSelectedCommodity(result.prices[0].commodity);
         }
       }
     } catch (e) {
       console.warn("Location detection failed:", e);
+      setLocationError(isHindi ? "स्थान नहीं मिल सका। कृपया मैन्युअल रूप से चुनें।" : "Could not detect location. Please select manually.");
     } finally {
       setLocating(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isHindi]);
 
   // ── Search ────────────────────────────────────────────────────────────────
   const handleSearch = useCallback(async () => {
@@ -439,7 +428,7 @@ export default function MarketDashboard() {
     setShowSearchResults(true);
     try {
       const results = await searchMandiPrices(
-        searchQuery.trim(), 
+        searchQuery.trim(),
         searchType,
         selectedState,
         selectedDistrict,
@@ -452,7 +441,7 @@ export default function MarketDashboard() {
     } finally {
       setIsSearching(false);
     }
-  }, [searchQuery, searchType]);
+  }, [searchQuery, searchType, selectedState, selectedDistrict, selectedMarket]);
 
   const clearSearch = () => {
     setSearchQuery("");
@@ -499,9 +488,14 @@ export default function MarketDashboard() {
   // ── Load news ─────────────────────────────────────────────────────────────
   const loadNews = useCallback(async () => {
     setLoadingNews(true);
+    setNewsError(false);
     try {
       const data = await fetchMarketNews(language);
       setNews(data);
+      if (data.length === 0) setNewsError(true);
+    } catch (e) {
+      console.error("News load failed:", e);
+      setNewsError(true);
     } finally {
       setLoadingNews(false);
     }
@@ -576,6 +570,8 @@ export default function MarketDashboard() {
   useEffect(() => {
     if (!detailCommodity) return;
     const commodity = detailCommodity.commodity;
+    // Cancellation flag — prevents stale async results from overwriting fresh ones
+    let cancelled = false;
 
     // Load price history
     (async () => {
@@ -584,11 +580,11 @@ export default function MarketDashboard() {
       try {
         const marketFilter = selectedMarket !== "All" ? selectedMarket : undefined;
         const hist = await fetchPriceHistory(commodity, selectedState, selectedDistrict, timeRange, marketFilter);
-        setPriceHistory(hist);
+        if (!cancelled) setPriceHistory(hist);
       } catch (e) {
         console.error(e);
       } finally {
-        setLoadingHistory(false);
+        if (!cancelled) setLoadingHistory(false);
       }
     })();
 
@@ -599,13 +595,15 @@ export default function MarketDashboard() {
       try {
         const excludeMkt = selectedMarket !== "All" ? selectedMarket : undefined;
         const data = await fetchMarketComparison(commodity, selectedState, selectedDistrict, excludeMkt);
-        setMarketComparison(data);
+        if (!cancelled) setMarketComparison(data);
       } catch (e) {
         console.error(e);
       } finally {
-        setLoadingComparison(false);
+        if (!cancelled) setLoadingComparison(false);
       }
     })();
+
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detailCommodity, timeRange, selectedState, selectedDistrict]);
 
@@ -668,8 +666,10 @@ export default function MarketDashboard() {
       ? (isHindi ? `${selectedMarket} मंडी भाव` : `${selectedMarket} Mandi Rates`)
       : (isHindi ? "आज के मंडी भाव" : "Today's Mandi Rates");
 
-  // Reset visible count when prices change
+  // Reset visible count when filters or search change
   const displayKey = selectedState + selectedDistrict + selectedMarket + (showSearchResults ? searchQuery : "");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { setVisibleCount(12); }, [displayKey]);
 
   const barChartData = marketComparison.map((c) => ({
     ...c,
@@ -785,12 +785,11 @@ export default function MarketDashboard() {
               closeCommodityDetail();
             }}
           />
-          <div className="flex items-end">
+          <div className="flex flex-col gap-1 items-stretch sm:items-end w-full sm:w-auto">
             <button
               onClick={detectLocation}
               disabled={locating}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl border font-bold text-sm transition-all hover:border-emerald-500/40 active:scale-95 disabled:opacity-50"
-              style={{ background: "var(--bg-input)", borderColor: "var(--border-input)", color: "var(--text-main)" }}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border font-bold text-sm transition-all hover:border-emerald-500/40 active:scale-95 disabled:opacity-50 input-surface text-theme-main w-full sm:w-auto"
             >
               {locating ? (
                 <Loader2 size={14} className="animate-spin text-emerald-400" />
@@ -799,15 +798,20 @@ export default function MarketDashboard() {
               )}
               {isHindi ? "मेरा स्थान" : "My Location"}
             </button>
+            {locationError && (
+              <p className="text-[9px] font-semibold text-rose-400 text-center sm:text-right max-w-none sm:max-w-[120px] leading-tight">
+                {locationError}
+              </p>
+            )}
           </div>
         </div>
 
         {/* Search row */}
-        <div className="flex gap-2 items-end flex-wrap">
-          <div className="flex-1 min-w-[200px]">
+        <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-end">
+          <div className="flex-1">
             <div className="flex items-center gap-1.5 mb-1">
-              <Search size={11} style={{ color: "var(--text-subtle)" }} />
-              <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: "var(--text-subtle)" }}>
+              <Search size={11} className="text-theme-subtle" />
+              <span className="text-[9px] font-black uppercase tracking-widest text-theme-subtle">
                 {isHindi ? "खोजें" : "Search"}
               </span>
             </div>
@@ -818,54 +822,54 @@ export default function MarketDashboard() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                 placeholder={isHindi ? "फसल या मंडी का नाम…" : "Search commodity or market name…"}
-                className="w-full rounded-xl px-3 py-2.5 pr-10 text-sm font-semibold border focus:outline-none focus:border-emerald-500/50 transition-colors"
-                style={{ background: "var(--bg-input)", borderColor: "var(--border-input)", color: "var(--text-main)" }}
+                className="w-full rounded-xl px-3 py-2.5 pr-10 text-sm font-semibold border focus:outline-none focus:border-emerald-500/50 transition-colors input-surface text-theme-main"
               />
               {searchQuery && (
                 <button aria-label="Clear search" title="Clear search" onClick={clearSearch} className="absolute right-3 top-1/2 -translate-y-1/2">
-                  <X size={14} style={{ color: "var(--text-subtle)" }} />
+                  <X size={14} className="text-theme-subtle" />
                 </button>
               )}
             </div>
           </div>
 
-          {/* Search type toggle */}
-          <div>
-            <div className="flex items-center gap-1.5 mb-1">
-              <Filter size={11} style={{ color: "var(--text-subtle)" }} />
-              <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: "var(--text-subtle)" }}>
-                {isHindi ? "प्रकार" : "Type"}
-              </span>
+          <div className="grid grid-cols-2 sm:flex gap-3 items-end w-full sm:w-auto">
+            {/* Search type toggle */}
+            <div className="w-full sm:w-auto">
+              <div className="flex items-center gap-1.5 mb-1">
+                <Filter size={11} className="text-theme-subtle" />
+                <span className="text-[9px] font-black uppercase tracking-widest text-theme-subtle">
+                  {isHindi ? "प्रकार" : "Type"}
+                </span>
+              </div>
+              <div className="flex rounded-xl border overflow-hidden border-theme-input w-full">
+                {([
+                  { key: "commodity" as const, label: isHindi ? "फसल" : "Crop", icon: Store },
+                  { key: "market" as const, label: isHindi ? "मंडी" : "Mandi", icon: MapPin },
+                ]).map((t) => (
+                  <button
+                    key={t.key}
+                    onClick={() => setSearchType(t.key)}
+                    className={`flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-bold transition-all flex-1 ${searchType === t.key
+                        ? "bg-emerald-500/20 text-emerald-400"
+                        : "bg-theme-input text-theme-muted"
+                      }`}
+                  >
+                    <t.icon size={12} />
+                    {t.label}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="flex rounded-xl border overflow-hidden" style={{ borderColor: "var(--border-input)" }}>
-              {([
-                { key: "commodity" as const, label: isHindi ? "फसल" : "Crop", icon: Store },
-                { key: "market" as const, label: isHindi ? "मंडी" : "Mandi", icon: MapPin },
-              ]).map((t) => (
-                <button
-                  key={t.key}
-                  onClick={() => setSearchType(t.key)}
-                  className={`flex items-center gap-1.5 px-3 py-2.5 text-xs font-bold transition-all ${searchType === t.key
-                      ? "bg-emerald-500/20 text-emerald-400"
-                      : ""
-                    }`}
-                  style={searchType !== t.key ? { background: "var(--bg-input)", color: "var(--text-muted)" } : undefined}
-                >
-                  <t.icon size={12} />
-                  {t.label}
-                </button>
-              ))}
-            </div>
-          </div>
 
-          <button
-            onClick={handleSearch}
-            disabled={!searchQuery.trim() || isSearching}
-            className="flex items-center gap-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-emerald-500/25 active:scale-95"
-          >
-            {isSearching ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
-            {isHindi ? "खोजें" : "Search"}
-          </button>
+            <button
+              onClick={handleSearch}
+              disabled={!searchQuery.trim() || isSearching}
+              className="flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-emerald-500/25 active:scale-95 w-full sm:w-auto text-center justify-center"
+            >
+              {isSearching ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+              {isHindi ? "खोजें" : "Search"}
+            </button>
+          </div>
         </div>
 
         {/* Quick commodity pills */}
@@ -874,8 +878,7 @@ export default function MarketDashboard() {
             <button
               key={c}
               onClick={() => { setSearchQuery(c); setSearchType("commodity"); }}
-              className={`shrink-0 px-3 py-1.5 rounded-xl text-[11px] font-bold border transition-all hover:border-emerald-500/30 hover:text-emerald-400`}
-              style={{ background: "var(--bg-input)", borderColor: "var(--border-input)", color: "var(--text-muted)" }}
+              className="shrink-0 px-3 py-1.5 rounded-xl text-[11px] font-bold border transition-all hover:border-emerald-500/30 hover:text-emerald-400 input-surface text-theme-muted"
             >
               {isHindi ? translateName(c, isHindi) : c}
             </button>
@@ -892,12 +895,12 @@ export default function MarketDashboard() {
         >
           <div className="flex items-center gap-2">
             <Search size={14} className="text-emerald-400" />
-            <span className="text-sm font-bold" style={{ color: "var(--text-main)" }}>
+            <span className="text-sm font-bold text-theme-main">
               {isSearching
                 ? (isHindi ? "खोज रहे हैं…" : "Searching…")
                 : (isHindi ? `${searchResults.length} परिणाम मिले` : `${searchResults.length} results found`)}
             </span>
-            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+            <span className="text-xs text-theme-muted">
               "{searchQuery}" · {searchType === "commodity" ? (isHindi ? "फसल" : "Crop") : (isHindi ? "मंडी" : "Market")}
             </span>
           </div>
@@ -925,7 +928,7 @@ export default function MarketDashboard() {
                 className="space-y-5"
               >
                 {/* Detail Header */}
-                <div className="rounded-2xl p-6 border" style={{ background: "var(--bg-card)", borderColor: "var(--border-card)" }}>
+                <div className="rounded-2xl p-6 border card-surface">
                   <div className="flex items-center justify-between mb-4">
                     <button
                       onClick={closeCommodityDetail}
@@ -939,10 +942,10 @@ export default function MarketDashboard() {
 
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
-                      <h2 className="text-2xl font-black tracking-tight" style={{ color: "var(--text-main)" }}>
+                      <h2 className="text-2xl font-black tracking-tight text-theme-main">
                         {isHindi ? translateName(formatCommodityName(detailCommodity.commodity), isHindi) : formatCommodityName(detailCommodity.commodity)}
                       </h2>
-                      <p className="text-xs font-medium mt-1" style={{ color: "var(--text-muted)" }}>
+                      <p className="text-xs font-medium mt-1 text-theme-muted">
                         {isHindi ? translateName(detailCommodity.market_name, isHindi) : detailCommodity.market_name} ·{" "}
                         {isHindi ? translateName(detailCommodity.district, isHindi) : detailCommodity.district},{" "}
                         {isHindi ? translateName(detailCommodity.state, isHindi) : detailCommodity.state}
@@ -953,7 +956,7 @@ export default function MarketDashboard() {
                       <span className="text-4xl font-extrabold text-emerald-400 tracking-tighter">
                         {detailCommodity.modal_price.toLocaleString("en-IN")}
                       </span>
-                      <span className="text-sm font-bold ml-1" style={{ color: "var(--text-subtle)" }}>/qtl</span>
+                      <span className="text-sm font-bold ml-1 text-theme-subtle">/qtl</span>
                     </div>
                   </div>
 
@@ -972,10 +975,9 @@ export default function MarketDashboard() {
                     ].map((stat) => (
                       <div
                         key={stat.label}
-                        className="px-3 py-1.5 rounded-xl border text-center"
-                        style={{ background: "var(--bg-input)", borderColor: "var(--border-input)" }}
+                        className="px-3 py-1.5 rounded-xl border text-center input-surface"
                       >
-                        <p className="text-[8px] font-black uppercase tracking-widest mb-0.5" style={{ color: "var(--text-subtle)" }}>{stat.label}</p>
+                        <p className="text-[8px] font-black uppercase tracking-widest mb-0.5 text-theme-subtle">{stat.label}</p>
                         <p className={`text-xs font-black ${stat.color}`}>{stat.value}</p>
                       </div>
                     ))}
@@ -984,16 +986,16 @@ export default function MarketDashboard() {
 
                 {/* Variety-Wise Breakdown */}
                 {(varieties.length > 0 || loadingVarieties) && (
-                  <div className="rounded-2xl p-6 border" style={{ background: "var(--bg-card)", borderColor: "var(--border-card)" }}>
+                  <div className="rounded-2xl p-6 border card-surface">
                     <div className="flex items-center gap-3 mb-5">
                       <div className="p-2 rounded-xl bg-blue-500/12 border border-blue-500/20">
                         <Store size={16} className="text-blue-400" />
                       </div>
                       <div>
-                        <h3 className="font-black text-sm" style={{ color: "var(--text-main)" }}>
+                        <h3 className="font-black text-sm text-theme-main">
                           {isHindi ? "किस्म-वार भाव" : "Variety-Wise Prices"}
                         </h3>
-                        <p className="text-[10px] font-semibold" style={{ color: "var(--text-muted)" }}>
+                        <p className="text-[10px] font-semibold text-theme-muted">
                           {detailCommodity.market_name || selectedMarket} · {isHindi ? "ताज़ा भाव" : "Latest prices"}
                         </p>
                       </div>
@@ -1011,27 +1013,26 @@ export default function MarketDashboard() {
                           return (
                             <div
                               key={v.variety + i}
-                              className={`flex items-center justify-between p-3 rounded-xl border transition-all ${isBest ? "border-emerald-500/30 bg-emerald-500/8" : ""
+                              className={`flex items-center justify-between p-3 rounded-xl border transition-all ${isBest ? "border-emerald-500/30 bg-emerald-500/8" : "input-surface"
                                 }`}
-                              style={!isBest ? { background: "var(--bg-input)", borderColor: "var(--border-input)" } : undefined}
                             >
                               <div className="flex items-center gap-2">
                                 {isBest && <span className="text-emerald-400 text-xs">✨</span>}
-                                <span className="text-sm font-bold" style={{ color: "var(--text-main)" }}>
+                                <span className="text-sm font-bold text-theme-main">
                                   {isHindi ? translateName(v.variety || "Standard", isHindi) : (v.variety || "Standard")}
                                 </span>
                               </div>
                               <div className="flex items-center gap-4">
                                 <div className="text-center">
-                                  <p className="text-[8px] font-black uppercase" style={{ color: "var(--text-subtle)" }}>{t("market.min")}</p>
+                                  <p className="text-[8px] font-black uppercase text-theme-subtle">{t("market.min")}</p>
                                   <p className="text-xs font-bold text-blue-400">₹{v.min_price.toLocaleString("en-IN")}</p>
                                 </div>
                                 <div className="text-center">
-                                  <p className="text-[8px] font-black uppercase" style={{ color: "var(--text-subtle)" }}>{t("market.modal")}</p>
+                                  <p className="text-[8px] font-black uppercase text-theme-subtle">{t("market.modal")}</p>
                                   <p className="text-xs font-bold text-emerald-400">₹{v.modal_price.toLocaleString("en-IN")}</p>
                                 </div>
                                 <div className="text-center">
-                                  <p className="text-[8px] font-black uppercase" style={{ color: "var(--text-subtle)" }}>{t("market.max")}</p>
+                                  <p className="text-[8px] font-black uppercase text-theme-subtle">{t("market.max")}</p>
                                   <p className="text-xs font-bold text-rose-400">₹{v.max_price.toLocaleString("en-IN")}</p>
                                 </div>
                               </div>
@@ -1044,25 +1045,24 @@ export default function MarketDashboard() {
                 )}
 
                 {/* Time-Range Price Chart */}
-                <div className="rounded-2xl p-6 border" style={{ background: "var(--bg-card)", borderColor: "var(--border-card)" }}>
+                <div className="rounded-2xl p-6 border card-surface">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
                     <div className="flex items-center gap-2">
                       <Clock size={14} className="text-emerald-400" />
-                      <span className="text-xs font-black uppercase tracking-widest" style={{ color: "var(--text-subtle)" }}>
+                      <span className="text-xs font-black uppercase tracking-widest text-theme-subtle">
                         {isHindi ? "मूल्य इतिहास" : "Price History"}
                       </span>
                     </div>
                     {/* Time range selector */}
-                    <div className="flex rounded-xl border overflow-hidden" style={{ borderColor: "var(--border-input)" }}>
+                    <div className="flex rounded-xl border overflow-hidden border-theme-input">
                       {TIME_RANGES.map((r) => (
                         <button
                           key={r.key}
                           onClick={() => setTimeRange(r.key)}
                           className={`px-3 py-1.5 text-[11px] font-bold transition-all ${timeRange === r.key
                               ? "bg-emerald-500/20 text-emerald-400"
-                              : ""
+                              : "bg-theme-input text-theme-muted"
                             }`}
-                          style={timeRange !== r.key ? { background: "var(--bg-input)", color: "var(--text-muted)" } : undefined}
                         >
                           {isHindi ? r.labelHi : r.label}
                         </button>
@@ -1157,23 +1157,23 @@ export default function MarketDashboard() {
                             backgroundImage: l.dashed ? `repeating-linear-gradient(90deg, ${l.color} 0, ${l.color} 4px, transparent 4px, transparent 8px)` : undefined,
                           }}
                         />
-                        <span className="text-[9px] font-bold" style={{ color: "var(--text-subtle)" }}>{l.label}</span>
+                        <span className="text-[9px] font-bold text-theme-subtle">{l.label}</span>
                       </div>
                     ))}
                   </div>
                 </div>
 
                 {/* Market Comparison Bar Chart — Same Commodity, Different Mandis */}
-                <div className="rounded-2xl p-6 border" style={{ background: "var(--bg-card)", borderColor: "var(--border-card)" }}>
+                <div className="rounded-2xl p-6 border card-surface">
                   <div className="flex items-center gap-3 mb-5">
                     <div className="p-2 rounded-xl bg-teal-500/12 border border-teal-500/20">
                       <BarChart2 size={16} className="text-teal-400" />
                     </div>
                     <div>
-                      <h3 className="font-black text-sm" style={{ color: "var(--text-main)" }}>
+                      <h3 className="font-black text-sm text-theme-main">
                         {isHindi ? "मंडी तुलना" : "Market Comparison"}
                       </h3>
-                      <p className="text-[10px] font-semibold" style={{ color: "var(--text-muted)" }}>
+                      <p className="text-[10px] font-semibold text-theme-muted">
                         {isHindi
                           ? `${formatCommodityName(detailCommodity.commodity)} · ${selectedState} · अलग-अलग मंडियाँ`
                           : `${formatCommodityName(detailCommodity.commodity)} · ${selectedState} · Across Markets`}
@@ -1187,7 +1187,7 @@ export default function MarketDashboard() {
                     </div>
                   ) : barChartData.length === 0 ? (
                     <div className="h-48 flex items-center justify-center">
-                      <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                      <p className="text-sm text-theme-muted">
                         {isHindi ? "तुलना डेटा उपलब्ध नहीं है।" : "No comparison data available."}
                       </p>
                     </div>
@@ -1222,20 +1222,17 @@ export default function MarketDashboard() {
                 </div>
 
                 {/* AI Sentiment Panel */}
-                <div
-                  className="rounded-2xl p-6 border"
-                  style={{ background: "var(--bg-card)", borderColor: "var(--border-card)" }}
-                >
+                <div className="rounded-2xl p-6 border card-surface">
                   <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
                     <div className="flex items-center gap-3">
                       <div className="p-2.5 rounded-xl bg-violet-500/15 border border-violet-500/20">
                         <Brain size={18} className="text-violet-400" />
                       </div>
                       <div>
-                        <h3 className="font-black text-sm" style={{ color: "var(--text-main)" }}>
+                        <h3 className="font-black text-sm text-theme-main">
                           {isHindi ? "AI बाज़ार भावना" : "AI Market Sentiment"}
                         </h3>
-                        <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+                        <p className="text-[10px] text-theme-muted">
                           {isHindi ? "AI द्वारा संचालित विश्लेषण" : "AI-powered market analysis"}
                         </p>
                       </div>
@@ -1257,7 +1254,7 @@ export default function MarketDashboard() {
                   {loadingSentiment ? (
                     <div className="flex items-center gap-3 py-4">
                       <Loader2 className="animate-spin text-violet-400 shrink-0" size={18} />
-                      <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                      <p className="text-sm text-theme-muted">
                         {isHindi ? "बाज़ार का विश्लेषण हो रहा है…" : "Analyzing market patterns…"}
                       </p>
                     </div>
@@ -1265,11 +1262,11 @@ export default function MarketDashboard() {
                     <div className="space-y-4">
                       {/* Confidence bar */}
                       <div>
-                        <div className="flex justify-between text-[9px] font-black uppercase tracking-widest mb-1.5" style={{ color: "var(--text-subtle)" }}>
+                        <div className="flex justify-between text-[9px] font-black uppercase tracking-widest mb-1.5 text-theme-subtle">
                           <span>{isHindi ? "विश्वास स्तर" : "Confidence"}</span>
                           <span>{sentiment.confidence}%</span>
                         </div>
-                        <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--bg-input)" }}>
+                        <div className="h-1.5 rounded-full overflow-hidden bg-theme-input">
                           <motion.div
                             initial={{ width: 0 }}
                             animate={{ width: `${sentiment.confidence}%` }}
@@ -1282,11 +1279,11 @@ export default function MarketDashboard() {
                       </div>
 
                       {/* Why */}
-                      <div className="rounded-xl p-4 border" style={{ background: "var(--bg-input)", borderColor: "var(--border-input)" }}>
-                        <p className="text-[9px] font-black uppercase tracking-widest mb-2" style={{ color: "var(--text-subtle)" }}>
+                      <div className="rounded-xl p-4 border input-surface">
+                        <p className="text-[9px] font-black uppercase tracking-widest mb-2 text-theme-subtle">
                           {isHindi ? "विश्लेषण" : "Analysis"}
                         </p>
-                        <p className="text-sm leading-relaxed" style={{ color: "var(--text-muted)" }}>{sentiment.why}</p>
+                        <p className="text-sm leading-relaxed text-theme-muted">{sentiment.why}</p>
                       </div>
 
                       {/* Action */}
@@ -1312,7 +1309,7 @@ export default function MarketDashboard() {
                       <div className="w-12 h-12 rounded-2xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
                         <Brain size={20} className="text-violet-400/50" />
                       </div>
-                      <p className="text-sm font-medium" style={{ color: "var(--text-muted)" }}>
+                      <p className="text-sm font-medium text-theme-muted">
                         {isHindi
                           ? "\"विश्लेषण करें\" पर क्लिक करके AI भावना रिपोर्ट देखें"
                           : "Click \"Analyse\" to get AI-powered sentiment report"}
@@ -1323,12 +1320,12 @@ export default function MarketDashboard() {
 
                 {/* Related News for this commodity */}
                 {detailNews.length > 0 && (
-                  <div className="rounded-2xl p-5 border" style={{ background: "var(--bg-card)", borderColor: "var(--border-card)" }}>
+                  <div className="rounded-2xl p-5 border card-surface">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="p-2 rounded-xl bg-amber-500/12 border border-amber-500/20">
                         <Newspaper size={16} className="text-amber-400" />
                       </div>
-                      <h3 className="font-black text-sm" style={{ color: "var(--text-main)" }}>
+                      <h3 className="font-black text-sm text-theme-main">
                         {isHindi ? "संबंधित समाचार" : "Related News"}
                       </h3>
                     </div>
@@ -1344,7 +1341,7 @@ export default function MarketDashboard() {
           {/* ── Price Cards Grid (hidden when detail view is open) ──────────── */}
           {!detailCommodity && (
             <div>
-              <h2 className="text-xs font-black uppercase tracking-widest mb-3" style={{ color: "var(--text-subtle)" }}>
+              <h2 className="text-xs font-black uppercase tracking-widest mb-3 text-theme-subtle">
                 {displayTitle} {!showSearchResults && `· ${selectedDistrict}, ${selectedState}`}
               </h2>
               {loadingPrices && !showSearchResults ? (
@@ -1352,12 +1349,12 @@ export default function MarketDashboard() {
                   {Array.from({ length: 6 }).map((_, i) => <SkeletonPriceCard key={i} />)}
                 </div>
               ) : displayPrices.length === 0 ? (
-                <div className="rounded-2xl p-12 text-center border" style={{ background: "var(--bg-card)", borderColor: "var(--border-card)" }}>
-                  <AlertCircle size={32} className="mx-auto mb-3" style={{ color: "var(--text-muted)" }} />
-                  <p className="font-semibold" style={{ color: "var(--text-muted)" }}>
+                <div className="rounded-2xl p-12 text-center border card-surface">
+                  <AlertCircle size={32} className="mx-auto mb-3 text-theme-muted" />
+                  <p className="font-semibold text-theme-muted">
                     {priceError || (isHindi ? "कोई डेटा नहीं मिला।" : "No market data found.")}
                   </p>
-                  <p className="text-sm mt-1" style={{ color: "var(--text-subtle)" }}>
+                  <p className="text-sm mt-1 text-theme-subtle">
                     {showSearchResults
                       ? (isHindi ? "दूसरा नाम आज़माएं।" : "Try a different search term.")
                       : (isHindi ? "दूसरा जिला आज़माएं।" : "Try another district.")}
@@ -1391,15 +1388,14 @@ export default function MarketDashboard() {
                       animate={{ opacity: 1 }}
                       className="flex flex-col items-center gap-2 mt-5"
                     >
-                      <p className="text-[10px] font-semibold" style={{ color: "var(--text-subtle)" }}>
+                      <p className="text-[10px] font-semibold text-theme-subtle">
                         {isHindi
                           ? `${visibleCount} / ${displayPrices.length} फसलें दिख रही हैं`
                           : `Showing ${visibleCount} of ${displayPrices.length} commodities`}
                       </p>
                       <button
                         onClick={() => setVisibleCount((c) => c + 12)}
-                        className="flex items-center gap-2 px-6 py-2.5 rounded-xl border font-bold text-sm transition-all hover:border-emerald-500/40 hover:text-emerald-400 active:scale-95"
-                        style={{ background: "var(--bg-card)", borderColor: "var(--border-card)", color: "var(--text-muted)" }}
+                        className="flex items-center gap-2 px-6 py-2.5 rounded-xl border font-bold text-sm transition-all hover:border-emerald-500/40 hover:text-emerald-400 active:scale-95 card-surface text-theme-muted"
                       >
                         {isHindi ? "और दिखाएं" : "Load More"}
                       </button>
@@ -1414,18 +1410,17 @@ export default function MarketDashboard() {
         {/* RIGHT: News Sidebar ─────────────────────────────────────────────── */}
         <div className="space-y-4">
           <div
-            className="rounded-2xl p-5 border sticky top-4"
-            style={{ background: "var(--bg-card)", borderColor: "var(--border-card)" }}
+            className="rounded-2xl p-5 border sticky top-4 card-surface"
           >
             <div className="flex items-center gap-3 mb-4">
               <div className="p-2 rounded-xl bg-amber-500/12 border border-amber-500/20">
                 <Newspaper size={16} className="text-amber-400" />
               </div>
               <div>
-                <h3 className="font-black text-sm" style={{ color: "var(--text-main)" }}>
+                <h3 className="font-black text-sm text-theme-main">
                   {isHindi ? "कृषि समाचार" : "Agri News Feed"}
                 </h3>
-                <p className="text-[9px] font-semibold uppercase tracking-widest mt-0.5" style={{ color: "var(--text-subtle)" }}>
+                <p className="text-[9px] font-semibold uppercase tracking-widest mt-0.5 text-theme-subtle">
                   {isHindi ? "बाज़ार प्रभाव समाचार" : "Market impact news"}
                 </p>
               </div>
@@ -1434,7 +1429,7 @@ export default function MarketDashboard() {
             {loadingNews ? (
               <div className="space-y-3">
                 {[0, 1, 2].map((i) => (
-                  <div key={i} className="rounded-2xl p-4 border" style={{ background: "var(--bg-input)", borderColor: "var(--border-input)" }}>
+                  <div key={i} className="rounded-2xl p-4 border input-surface">
                     <div className="w-16 h-3 skeleton rounded mb-2" />
                     <div className="w-full h-3 skeleton rounded mb-1.5" />
                     <div className="w-4/5 h-3 skeleton rounded mb-1.5" />
@@ -1442,12 +1437,19 @@ export default function MarketDashboard() {
                   </div>
                 ))}
               </div>
-            ) : news.length === 0 ? (
+            ) : newsError || news.length === 0 ? (
               <div className="text-center py-8">
-                <Newspaper size={24} className="mx-auto mb-2" style={{ color: "var(--text-subtle)" }} />
-                <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                <Newspaper size={24} className="mx-auto mb-2 text-theme-subtle" />
+                <p className="text-xs mb-3 text-theme-muted">
                   {isHindi ? "समाचार लोड नहीं हुए।" : "Could not load news."}
                 </p>
+                <button
+                  onClick={loadNews}
+                  className="flex items-center gap-1.5 mx-auto text-[10px] font-bold text-emerald-400 hover:text-emerald-300 transition-colors px-3 py-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/8"
+                >
+                  <RefreshCw size={10} />
+                  {isHindi ? "पुनः प्रयास" : "Retry"}
+                </button>
               </div>
             ) : (
               <div className="space-y-3">
@@ -1456,7 +1458,7 @@ export default function MarketDashboard() {
             )}
 
             {/* Legend */}
-            <div className="mt-4 pt-4 border-t grid grid-cols-3 gap-2" style={{ borderColor: "var(--border-card)" }}>
+            <div className="mt-4 pt-4 border-t grid grid-cols-3 gap-2 border-theme-card">
               {[
                 { color: "bg-emerald-400", label: isHindi ? "सकारात्मक" : "Positive" },
                 { color: "bg-rose-400", label: isHindi ? "नकारात्मक" : "Negative" },
@@ -1464,13 +1466,13 @@ export default function MarketDashboard() {
               ].map((l) => (
                 <div key={l.label} className="flex items-center gap-1">
                   <div className={`w-1.5 h-1.5 rounded-full ${l.color}`} />
-                  <span className="text-[8px] font-semibold" style={{ color: "var(--text-subtle)" }}>{l.label}</span>
+                  <span className="text-[8px] font-semibold text-theme-subtle">{l.label}</span>
                 </div>
               ))}
             </div>
 
             {/* Data source */}
-            <p className="text-[8px] mt-4 leading-relaxed" style={{ color: "var(--text-subtle)" }}>
+            <p className="text-[8px] mt-4 leading-relaxed text-theme-subtle">
               {isHindi
                 ? "* मंडी भाव: data.gov.in (Agmarknet)। समाचार: Krishi Jagran, ET Agriculture। AI विश्लेषण सलाहकार उद्देश्य के लिए है।"
                 : "* Mandi prices sourced from data.gov.in (Agmarknet). News: Krishi Jagran, ET Agriculture. AI analysis is advisory."}
