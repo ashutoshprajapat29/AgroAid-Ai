@@ -75,11 +75,11 @@ const PRIORITY_STATES = [
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FUNCTION 1: Sync Mandi Prices to Supabase (replaces old Firestore ingestion)
-// Runs every day at 11:30 AM IST (data.gov.in publishes previous day's data by morning)
+// Runs every day at 5:30 AM IST (data.gov.in publishes previous day's data by morning)
 // ─────────────────────────────────────────────────────────────────────────────
 export const syncMandiToSupabase = functions
   .runWith({ timeoutSeconds: 540, memory: "1GB" })
-  .pubsub.schedule("30 11 * * *")
+  .pubsub.schedule("30 5 * * *")
   .timeZone("Asia/Kolkata")
   .onRun(async (context: functions.EventContext) => {
     functions.logger.info("Starting Mandi → Supabase sync for priority states...");
