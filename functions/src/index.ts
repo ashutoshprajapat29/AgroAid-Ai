@@ -75,11 +75,11 @@ const PRIORITY_STATES = [
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FUNCTION 1: Sync Mandi Prices to Supabase (replaces old Firestore ingestion)
-// Runs every day at 5:30 AM IST (data.gov.in publishes previous day's data by morning)
+// Runs every day at 7:00 AM IST (data.gov.in publishes previous day's data by morning)
 // ─────────────────────────────────────────────────────────────────────────────
 export const syncMandiToSupabase = functions
   .runWith({ timeoutSeconds: 540, memory: "1GB" })
-  .pubsub.schedule("30 5 * * *")
+  .pubsub.schedule("0 7 * * *")
   .timeZone("Asia/Kolkata")
   .onRun(async (context: functions.EventContext) => {
     functions.logger.info("Starting Mandi → Supabase sync for priority states...");
@@ -109,9 +109,15 @@ export const syncMandiToSupabase = functions
     functions.logger.info(`Target date: ${targetDate}`);
 
     for (const state of PRIORITY_STATES) {
+      // Early exit if approaching 9-minute timeout (e.g. at 8 mins = 480000ms)
+      if (Date.now() - startTime > 480000) {
+        functions.logger.warn("Approaching function timeout. Halting processing early to finish gracefully.");
+        break;
+      }
+
       const stateRecords: Record<string, unknown>[] = [];
         let offset = 0;
-        const limit = 500;
+        const limit = 100; // Reduced from 500 to make smaller, faster DB queries to data.gov.in
 
         // Paginate through records for this state + date
         while (true) {
@@ -142,8 +148,9 @@ export const syncMandiToSupabase = functions
                   totalErrors++;
                   break;
               }
-              // Wait 5 seconds before retrying
-              await new Promise((resolve) => setTimeout(resolve, 5000));
+              // Exponential backoff: 5s, 10s, 20s
+              const backoff = 5000 * Math.pow(2, 3 - retries);
+              await new Promise((resolve) => setTimeout(resolve, backoff));
             }
           }
 
@@ -178,7 +185,7 @@ export const syncMandiToSupabase = functions
         offset += limit;
 
         // Rate limit delay between successful pagination requests
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        await new Promise((resolve) => setTimeout(resolve, 1000));
       }
 
       // Deduplicate records to prevent "ON CONFLICT DO UPDATE command cannot affect row a second time"
@@ -212,6 +219,9 @@ export const syncMandiToSupabase = functions
       }
 
       functions.logger.info(`[${state}] ${uniqueStateRecords.length} records processed`);
+      
+      // Add a brief delay between states to prevent overwhelming the API
+      await new Promise((resolve) => setTimeout(resolve, 2000));
     }
 
     // Purge records older than 45 days to keep DB size in check
