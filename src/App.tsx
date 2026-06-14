@@ -11,6 +11,7 @@ import {
 import ThemeToggle from "./components/ThemeToggle";
 import LanguageToggle from "./components/LanguageToggle";
 import NotificationManager from "./components/NotificationManager";
+import { AdvisorSimulator, ScannerSimulator, PlotsSimulator } from "./components/LandingSimulators";
 const DiseaseScanner  = lazy(() => import("./components/DiseaseScanner"));
 const Profile         = lazy(() => import("./components/Profile"));
 const WeatherWidget   = lazy(() => import("./components/WeatherWidget"));
@@ -220,6 +221,25 @@ function Landing() {
   const [step, setStep]   = useState<'method' | 'phone' | 'otp'>('method');
   const [error, setError] = useState("");
 
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+  const [activePreview, setActivePreview] = useState<'advisor' | 'disease' | 'plots' | null>(null);
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const card = e.currentTarget;
+    const rect = card.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const xc = rect.width / 2;
+    const yc = rect.height / 2;
+    const rotateY = ((x - xc) / xc) * 8;
+    const rotateX = -((y - yc) / yc) * 8;
+    setTilt({ x: rotateX, y: rotateY });
+  };
+
+  const handleMouseLeave = () => {
+    setTilt({ x: 0, y: 0 });
+  };
+
   const selectLang = (l: 'English'|'Hindi') => { setLang(l); setLanguage(l); };
 
   const handleSendOTP = async (e: React.FormEvent) => {
@@ -360,7 +380,14 @@ function Landing() {
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.4, duration: 0.5 }}
-        className="relative z-10 w-full max-w-md px-4 mb-16"
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+        style={{
+          transform: `perspective(1000px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
+          transformStyle: "preserve-3d",
+          transition: "transform 0.15s cubic-bezier(0.25, 1, 0.5, 1)",
+        }}
+        className="relative z-10 w-full max-w-md px-4 mb-16 cursor-default"
       >
         <div className="glass-panel border-2 border-emerald-500/15 rounded-[2.5rem] p-8 md:p-10 shadow-2xl relative overflow-hidden">
           <div className="absolute -top-24 -left-24 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -505,6 +532,7 @@ function Landing() {
         >
           {[
             {
+              type: "advisor",
               icon: MessageSquare,
               title: t("feature.advisor.title"),
               desc: t("feature.advisor.desc"),
@@ -514,6 +542,7 @@ function Landing() {
               badge: t("Hindi") === "Hindi" ? "वॉयस और चैट" : "Voice & Chat"
             },
             {
+              type: "disease",
               icon: Camera,
               title: t("feature.disease.title"),
               desc: t("feature.disease.desc"),
@@ -523,6 +552,7 @@ function Landing() {
               badge: t("Hindi") === "Hindi" ? "एआई विजन" : "AI Vision"
             },
             {
+              type: "plots",
               icon: Compass,
               title: t("feature.plots.title"),
               desc: t("feature.plots.desc"),
@@ -537,7 +567,8 @@ function Landing() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.65 + i * 0.1 }}
-              className={`glass-panel rounded-[2rem] p-6 hover:-translate-y-2 transition-all duration-300 cursor-default flex flex-col justify-between ${card.accent} shadow-lg ${card.glow} relative group overflow-hidden`}
+              onClick={() => setActivePreview(card.type as any)}
+              className={`glass-panel rounded-[2rem] p-6 hover:-translate-y-2 transition-all duration-300 cursor-pointer flex flex-col justify-between ${card.accent} shadow-lg ${card.glow} relative group overflow-hidden`}
             >
               <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-white/5 to-transparent rounded-bl-3xl pointer-events-none" />
               <div>
@@ -552,10 +583,33 @@ function Landing() {
                 <h3 className="text-base font-black text-bento-text-main mb-2 tracking-tight">{card.title}</h3>
                 <p className="text-xs text-bento-text-muted leading-relaxed font-semibold">{card.desc}</p>
               </div>
+
+              {/* Click call-to-action */}
+              <div className="mt-5 flex justify-between items-center pt-3 border-t border-[var(--border-input)] z-10">
+                <span className="text-[10px] font-bold text-emerald-400 group-hover:underline">
+                  {lang === "Hindi" ? "डेमो चलाएं →" : "Try Demo →"}
+                </span>
+                <span className="text-[8px] font-black uppercase tracking-widest text-bento-text-muted">
+                  {lang === "Hindi" ? "लाइव टेस्ट" : "Live Sandbox"}
+                </span>
+              </div>
             </motion.div>
           ))}
         </motion.div>
       </div>
+
+      {/* Simulation Overlays */}
+      <AnimatePresence>
+        {activePreview === 'advisor' && (
+          <AdvisorSimulator lang={lang} onClose={() => setActivePreview(null)} />
+        )}
+        {activePreview === 'disease' && (
+          <ScannerSimulator lang={lang} onClose={() => setActivePreview(null)} />
+        )}
+        {activePreview === 'plots' && (
+          <PlotsSimulator lang={lang} onClose={() => setActivePreview(null)} />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
