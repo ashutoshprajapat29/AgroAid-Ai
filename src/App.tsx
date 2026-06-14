@@ -251,8 +251,8 @@ function Landing() {
     const normalizedPhone = phone.trim();
     if (!/^[6-9]\d{9}$/.test(normalizedPhone)) {
       setError(lang === 'Hindi'
-        ? "कृपया एक मान्य 10-अंकीय भारतीय मोबाइल नंबर दर्ज करें (6-9 से शुरू होने वाला)।"
-        : "Please enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9.");
+        ? "कृपया सही मोबाइल नंबर दर्ज करें"
+        : "Please enter correct mobile number");
       return;
     }
 
@@ -264,13 +264,18 @@ function Landing() {
       setStep('otp');
     } catch (err: any) {
       const msg = err.message || "";
-      if (msg.includes('operation-not-allowed') || msg.includes('region enabled'))
-        setError("Phone Login unavailable for your region. Please use Google Sign‑in.");
-      else if (msg.includes('billing-not-enabled'))
-        setError("Daily SMS quota reached. Please use Google Sign‑in.");
-      else if (msg.includes('too-many-requests'))
-        setError("Too many attempts. Wait a few minutes or use Google Login.");
-      else setError(msg || "Failed to send OTP");
+      const code = err.code || "";
+      if (code === 'auth/invalid-phone-number' || msg.includes('invalid-phone-number')) {
+        setError(lang === 'Hindi' ? "कृपया सही मोबाइल नंबर दर्ज करें" : "Please enter correct mobile number");
+      } else if (msg.includes('operation-not-allowed') || msg.includes('region enabled')) {
+        setError(lang === 'Hindi' ? "यह सुविधा आपके क्षेत्र में उपलब्ध नहीं है।" : "Phone Login unavailable for your region. Please use Google Sign‑in.");
+      } else if (msg.includes('billing-not-enabled')) {
+        setError(lang === 'Hindi' ? "दैनिक सीमा समाप्त हो गई है।" : "Daily SMS quota reached. Please use Google Sign‑in.");
+      } else if (msg.includes('too-many-requests')) {
+        setError(lang === 'Hindi' ? "बहुत सारे प्रयास। कुछ मिनट प्रतीक्षा करें।" : "Too many attempts. Wait a few minutes or use Google Login.");
+      } else {
+        setError(lang === 'Hindi' ? "कृपया सही मोबाइल नंबर दर्ज करें" : "Please enter correct mobile number");
+      }
     } finally {
       setActionLoading(false);
     }
@@ -284,7 +289,13 @@ function Landing() {
     try {
       await verifyOTP(otp);
     } catch (err: any) {
-      setError(err.message || "Invalid OTP");
+      const msg = err.message || "";
+      const code = err.code || "";
+      if (code === 'auth/invalid-verification-code' || msg.includes('invalid-verification-code') || code === 'auth/code-expired' || msg.includes('code-expired')) {
+        setError(lang === 'Hindi' ? "कृपया सही ओटीपी दर्ज करें" : "Please enter correct OTP");
+      } else {
+        setError(lang === 'Hindi' ? "कृपया सही ओटीपी दर्ज करें" : "Please enter correct OTP");
+      }
     } finally {
       setActionLoading(false);
     }
@@ -535,7 +546,15 @@ function Landing() {
                           setActionLoading(true);
                           setError("");
                           verifyOTP(val)
-                            .catch((err: any) => setError(err.message || "Invalid OTP"))
+                            .catch((err: any) => {
+                              const msg = err.message || "";
+                              const code = err.code || "";
+                              if (code === 'auth/invalid-verification-code' || msg.includes('invalid-verification-code') || code === 'auth/code-expired' || msg.includes('code-expired')) {
+                                setError(lang === 'Hindi' ? "कृपया सही ओटीपी दर्ज करें" : "Please enter correct OTP");
+                              } else {
+                                setError(lang === 'Hindi' ? "कृपया सही ओटीपी दर्ज करें" : "Please enter correct OTP");
+                              }
+                            })
                             .finally(() => setActionLoading(false));
                         }
                       }}
