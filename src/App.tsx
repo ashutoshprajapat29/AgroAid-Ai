@@ -2,7 +2,7 @@ import { AuthProvider, useAuth } from "./lib/AuthContext";
 import { WeatherProvider } from "./lib/WeatherContext";
 import { ThemeProvider } from "./lib/ThemeContext";
 import { LanguageProvider, useLanguage } from "./lib/LanguageContext";
-import { useState, lazy, Suspense } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   MessageSquare, Camera, User as UserIcon, Loader2, Leaf,
@@ -46,6 +46,32 @@ function AuthenticatedApp() {
   const [activeTab, setActiveTab] = useState<TabType>('fields');
   const { t } = useLanguage();
   const NAV_ITEMS = NAV_CONFIG.map(item => ({ ...item, label: t(item.labelKey) }));
+
+  // Tab navigation back button support
+  useEffect(() => {
+    // Replace initial state with current tab if there is no tab in history state
+    if (!window.history.state || !window.history.state.tab) {
+      window.history.replaceState({ tab: 'fields' }, '');
+    }
+
+    const handlePopState = (e: PopStateEvent) => {
+      // If the pop event state contains a tab, switch to it
+      if (e.state && e.state.tab) {
+        setActiveTab(e.state.tab);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
+
+  const handleTabChange = (tab: TabType) => {
+    if (tab === activeTab) return;
+    setActiveTab(tab);
+    window.history.pushState({ tab }, '');
+  };
 
   return (
     <div className="h-screen h-[100dvh] flex flex-col overflow-hidden relative bg-theme-base text-theme-main">
@@ -101,7 +127,7 @@ function AuthenticatedApp() {
             <NavButton
               key={item.id}
               active={activeTab === item.id}
-              onClick={() => setActiveTab(item.id)}
+              onClick={() => handleTabChange(item.id)}
               icon={<item.icon size={20} />}
               label={item.label}
             />

@@ -21,8 +21,11 @@ export function useBackButton(isOpen: boolean, close: () => void, modalId: strin
     window.history.pushState({ modalId }, '');
 
     const handlePopState = (e: PopStateEvent) => {
-      // When the user presses the back button, the browser pops the state automatically.
-      // We just need to trigger the close action in our React state.
+      // If the current history state matches our modalId, it means some OTHER modal
+      // was popped, and we are now the active state again. Do NOT close.
+      if (e.state && e.state.modalId === modalId) {
+        return;
+      }
       closeRef.current();
     };
 

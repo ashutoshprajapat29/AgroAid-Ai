@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useBackButton } from "../hooks/useBackButton";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell,
@@ -355,6 +356,9 @@ export default function MarketDashboard() {
 
   // Commodity Detail View
   const [detailCommodity, setDetailCommodity] = useState<MandiPrice | null>(null);
+
+  // Handle browser/hardware back button for the commodity detail view
+  useBackButton(!!detailCommodity, () => closeCommodityDetail(), 'marketDetail');
   const [timeRange, setTimeRange] = useState<TimeRange>("30D");
 
   // Geolocation

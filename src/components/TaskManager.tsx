@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useBackButton } from "../hooks/useBackButton";
 import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, doc, serverTimestamp, deleteDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { handleFirestoreError, OperationType } from "../lib/firebaseUtils";
@@ -33,6 +34,9 @@ export default function TaskManager() {
   const [fields,    setFields]    = useState<Field[]>([]);
   const [loading,   setLoading]   = useState(true);
   const [isAdding,  setIsAdding]  = useState(false);
+
+  // Handle browser/hardware back button to close the add task form
+  useBackButton(isAdding, () => setIsAdding(false), 'addTask');
   const [notified,  setNotified]  = useState(false);
   const [newTask, setNewTask] = useState<Partial<Reminder>>({
     title: "", description: "", type: "other",

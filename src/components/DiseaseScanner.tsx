@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useBackButton } from "../hooks/useBackButton";
 import { detectPlantDisease, extractFarmUpdates } from "../services/gemini";
 import { useAuth } from "../lib/AuthContext";
 import { Camera, Loader2, AlertCircle, CheckCircle2, RefreshCw, ScanLine, Sprout, Upload } from "lucide-react";
@@ -105,6 +106,9 @@ export default function DiseaseScanner() {
   }, [image, loading, user, selectedFieldId, fields]);
 
   const reset = () => { setImage(null); setResult(null); setError(null); };
+
+  // Handle browser/hardware back button to clear selected image/results and return to upload screen
+  useBackButton(!!image, () => reset(), 'diseaseScanner');
 
   return (
     <div className="max-w-7xl mx-auto relative">
