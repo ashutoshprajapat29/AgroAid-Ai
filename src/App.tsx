@@ -267,6 +267,8 @@ function Landing() {
       const code = err.code || "";
       if (code === 'auth/invalid-phone-number' || msg.includes('invalid-phone-number')) {
         setError(lang === 'Hindi' ? "कृपया सही मोबाइल नंबर दर्ज करें" : "Please enter correct mobile number");
+      } else if (code === 'auth/quota-exceeded' || msg.includes('quota-exceeded')) {
+        setError(lang === 'Hindi' ? "एसएमएस कोटा समाप्त हो गया है। कृपया बाद में प्रयास करें या गूगल लॉगिन का उपयोग करें।" : "SMS quota exceeded. Please try again later or use Google Login.");
       } else if (msg.includes('operation-not-allowed') || msg.includes('region enabled')) {
         setError(lang === 'Hindi' ? "यह सुविधा आपके क्षेत्र में उपलब्ध नहीं है।" : "Phone Login unavailable for your region. Please use Google Sign‑in.");
       } else if (msg.includes('billing-not-enabled')) {
@@ -274,7 +276,7 @@ function Landing() {
       } else if (msg.includes('too-many-requests')) {
         setError(lang === 'Hindi' ? "बहुत सारे प्रयास। कुछ मिनट प्रतीक्षा करें।" : "Too many attempts. Wait a few minutes or use Google Login.");
       } else {
-        setError(lang === 'Hindi' ? "कृपया सही मोबाइल नंबर दर्ज करें" : "Please enter correct mobile number");
+        setError(err.message || (lang === 'Hindi' ? "ओटीपी भेजने में विफल। कृपया पुनः प्रयास करें।" : "Failed to send OTP. Please try again."));
       }
     } finally {
       setActionLoading(false);
