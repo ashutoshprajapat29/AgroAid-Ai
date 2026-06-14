@@ -1,5 +1,15 @@
 {
   "projects": {
     "default": "farming-ai-c1f6b"
-  }
+  },
+  "targets": {
+    "farming-ai-c1f6b": {
+      "hosting": {
+        "main": [
+          "agro-aid-ai"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }
