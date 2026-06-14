@@ -223,6 +223,7 @@ function Landing() {
 
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const [activePreview, setActivePreview] = useState<'advisor' | 'disease' | 'plots' | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const card = e.currentTarget;
@@ -243,14 +244,18 @@ function Landing() {
   const selectLang = (l: 'English'|'Hindi') => { setLang(l); setLanguage(l); };
 
   const handleSendOTP = async (e: React.FormEvent) => {
-    e.preventDefault(); setError("");
+    e.preventDefault();
+    if (actionLoading) return;
+    setActionLoading(true);
+    setError("");
     try {
       let fp = phone.trim();
       if (!fp.startsWith('+')) {
         if (fp.length === 10) fp = '+91' + fp;
-        else { setError("Please include your country code (e.g., +919998887770)"); return; }
+        else { setError("Please include your country code (e.g., +919998887770)"); setActionLoading(false); return; }
       }
-      await sendOTP(fp); setStep('otp');
+      await sendOTP(fp);
+      setStep('otp');
     } catch (err: any) {
       const msg = err.message || "";
       if (msg.includes('operation-not-allowed') || msg.includes('region enabled'))
@@ -260,20 +265,30 @@ function Landing() {
       else if (msg.includes('too-many-requests'))
         setError("Too many attempts. Wait a few minutes or use Google Login.");
       else setError(msg || "Failed to send OTP");
+    } finally {
+      setActionLoading(false);
     }
   };
 
   const handleVerifyOTP = async (e: React.FormEvent) => {
-    e.preventDefault(); setError("");
-    try { await verifyOTP(otp); }
-    catch (err: any) { setError(err.message || "Invalid OTP"); }
+    e.preventDefault();
+    if (actionLoading) return;
+    setActionLoading(true);
+    setError("");
+    try {
+      await verifyOTP(otp);
+    } catch (err: any) {
+      setError(err.message || "Invalid OTP");
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   // OTP individual digit boxes layout
   const otpArray = otp.split('');
   const otpBoxes = Array.from({ length: 6 }).map((_, idx) => {
     const char = otpArray[idx] || '';
-    const isFocused = otp.length === idx;
+    const isFocused = otp.length === idx && !actionLoading;
     return (
       <div
         key={idx}
@@ -363,7 +378,8 @@ function Landing() {
             <button
               key={l}
               onClick={() => selectLang(l)}
-              className={`px-6 py-2 rounded-full text-xs font-black uppercase tracking-wider transition-all duration-300 ${
+              disabled={actionLoading}
+              className={`px-6 py-2 rounded-full text-xs font-black uppercase tracking-wider transition-all duration-300 disabled:opacity-50 ${
                 lang === l
                   ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 scale-105'
                   : 'text-theme-muted hover:text-emerald-400'
@@ -401,11 +417,18 @@ function Landing() {
                 </div>
 
                 <button
-                  onClick={() => login()}
-                  disabled={loading}
+                  onClick={async () => {
+                    setActionLoading(true);
+                    try {
+                      await login();
+                    } finally {
+                      setActionLoading(false);
+                    }
+                  }}
+                  disabled={actionLoading}
                   className="w-full px-6 py-4 bg-emerald-500 hover:bg-emerald-400 text-white rounded-2xl font-black text-sm uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-3 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/35 hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
                 >
-                  {loading ? (
+                  {actionLoading ? (
                     <Loader2 className="animate-spin" size={18} />
                   ) : (
                     <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5 bg-white p-0.5 rounded-full" alt="Google" />
@@ -421,7 +444,8 @@ function Landing() {
 
                 <button
                   onClick={() => setStep('phone')}
-                  className="w-full px-6 py-4 bg-[var(--bg-input)] border border-[var(--border-input)] text-bento-text-main rounded-2xl font-black text-xs uppercase tracking-wider hover:bg-[var(--bg-hover)] hover:border-emerald-500/25 transition-all duration-300 flex items-center justify-center gap-3 active:scale-[0.98] cursor-pointer"
+                  disabled={actionLoading}
+                  className="w-full px-6 py-4 bg-[var(--bg-input)] border border-[var(--border-input)] text-bento-text-main rounded-2xl font-black text-xs uppercase tracking-wider hover:bg-[var(--bg-hover)] hover:border-emerald-500/25 transition-all duration-300 flex items-center justify-center gap-3 active:scale-[0.98] cursor-pointer disabled:opacity-50"
                 >
                   <Smartphone size={18} className="text-emerald-400" />
                   <span>{t("auth.phone")}</span>
@@ -432,7 +456,7 @@ function Landing() {
             {step === 'phone' && (
               <motion.div key="phone" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} className="space-y-5">
                 <div className="flex items-center gap-2">
-                  <button type="button" onClick={() => setStep('method')} className="p-2 hover:bg-[var(--bg-hover)] text-bento-text-muted hover:text-bento-text-main rounded-xl border border-transparent hover:border-[var(--border-input)] transition-all">
+                  <button type="button" disabled={actionLoading} onClick={() => setStep('method')} className="p-2 hover:bg-[var(--bg-hover)] text-bento-text-muted hover:text-bento-text-main rounded-xl border border-transparent hover:border-[var(--border-input)] transition-all disabled:opacity-50">
                     <ArrowLeft size={16} />
                   </button>
                   <div>
@@ -452,13 +476,14 @@ function Landing() {
                       placeholder="9998887770"
                       value={phone}
                       onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
-                      className="w-full bg-transparent px-4 py-4 text-lg font-bold text-bento-text-main placeholder:text-bento-text-muted/30 focus:outline-none"
+                      disabled={actionLoading}
+                      className="w-full bg-transparent px-4 py-4 text-lg font-bold text-bento-text-main placeholder:text-bento-text-muted/30 focus:outline-none disabled:opacity-50"
                       required
                     />
                   </div>
                   {error && <p className="text-rose-400 text-xs font-semibold px-1">{error}</p>}
-                  <button type="submit" disabled={loading} className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-white rounded-2xl font-black text-sm uppercase tracking-wider transition-all shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/35 active:scale-[0.98] disabled:opacity-50 cursor-pointer">
-                    {loading ? <Loader2 className="animate-spin mx-auto" size={18} /> : t("auth.sendOTP")}
+                  <button type="submit" disabled={actionLoading} className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-white rounded-2xl font-black text-sm uppercase tracking-wider transition-all shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/35 active:scale-[0.98] disabled:opacity-50 cursor-pointer">
+                    {actionLoading ? <Loader2 className="animate-spin mx-auto" size={18} /> : t("auth.sendOTP")}
                   </button>
                 </form>
               </motion.div>
@@ -467,7 +492,7 @@ function Landing() {
             {step === 'otp' && (
               <motion.div key="otp" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }} className="space-y-5">
                 <div className="flex items-center gap-2">
-                  <button type="button" onClick={() => setStep('phone')} className="p-2 hover:bg-[var(--bg-hover)] text-bento-text-muted hover:text-bento-text-main rounded-xl border border-transparent hover:border-[var(--border-input)] transition-all">
+                  <button type="button" disabled={actionLoading} onClick={() => setStep('phone')} className="p-2 hover:bg-[var(--bg-hover)] text-bento-text-muted hover:text-bento-text-main rounded-xl border border-transparent hover:border-[var(--border-input)] transition-all disabled:opacity-50">
                     <ArrowLeft size={16} />
                   </button>
                   <div>
@@ -483,16 +508,19 @@ function Landing() {
                       type="tel"
                       maxLength={6}
                       value={otp}
+                      disabled={actionLoading}
                       onChange={e => {
                         const val = e.target.value.replace(/\D/g, '');
                         setOtp(val);
-                        if (val.length === 6) {
-                          // Auto submit OTP once 6 digits are typed
+                        if (val.length === 6 && !actionLoading) {
+                          setActionLoading(true);
                           setError("");
-                          verifyOTP(val).catch((err: any) => setError(err.message || "Invalid OTP"));
+                          verifyOTP(val)
+                            .catch((err: any) => setError(err.message || "Invalid OTP"))
+                            .finally(() => setActionLoading(false));
                         }
                       }}
-                      className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
+                      className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10 disabled:cursor-not-allowed"
                       autoFocus
                       required
                       placeholder="123456"
@@ -501,12 +529,12 @@ function Landing() {
 
                   {error && <p className="text-rose-400 text-xs font-semibold text-center">{error}</p>}
                   
-                  <button type="submit" disabled={loading || otp.length < 6} className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-white rounded-2xl font-black text-sm uppercase tracking-wider transition-all shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/35 active:scale-[0.98] disabled:opacity-50 cursor-pointer">
-                    {loading ? <Loader2 className="animate-spin mx-auto" size={18} /> : t("auth.verify")}
+                  <button type="submit" disabled={actionLoading || otp.length < 6} className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-white rounded-2xl font-black text-sm uppercase tracking-wider transition-all shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/35 active:scale-[0.98] disabled:opacity-50 cursor-pointer">
+                    {actionLoading ? <Loader2 className="animate-spin mx-auto" size={18} /> : t("auth.verify")}
                   </button>
                   
                   <div className="text-center">
-                    <button type="button" onClick={() => { setStep('phone'); setOtp(''); setError(''); }} className="text-[10px] font-black uppercase tracking-widest text-bento-text-muted hover:text-bento-text-main transition-colors">
+                    <button type="button" disabled={actionLoading} onClick={() => { setStep('phone'); setOtp(''); setError(''); }} className="text-[10px] font-black uppercase tracking-widest text-bento-text-muted hover:text-bento-text-main transition-colors disabled:opacity-50">
                       {t("auth.resendOrEdit")}
                     </button>
                   </div>
