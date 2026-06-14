@@ -246,14 +246,20 @@ function Landing() {
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault();
     if (actionLoading) return;
+
+    // Proper Indian phone number validation (exactly 10 digits starting with 6, 7, 8, or 9)
+    const normalizedPhone = phone.trim();
+    if (!/^[6-9]\d{9}$/.test(normalizedPhone)) {
+      setError(lang === 'Hindi'
+        ? "कृपया एक मान्य 10-अंकीय भारतीय मोबाइल नंबर दर्ज करें (6-9 से शुरू होने वाला)।"
+        : "Please enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9.");
+      return;
+    }
+
     setActionLoading(true);
     setError("");
     try {
-      let fp = phone.trim();
-      if (!fp.startsWith('+')) {
-        if (fp.length === 10) fp = '+91' + fp;
-        else { setError("Please include your country code (e.g., +919998887770)"); setActionLoading(false); return; }
-      }
+      const fp = '+91' + normalizedPhone;
       await sendOTP(fp);
       setStep('otp');
     } catch (err: any) {
@@ -466,23 +472,36 @@ function Landing() {
                 </div>
 
                 <form onSubmit={handleSendOTP} className="space-y-4 pt-2">
-                  <div className="relative flex items-center bg-[var(--bg-input)] border-2 border-[var(--border-strong)] rounded-2xl overflow-hidden focus-within:border-emerald-500/40 transition-colors">
+                  <div className={`relative flex items-center bg-[var(--bg-input)] border-2 rounded-2xl overflow-hidden focus-within:border-emerald-500/40 transition-colors ${
+                    error && phone.length === 10 && !/^[6-9]\d{9}$/.test(phone)
+                      ? 'border-rose-500/50 bg-rose-500/5'
+                      : 'border-[var(--border-strong)]'
+                  }`}>
                     <div className="flex items-center gap-1 px-4 py-4 border-r border-[var(--border-input)] bg-[var(--bg-hover)] shrink-0">
                       <span className="text-base">🇮🇳</span>
                       <span className="text-sm font-black text-bento-text-main">+91</span>
                     </div>
                     <input
                       type="tel"
+                      maxLength={10}
                       placeholder="9998887770"
                       value={phone}
-                      onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
+                      onChange={e => {
+                        const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                        setPhone(val);
+                        if (error) setError("");
+                      }}
                       disabled={actionLoading}
                       className="w-full bg-transparent px-4 py-4 text-lg font-bold text-bento-text-main placeholder:text-bento-text-muted/30 focus:outline-none disabled:opacity-50"
                       required
                     />
                   </div>
-                  {error && <p className="text-rose-400 text-xs font-semibold px-1">{error}</p>}
-                  <button type="submit" disabled={actionLoading} className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-white rounded-2xl font-black text-sm uppercase tracking-wider transition-all shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/35 active:scale-[0.98] disabled:opacity-50 cursor-pointer">
+                  {error && <p className="text-rose-400 text-[11px] font-semibold px-1 leading-snug">{error}</p>}
+                  <button
+                    type="submit"
+                    disabled={actionLoading || phone.length < 10 || !/^[6-9]\d{9}$/.test(phone)}
+                    className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-white rounded-2xl font-black text-sm uppercase tracking-wider transition-all shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/35 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                  >
                     {actionLoading ? <Loader2 className="animate-spin mx-auto" size={18} /> : t("auth.sendOTP")}
                   </button>
                 </form>
