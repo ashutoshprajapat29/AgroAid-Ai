@@ -32,6 +32,8 @@ export default defineConfig(({mode}) => {
         },
         workbox: {
           navigateFallbackDenylist: [/^\/__/],
+          skipWaiting: true,
+          clientsClaim: true,
           runtimeCaching: [
             {
               urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
