@@ -6,6 +6,7 @@ import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css';
 import { area } from '@turf/area';
 import { polygon } from '@turf/helpers';
+import { useLanguage } from '../lib/LanguageContext';
 
 // Fix leaflet icon issues
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -34,6 +35,7 @@ function MapUpdater({ center }: { center: [number, number] | null }) {
 function LocateControl({ onLocationFound }: { onLocationFound: (latlng: [number, number]) => void }) {
   const map = useMap();
   const [loading, setLoading] = useState(false);
+  const { t } = useLanguage();
 
   const locateUser = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -50,7 +52,7 @@ function LocateControl({ onLocationFound }: { onLocationFound: (latlng: [number,
       }, 
       () => {
         setLoading(false);
-        alert("Could not get your location. Please check permissions.");
+        alert(t("plots.error_location_retrieve"));
       }, 
       { enableHighAccuracy: true }
     );
@@ -82,6 +84,7 @@ function LocateControl({ onLocationFound }: { onLocationFound: (latlng: [number,
 }
 
 export default function PlotMap({ initialLocation, onPolygonDrawn }: PlotMapProps) {
+  const { t } = useLanguage();
   const [center, setCenter] = useState<[number, number]>([20.5937, 78.9629]); // Default India
   const [hasLocation, setHasLocation] = useState(false);
   const [markerPos, setMarkerPos] = useState<[number, number] | null>(null);
@@ -180,7 +183,7 @@ export default function PlotMap({ initialLocation, onPolygonDrawn }: PlotMapProp
   return (
     <div className="h-[350px] md:h-[450px] w-full rounded-2xl overflow-hidden shadow-[0_8px_30px_rgba(18,53,36,0.1)] border-2 border-[#123524]/20 z-10 relative group">
       <div className="absolute top-4 left-4 z-[1000] bg-white/90 backdrop-blur-md px-4 py-2 rounded-xl text-xs font-bold text-[#123524] shadow-lg pointer-events-none opacity-90">
-        Satellite Plot Mapper
+        {t("plots.satellite_mapper")}
       </div>
       <MapContainer 
         center={center} 
@@ -227,7 +230,7 @@ export default function PlotMap({ initialLocation, onPolygonDrawn }: PlotMapProp
               marker: false,
               polygon: {
                 allowIntersection: false,
-                drawError: { color: '#e1e100', message: 'You cannot draw intersecting lines!' },
+                drawError: { color: '#e1e100', message: t("plots.error_intersecting") },
                 shapeOptions: { color: '#3e7b27', fillColor: '#123524', fillOpacity: 0.4, weight: 3 }
               }
             }}

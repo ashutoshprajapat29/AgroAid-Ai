@@ -176,7 +176,7 @@ export default function FieldManager() {
   // --- Field Handlers ---
   const getCurrentLocation = () => {
     if (!navigator.geolocation) {
-      alert("Geolocation is not supported by your browser");
+      alert(t("plots.error_geolocation_unsupported"));
       return;
     }
 
@@ -192,7 +192,7 @@ export default function FieldManager() {
       },
       (error) => {
         console.error("Geolocation error:", error);
-        alert("Unable to retrieve your location. Please check permissions.");
+        alert(t("plots.error_location_retrieve"));
         setIsLocating(false);
       },
       { enableHighAccuracy: true }
@@ -205,7 +205,7 @@ export default function FieldManager() {
     try {
       const area = parseFloat(fieldFormData.area);
       if (isNaN(area) || area <= 0) {
-        alert("Please enter a valid area size greater than 0.");
+        alert(t("plots.error_invalid_area"));
         return;
       }
 
@@ -251,7 +251,7 @@ export default function FieldManager() {
       setFieldFormData({ name: '', area: '', unit: 'Acres', soilType: '', location: '', description: '', currentCrop: '', variety: '', plantingDate: '', previousSprays: '', irrigationTimings: '', otherDetails: '' });
     } catch (err) {
       console.error(err);
-      alert("Failed to save plot.");
+      alert(t("plots.error_save_failed"));
     }
   };
 
@@ -303,7 +303,7 @@ export default function FieldManager() {
       setAssigningReportId(null);
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, reportPath);
-      alert("Failed to assign report.");
+      alert(t("plots.error_assign_failed"));
     }
   };
 
@@ -313,27 +313,27 @@ export default function FieldManager() {
     try {
       const ph = parseNumberSafe(soilFormData.ph);
       if (ph !== null && (ph < 0 || ph > 14)) {
-        alert("pH must be between 0 and 14.");
+        alert(t("plots.error_invalid_ph"));
         return;
       }
       const nitrogen = parseNumberSafe(soilFormData.nitrogen);
       if (nitrogen !== null && nitrogen < 0) {
-        alert("Nitrogen level cannot be negative.");
+        alert(t("plots.error_negative_nitrogen"));
         return;
       }
       const phosphorus = parseNumberSafe(soilFormData.phosphorus);
       if (phosphorus !== null && phosphorus < 0) {
-        alert("Phosphorus level cannot be negative.");
+        alert(t("plots.error_negative_phosphorus"));
         return;
       }
       const potassium = parseNumberSafe(soilFormData.potassium);
       if (potassium !== null && potassium < 0) {
-        alert("Potassium level cannot be negative.");
+        alert(t("plots.error_negative_potassium"));
         return;
       }
       const organicCarbon = parseNumberSafe(soilFormData.organicCarbon);
       if (organicCarbon !== null && organicCarbon < 0) {
-        alert("Organic Carbon level cannot be negative.");
+        alert(t("plots.error_negative_carbon"));
         return;
       }
 
@@ -375,7 +375,7 @@ export default function FieldManager() {
       setIsAddingSoil(false);
     } catch (err) {
       console.error(err);
-      alert("Failed to save soil record.");
+      alert(t("plots.error_save_soil_failed"));
     }
   };
 
@@ -568,7 +568,7 @@ export default function FieldManager() {
                     </div>
                   </div>
                 </div>
-                <button type="submit" className="w-full text-[var(--text-main)] text-white font-black py-4 rounded-xl hover:bg-teal-600 transition-colors shadow-lg active:scale-[0.98]">
+                <button type="submit" className="w-full bg-teal-600 text-white font-black py-4 rounded-xl hover:bg-teal-700 transition-colors shadow-lg active:scale-[0.98]">
                   {editingFieldId ? t('plots.update_plot') : t('plots.save_plot')}
                 </button>
               </form>
@@ -648,7 +648,7 @@ export default function FieldManager() {
                   <textarea value={soilFormData.otherNotes} onChange={e => setSoilFormData({...soilFormData, otherNotes: e.target.value})} className="w-full bg-[var(--bg-input)] border-2 border-[var(--border-strong)] rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500 font-medium" rows={3} placeholder={t("Hindi") === "Hindi" ? "कोई विशिष्ट कमी (जैसे: जिंक की कमी) या सिफारिशें?" : "Any specific issues (e.g. Zinc deficiency) or recommendations?"}></textarea>
                 </div>
 
-                <button type="submit" className="w-full text-[var(--text-main)] text-white font-black py-4 rounded-xl hover:bg-indigo-600 transition-colors shadow-lg active:scale-[0.98]">
+                <button type="submit" className="w-full bg-indigo-600 text-white font-black py-4 rounded-xl hover:bg-indigo-700 transition-colors shadow-lg active:scale-[0.98]">
                   {editingSoilId ? t('plots.update_soil') : t('plots.save_soil')}
                 </button>
               </form>
@@ -878,7 +878,7 @@ export default function FieldManager() {
                           <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-subtle)]">{t('plots.action_required')}</span>
                           <button 
                             onClick={() => setAssigningReportId(report.id)}
-                            className="text-[var(--text-main)] text-white px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest hover:bg-teal-600 transition-colors flex items-center gap-1 shadow-lg shadow-zinc-900/10"
+                            className="bg-teal-600 text-white px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest hover:bg-teal-700 transition-colors flex items-center gap-1 shadow-lg shadow-zinc-900/10"
                           >
                             {t('plots.link_to_plot')}
                           </button>
