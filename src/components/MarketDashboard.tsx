@@ -521,6 +521,30 @@ export default function MarketDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedState]);
 
+  // ── Normalize selected state case/formatting when available states load ──
+  useEffect(() => {
+    if (availableStates.length > 0 && selectedState) {
+      const match = availableStates.find(
+        (s) => s.toLowerCase() === selectedState.toLowerCase()
+      );
+      if (match && match !== selectedState) {
+        setSelectedState(match);
+      }
+    }
+  }, [availableStates, selectedState]);
+
+  // ── Normalize selected district case/formatting when available districts load ──
+  useEffect(() => {
+    if (availableDistricts.length > 0 && selectedDistrict) {
+      const match = availableDistricts.find(
+        (d) => d.toLowerCase() === selectedDistrict.toLowerCase()
+      );
+      if (match && match !== selectedDistrict) {
+        setSelectedDistrict(match);
+      }
+    }
+  }, [availableDistricts, selectedDistrict]);
+
   // ── Load markets when district changes ──────────────────────────────────
   useEffect(() => {
     setLoadingMarkets(true);

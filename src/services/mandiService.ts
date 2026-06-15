@@ -368,7 +368,37 @@ async function reverseGeocode(lat: number, lng: number): Promise<{ state: string
     const addr = data.address ?? {};
 
     const state = mapToDataGovState(addr.state ?? addr.state_district ?? "");
-    const district = addr.county ?? addr.state_district ?? addr.city ?? "";
+    
+    // Improved district matching against known state districts
+    let district = "";
+    const addressValues = Object.values(addr).map(v => String(v).toLowerCase().trim());
+    const stateDistricts = INDIA_STATES_DISTRICTS[state] ?? [];
+    
+    for (const d of stateDistricts) {
+      const dLower = d.toLowerCase();
+      // Match if any address field is equal to or contains the district name
+      if (addressValues.some(val => val === dLower || val.includes(dLower))) {
+        district = d;
+        break;
+      }
+    }
+    
+    // Fallback if no matching district in hardcoded list
+    if (!district) {
+      const rawDistrict = addr.district ?? addr.county ?? addr.city ?? addr.town ?? addr.state_district ?? addr.subdistrict ?? "";
+      // Clean up common divisions, districts and administrative units
+      district = rawDistrict
+        .replace(/\b(division|district|tehsil|taluka)\b/gi, "")
+        .replace(/\s+/g, " ")
+        .trim();
+        
+      if (district) {
+        // Title Case the fallback district
+        district = district.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+      } else {
+        district = "Ratlam";
+      }
+    }
 
     const result = { state, district };
     cacheSet(cacheKey, result, 24 * 60 * 60 * 1000);
@@ -507,7 +537,7 @@ Analyze and return ONLY valid JSON:
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export const INDIA_STATES_DISTRICTS: Record<string, string[]> = {
-  "Madhya Pradesh": ["Ratlam", "Indore", "Bhopal", "Gwalior", "Jabalpur", "Sagar", "Dewas", "Ujjain","Morena","Chhindwara","Sehore","Mandla","Bhind","Mandsaur","Betul","Neemuch","Dhar","Balaghat","Raisen","Harda","Sidhi","Hoshangabad","Guna","Narsinghpur","Satna","Khargone","Sheopur","Shajapur","Umaria","Shivpuri"],
+  "Madhya Pradesh": ["Agar Malwa", "Alirajpur", "Anuppur", "Ashoknagar", "Balaghat", "Barwani", "Betul", "Bhind", "Bhopal", "Burhanpur", "Chhatarpur", "Chhindwara", "Damoh", "Datia", "Dewas", "Dhar", "Dindori", "Guna", "Gwalior", "Harda", "Hoshangabad", "Indore", "Jabalpur", "Jhabua", "Katni", "Khandwa", "Khargone", "Mandla", "Mandsaur", "Morena", "Narsinghpur", "Neemuch", "Niwari", "Panna", "Raisen", "Rajgarh", "Ratlam", "Rewa", "Sagar", "Satna", "Sehore", "Seoni", "Shahdol", "Shajapur", "Sheopur", "Shivpuri", "Sidhi", "Singrauli", "Tikamgarh", "Ujjain", "Umaria", "Vidisha", "Mauganj", "Maihar", "Pandhurna"],
   "Maharashtra": ["Pune", "Nashik", "Kolhapur", "Solapur", "Aurangabad", "Nagpur", "Ahmednagar"],
   "Punjab":      ["Ludhiana", "Amritsar", "Jalandhar", "Patiala", "Bathinda", "Moga"],
   "Uttar Pradesh": ["Lucknow", "Agra", "Varanasi", "Kanpur", "Meerut", "Bareilly", "Allahabad"],
