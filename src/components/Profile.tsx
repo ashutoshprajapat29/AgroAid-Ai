@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../lib/AuthContext";
-import { User, Mail, ShieldCheck, Sprout, Save, Loader2, LogOut, Globe, Layers, Wind, Palette } from "lucide-react";
+import { User, Mail, ShieldCheck, Save, Loader2, LogOut, Globe, Layers, Palette } from "lucide-react";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { handleFirestoreError, OperationType } from "../lib/firebaseUtils";
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 import ThemeToggle from "./ThemeToggle";
 import { useLanguage } from "../lib/LanguageContext";
 
@@ -13,21 +13,22 @@ export default function Profile() {
   const { t, setLanguage } = useLanguage();
   const [formData, setFormData] = useState({
     displayName: profile?.displayName || "",
-    farmDetails: profile?.farmDetails || "",
     preferredLanguage: profile?.preferredLanguage || "English"
   });
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [stats, setStats]     = useState({ plots: 0, reports: 0 });
+  const [stats, setStats] = useState({ plots: 0, reports: 0 });
 
   useEffect(() => {
     async function fetchStats() {
       if (!user) return;
       try {
-        const fieldsSnap  = await getDocs(collection(db, "users", user.uid, "fields"));
+        const fieldsSnap = await getDocs(collection(db, "users", user.uid, "fields"));
         const reportsSnap = await getDocs(collection(db, "users", user.uid, "soil_reports"));
         setStats({ plots: fieldsSnap.size, reports: reportsSnap.size });
-      } catch (err) { handleFirestoreError(err, OperationType.GET, `users/${user.uid}/fields`); }
+      } catch (err) { 
+        handleFirestoreError(err, OperationType.GET, `users/${user.uid}/fields`); 
+      }
     }
     fetchStats();
   }, [user]);
@@ -50,182 +51,212 @@ export default function Profile() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-0 pb-24 md:pb-12">
-
-      {/* Hero identity card */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
-
-        {/* Profile hero */}
-        <div className="lg:col-span-2 rounded-[1.75rem] p-8 md:p-10 relative overflow-hidden flex flex-col md:flex-row items-center md:items-start gap-7
-          bg-gradient-to-br from-[#071409] via-[#091b0d] to-[#0c2411] border border-emerald-500/18">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/7 rounded-full -mr-32 -mt-32 blur-3xl pointer-events-none" />
-          <div className="absolute bottom-0 left-0 w-40 h-40 bg-amber-500/4 rounded-full -ml-20 -mb-20 blur-2xl pointer-events-none" />
-
-          {/* Avatar */}
-          <div className="relative z-10 shrink-0">
-            {profile?.photoURL ? (
-              <img src={profile.photoURL} alt={profile.displayName} referrerPolicy="no-referrer"
-                className="w-24 h-24 md:w-28 md:h-28 rounded-2xl border-2 border-emerald-500/20 shadow-2xl object-cover" />
-            ) : (
-              <div className="w-24 h-24 md:w-28 md:h-28 rounded-2xl bg-emerald-500/15 border-2 border-emerald-500/20 flex items-center justify-center">
-                <User size={40} className="text-emerald-400" />
-              </div>
-            )}
-            <div className="absolute -bottom-1.5 -right-1.5 w-6 h-6 bg-emerald-500 rounded-lg flex items-center justify-center shadow-lg shadow-emerald-500/40">
-              <ShieldCheck size={13} className="text-white" />
-            </div>
-          </div>
-
-          {/* Info */}
-          <div className="relative z-10 flex-1 text-center md:text-left">
-            <div className="flex flex-wrap justify-center md:justify-start items-center gap-2 mb-3">
-              <span className="text-[10px] font-bold uppercase tracking-widest bg-emerald-500/15 text-emerald-400 px-3 py-1 rounded-full border border-emerald-500/20">
-                {t("profile.verified_farmer")}
-              </span>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-bento-text-muted px-3 py-1 rounded-full border flex items-center gap-1" style={{ background: 'var(--bg-input)', borderColor: 'var(--border-input)' }}>
-                <Globe size={9} /> {formData.preferredLanguage}
-              </span>
-            </div>
-            <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-bento-text-main mb-2">
-              {profile?.displayName || t("profile.guardian")}
-            </h1>
-            <p className="text-bento-text-muted font-medium flex items-center justify-center md:justify-start gap-2 text-sm">
-              <Mail size={14} className="text-emerald-400/60" />
-              {profile?.email}
-            </p>
-          </div>
-        </div>
-
-        {/* Stats */}
-        <div className="glass-panel rounded-[1.75rem] p-7 flex flex-col justify-between">
-          <h3 className="text-[10px] font-bold uppercase tracking-widest text-bento-text-muted mb-6">{t("profile.impact")}</h3>
-          <div className="space-y-5">
-            {[
-              { label: t("profile.mapped_plots"), value: stats.plots, icon: Layers, color: "emerald" },
-              { label: t("profile.health_audits"), value: stats.reports, icon: ShieldCheck, color: "indigo" },
-            ].map(stat => (
-              <div key={stat.label} className="flex items-center gap-4">
-                <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${stat.color === 'emerald' ? 'bg-emerald-500/12 text-emerald-400 border border-emerald-500/20' : 'bg-indigo-500/12 text-indigo-400 border border-indigo-500/20'}`}>
-                  <stat.icon size={20} />
-                </div>
-                <div>
-                  <p className="text-2xl font-extrabold text-bento-text-main">{stat.value}</p>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-bento-text-muted">{stat.label}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="mt-6 p-3.5 bg-emerald-500/5 border border-emerald-500/10 rounded-xl italic text-[11px] font-medium text-bento-text-muted leading-relaxed">
-            {t("profile.quote")}
-          </div>
-        </div>
+    <div className="max-w-6xl mx-auto px-1 pb-24 md:pb-12">
+      {/* Page Title & Subtitle */}
+      <div className="mb-6 md:mb-8 text-left">
+        <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-bento-text-main">
+          {t("profile.title")}
+        </h1>
+        <p className="text-xs md:text-sm font-semibold text-bento-text-muted mt-1 uppercase tracking-wider">
+          {t("profile.subtitle")}
+        </p>
       </div>
 
-      {/* Settings form */}
-      <form onSubmit={handleSave} className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* LEFT COLUMN: Identity & Impact Stats */}
+        <div className="lg:col-span-5 space-y-6">
+          {/* Identity card */}
+          <div className="rounded-[2rem] p-8 relative overflow-hidden flex flex-col items-center text-center bg-gradient-to-br from-[#061408] via-[#091b0c] to-[#0a200f] border border-emerald-500/18 shadow-2xl">
+            {/* Elegant glass blobs for depth */}
+            <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-500/10 rounded-full -mr-20 -mt-20 blur-3xl pointer-events-none" />
+            <div className="absolute bottom-0 left-0 w-36 h-36 bg-amber-500/5 rounded-full -ml-16 -mb-16 blur-2xl pointer-events-none" />
 
-        {/* Identity */}
-        <div className="glass-panel rounded-[1.75rem] p-7 md:p-9 flex flex-col">
-          <div className="flex items-center gap-3 mb-7">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center border" style={{ background: 'var(--bg-input)', borderColor: 'var(--border-input)' }}>
-              <User size={18} style={{ color: 'var(--text-muted)' }} />
-            </div>
-            <h2 className="text-lg font-bold" style={{ color: 'var(--text-main)' }}>{t("profile.settings")}</h2>
-          </div>
-
-          <div className="space-y-5 flex-1">
-            <div>
-              <label className="block text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--text-muted)' }}>{t("profile.display_name")}</label>
-              <input
-                type="text"
-                value={formData.displayName}
-                onChange={e => setFormData({ ...formData, displayName: e.target.value })}
-                className="w-full theme-input rounded-2xl px-5 py-3.5 font-semibold"
-                placeholder="Your display name…"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--text-muted)' }}>{t("profile.language")}</label>
-              <div className="relative">
-                <select
-                  value={formData.preferredLanguage}
-                  onChange={e => setFormData({ ...formData, preferredLanguage: e.target.value })}
-                  className="w-full theme-input rounded-2xl px-5 py-3.5 font-semibold appearance-none cursor-pointer"
-                >
-                  {languages.map(l => <option key={l} value={l}>{l}</option>)}
-                </select>
-                <Globe size={16} className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
-              </div>
-            </div>
-
-            {/* Appearance row */}
-            <div className="pt-4 border-t border-[var(--border-input)]">
-              <label className="block text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--text-muted)' }}>{t("profile.appearance")}</label>
-              <div className="flex items-center justify-between bg-[var(--bg-input)] border border-[var(--border-input)] rounded-2xl px-5 py-3.5">
-                <div className="flex items-center gap-2.5">
-                  <Palette size={16} className="text-emerald-400" />
-                  <span className="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>{t("profile.color_theme")}</span>
+            {/* Profile Avatar */}
+            <div className="relative mb-5">
+              {profile?.photoURL ? (
+                <img 
+                  src={profile.photoURL} 
+                  alt={profile.displayName} 
+                  referrerPolicy="no-referrer"
+                  className="w-24 h-24 md:w-28 md:h-28 rounded-[2rem] border-2 border-emerald-500/30 shadow-2xl object-cover" 
+                />
+              ) : (
+                <div className="w-24 h-24 md:w-28 md:h-28 rounded-[2rem] bg-emerald-500/15 border-2 border-emerald-500/30 flex items-center justify-center shadow-inner">
+                  <User size={42} className="text-emerald-400" />
                 </div>
-                <ThemeToggle variant="pill" />
+              )}
+              <div className="absolute -bottom-1 -right-1 w-8 h-8 bg-emerald-500 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/40 border-2 border-[#091b0c]">
+                <ShieldCheck size={16} className="text-white" />
               </div>
             </div>
+
+            {/* Profile Info */}
+            <div className="space-y-2.5 w-full">
+              <div className="flex justify-center items-center gap-2 flex-wrap">
+                <span className="text-[9px] font-black uppercase tracking-widest bg-emerald-500/15 text-emerald-400 px-3.5 py-1 rounded-full border border-emerald-500/25">
+                  {t("profile.verified_farmer")}
+                </span>
+                <span 
+                  className="text-[9px] font-black uppercase tracking-widest text-bento-text-muted px-3.5 py-1 rounded-full border flex items-center gap-1.5" 
+                  style={{ background: 'var(--bg-input)', borderColor: 'var(--border-input)' }}
+                >
+                  <Globe size={11} className="text-emerald-400" /> {formData.preferredLanguage}
+                </span>
+              </div>
+              <h2 className="text-2xl font-extrabold tracking-tight text-white">
+                {profile?.displayName || t("profile.guardian")}
+              </h2>
+              <p className="text-emerald-400/70 font-semibold flex items-center justify-center gap-2 text-xs truncate max-w-full">
+                <Mail size={13} className="shrink-0" />
+                {profile?.email}
+              </p>
+            </div>
           </div>
 
-          <div className="mt-8 pt-6 flex items-center gap-3 flex-wrap border-t" style={{ borderColor: 'var(--border-input)' }}>
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex-1 min-w-[180px] px-6 py-4 bg-emerald-500 hover:bg-emerald-400 text-white rounded-2xl font-bold transition-all flex items-center justify-center gap-2.5 shadow-xl shadow-emerald-500/20 hover:-translate-y-0.5 active:scale-95 disabled:opacity-50"
-            >
-              {loading ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-              {loading ? t("profile.saving") : t("profile.save")}
-            </button>
-
-            {success && (
-              <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-                className="flex items-center gap-2 text-emerald-400 font-bold text-xs uppercase tracking-widest bg-emerald-500/12 border border-emerald-500/20 px-5 py-4 rounded-2xl">
-                <ShieldCheck size={15} /> {t("profile.saved")}
-              </motion.div>
-            )}
+          {/* Stats & Quote */}
+          <div className="glass-panel rounded-[2rem] p-7 md:p-8 flex flex-col justify-between shadow-lg border border-[var(--border-card)]">
+            <div>
+              <h3 className="text-[10px] font-black uppercase tracking-widest text-bento-text-muted mb-6">
+                {t("profile.impact")}
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                {[
+                  { label: t("profile.mapped_plots"), value: stats.plots, icon: Layers, color: "emerald" },
+                  { label: t("profile.health_audits"), value: stats.reports, icon: ShieldCheck, color: "indigo" },
+                ].map(stat => (
+                  <div key={stat.label} className="p-4 rounded-2xl bg-[var(--bg-input)] border border-[var(--border-input)] flex flex-col items-start gap-2.5 transition-all hover:translate-y-[-2px]">
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+                      stat.color === 'emerald' 
+                        ? 'bg-emerald-500/12 text-emerald-400 border border-emerald-500/20' 
+                        : 'bg-indigo-500/12 text-indigo-400 border border-indigo-500/20'
+                    }`}>
+                      <stat.icon size={18} />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-extrabold text-bento-text-main leading-none mb-1">{stat.value}</p>
+                      <p className="text-[9px] font-black uppercase tracking-wider text-bento-text-muted leading-tight">{stat.label}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            <div className="mt-6 p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-2xl italic text-[11px] font-bold text-bento-text-muted leading-relaxed text-center">
+              "{t("profile.quote")}"
+            </div>
           </div>
         </div>
 
-        {/* Farm context */}
-        <div className="glass-panel rounded-[1.75rem] p-7 md:p-9 flex flex-col group">
-          <div className="flex items-center gap-3 mb-5">
-            <div className="w-9 h-9 bg-emerald-500/10 border border-emerald-500/18 rounded-xl flex items-center justify-center transition-transform group-hover:rotate-12">
-              <Sprout size={18} className="text-emerald-400" />
+        {/* RIGHT COLUMN: Redesigned Settings Panel */}
+        <form onSubmit={handleSave} className="lg:col-span-7 space-y-6">
+          <div className="glass-panel rounded-[2rem] p-7 md:p-9 shadow-lg border border-[var(--border-card)] relative">
+            <div className="flex items-center gap-3.5 mb-8">
+              <div className="w-10 h-10 rounded-2xl flex items-center justify-center border" style={{ background: 'var(--bg-input)', borderColor: 'var(--border-input)' }}>
+                <User size={20} className="text-emerald-400" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-bento-text-main">{t("profile.settings")}</h2>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-bento-text-muted">Configure Preferences</p>
+              </div>
             </div>
-            <h2 className="text-lg font-bold" style={{ color: 'var(--text-main)' }}>{t("profile.farm_context")}</h2>
-          </div>
-          <p className="text-sm font-medium mb-5 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-            {t("profile.farm_context_desc")}
-          </p>
 
-          <div className="relative flex-1">
-            <div className="absolute top-4 left-5 text-emerald-500/10 pointer-events-none">
-              <Wind size={56} />
+            <div className="space-y-6">
+              {/* Display Name Input */}
+              <div className="space-y-2">
+                <label className="block text-[10px] font-black uppercase tracking-widest text-bento-text-muted">
+                  {t("profile.display_name")}
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={formData.displayName}
+                    onChange={e => setFormData({ ...formData, displayName: e.target.value })}
+                    className="w-full theme-input rounded-2xl px-5 py-4 font-bold text-sm tracking-wide bg-[var(--bg-input)] border border-[var(--border-input)] text-bento-text-main focus:outline-none focus:ring-2 focus:ring-emerald-500/30 transition-all"
+                    placeholder="Enter display name…"
+                  />
+                </div>
+              </div>
+
+              {/* Language Dropdown Select */}
+              <div className="space-y-2">
+                <label className="block text-[10px] font-black uppercase tracking-widest text-bento-text-muted">
+                  {t("profile.language")}
+                </label>
+                <div className="relative">
+                  <select
+                    value={formData.preferredLanguage}
+                    onChange={e => setFormData({ ...formData, preferredLanguage: e.target.value })}
+                    className="w-full theme-input rounded-2xl px-5 py-4 font-bold text-sm bg-[var(--bg-input)] border border-[var(--border-input)] text-bento-text-main appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500/30 transition-all"
+                  >
+                    {languages.map(l => (
+                      <option key={l} value={l} className="bg-[var(--bg-surface)] text-bento-text-main font-bold">
+                        {l}
+                      </option>
+                    ))}
+                  </select>
+                  <Globe size={18} className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-bento-text-muted" />
+                </div>
+              </div>
+
+              {/* Theme / Appearance Preferences */}
+              <div className="pt-5 border-t border-[var(--border-input)]">
+                <label className="block text-[10px] font-black uppercase tracking-widest text-bento-text-muted mb-3.5">
+                  {t("profile.appearance")}
+                </label>
+                <div className="flex items-center justify-between bg-[var(--bg-input)] border border-[var(--border-input)] rounded-2xl px-5 py-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 border border-emerald-500/20">
+                      <Palette size={16} />
+                    </div>
+                    <span className="text-sm font-bold text-bento-text-main">
+                      {t("profile.color_theme")}
+                    </span>
+                  </div>
+                  <ThemeToggle variant="pill" />
+                </div>
+              </div>
             </div>
-            <textarea
-              rows={9}
-              value={formData.farmDetails}
-              onChange={e => setFormData({ ...formData, farmDetails: e.target.value })}
-              placeholder="Describe your soil (Sandy, Clay, Loamy), typical climate (Arid, Tropical), terrain, and any existing crops…"
-              className="relative z-10 w-full theme-input rounded-2xl px-6 py-5 resize-none font-medium leading-relaxed transition-all h-full focus:border-emerald-500/30"
-            />
-          </div>
 
-          <button
-            type="button"
-            onClick={() => logout()}
-            className="mt-6 w-full px-6 py-4 font-semibold hover:text-rose-400 hover:bg-rose-500/8 border border-transparent hover:border-rose-500/15 rounded-2xl transition-all flex items-center justify-center gap-2 text-sm"
-            style={{ color: 'var(--text-muted)' }}
-          >
-            <LogOut size={16} /> {t("profile.sign_out")}
-          </button>
-        </div>
-      </form>
+            {/* Actions: Save Changes & Sign Out */}
+            <div className="mt-8 pt-7 border-t border-[var(--border-input)] flex flex-col sm:flex-row gap-4 items-center justify-between">
+              {/* Save Button & Success alert */}
+              <div className="flex items-center gap-3 w-full sm:w-auto flex-wrap">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full sm:w-auto min-w-[170px] px-7 py-4 bg-emerald-500 hover:bg-emerald-400 text-white rounded-2xl font-black transition-all flex items-center justify-center gap-2.5 shadow-xl shadow-emerald-500/20 hover:-translate-y-0.5 active:scale-95 disabled:opacity-50 cursor-pointer text-sm tracking-wide uppercase"
+                >
+                  {loading ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                  {loading ? t("profile.saving") : t("profile.save")}
+                </button>
+
+                <AnimatePresence>
+                  {success && (
+                    <motion.div 
+                      initial={{ scale: 0.9, opacity: 0 }} 
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0.9, opacity: 0 }}
+                      className="flex items-center gap-2 text-emerald-400 font-bold text-xs uppercase tracking-widest bg-emerald-500/12 border border-emerald-500/20 px-5 py-4 rounded-2xl"
+                    >
+                      <ShieldCheck size={16} /> {t("profile.saved")}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* Premium Sign Out Button */}
+              <button
+                type="button"
+                onClick={() => logout()}
+                className="w-full sm:w-auto px-6 py-4 font-bold text-rose-500 hover:text-white bg-rose-500/8 hover:bg-rose-500 border border-rose-500/20 hover:border-transparent rounded-2xl transition-all duration-300 flex items-center justify-center gap-2 text-xs tracking-wider uppercase cursor-pointer"
+              >
+                <LogOut size={15} /> 
+                {t("profile.sign_out")}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
