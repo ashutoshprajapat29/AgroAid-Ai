@@ -31,6 +31,7 @@ export default defineConfig(({mode}) => {
           ]
         },
         workbox: {
+          navigateFallbackDenylist: [/^\/__/],
           runtimeCaching: [
             {
               urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
