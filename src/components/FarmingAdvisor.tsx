@@ -67,6 +67,16 @@ export default function FarmingAdvisor({
   const [loading, setLoading] = useState(false);
   const [fields, setFields] = useState<Field[]>([]);
   const [soilReports, setSoilReports] = useState<SoilReport[]>([]);
+  const fieldsRef = useRef<Field[]>([]);
+  const soilReportsRef = useRef<SoilReport[]>([]);
+
+  useEffect(() => {
+    fieldsRef.current = fields;
+  }, [fields]);
+
+  useEffect(() => {
+    soilReportsRef.current = soilReports;
+  }, [soilReports]);
   // fieldId is now driven by parent prop; internal state for reset flow only
   const selectedFieldId = propFieldId || "";
   const [isSpeaking, setIsSpeaking] = useState<number | null>(null);
@@ -358,10 +368,10 @@ export default function FarmingAdvisor({
       recognitionRef.current?.stop();
     }
 
-    const userQuery = input || (selectedImages.length > 0 ? "Analyze these images for me." : "");
+    const userQuery = queryText || (selectedImages.length > 0 ? "Analyze these images for me." : "");
     const currentImages = [...selectedImages];
-    const selectedField = fields.find(f => f.id === selectedFieldId);
-    const relatedNotes = soilReports.filter(r => r.fieldId === selectedFieldId).sort((a, b) => new Date(b.testDate).getTime() - new Date(a.testDate).getTime());
+    const selectedField = fieldsRef.current.find(f => f.id === selectedFieldId);
+    const relatedNotes = soilReportsRef.current.filter(r => (r.fieldId || null) === (selectedFieldId || null)).sort((a, b) => new Date(b.testDate).getTime() - new Date(a.testDate).getTime());
     const latestSoilReport = relatedNotes.length > 0 ? relatedNotes[0] : undefined;
 
     const currentFieldIdForChat = selectedFieldId || 'default';
@@ -415,7 +425,8 @@ export default function FarmingAdvisor({
       // 2. Extract and Sync Farm data in background
       (async () => {
         try {
-          const { fieldUpdates, soilUpdates, newTasks } = await extractFarmUpdates(userQuery, responseText, selectedField);
+          const currentField = fieldsRef.current.find(f => f.id === selectedFieldId);
+          const { fieldUpdates, soilUpdates, newTasks } = await extractFarmUpdates(userQuery, responseText, currentField);
 
           if (newTasks && newTasks.length > 0) {
             for (const task of newTasks) {
@@ -458,7 +469,7 @@ export default function FarmingAdvisor({
             const syncKey = JSON.stringify({ ...soilUpdates, fieldId: selectedFieldId || 'none' });
             if (lastSoilSyncRef.current !== syncKey) {
               const targetFieldId = selectedFieldId || null;
-              const existingReport = soilReports.find(r => r.fieldId === targetFieldId);
+              const existingReport = soilReportsRef.current.find(r => (r.fieldId || null) === targetFieldId);
 
               if (existingReport) {
                 const soilReportPath = `users/${user.uid}/soil_reports/${existingReport.id}`;
