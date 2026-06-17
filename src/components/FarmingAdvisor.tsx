@@ -52,11 +52,27 @@ export default function FarmingAdvisor({
   onQueryClear?: () => void;
 }) {
   const { user, profile } = useAuth();
-  const { t } = useLanguage();
+  const { t, isHindi } = useLanguage();
   const defaultMessage: Message = useMemo(() => ({
     role: 'bot' as const,
     content: t("advisor.default_greeting")
   }), [t]);
+
+  const suggestionChips = useMemo(() => isHindi ? [
+    { text: "🌾 गेहूँ की देखभाल", prompt: "गेहूँ की फसल की उपज बढ़ाने के लिए शीर्ष सुझाव क्या हैं?" },
+    { text: "🍅 टमाटर के रोग", prompt: "टमाटर के पौधों में लगने वाले मुख्य रोग और उनके उपचार क्या हैं?" },
+    { text: "💧 सिंचाई की योजना", prompt: "गर्मियों में फसलों के लिए सही सिंचाई कार्यक्रम क्या होना चाहिए?" },
+    { text: "🧪 मिट्टी की उर्वरता", prompt: "मिट्टी का स्वास्थ्य और यूरिया का उपयोग कैसे संतुलित करें?" },
+    { text: "📊 मंडी का भाव", prompt: "मेरी स्थानीय मंडी में आज प्रमुख फसलों के भाव क्या चल रहे हैं?" },
+    { text: "🪱 जैविक कीटनाशक", prompt: "घर पर जैविक कीटनाशक (नीम का तेल आदि) कैसे तैयार करें?" }
+  ] : [
+    { text: "🌾 Wheat Care", prompt: "What are the top tips to increase wheat crop yield?" },
+    { text: "🍅 Tomato Diseases", prompt: "What are the common tomato plant diseases and how to treat them?" },
+    { text: "💧 Irrigation Plan", prompt: "What is the best irrigation schedule for crops during dry season?" },
+    { text: "🧪 Soil Fertility", prompt: "How do I check and improve my soil health and NPK balance?" },
+    { text: "📊 Mandi Rates", prompt: "What are the current crop prices in my local mandi?" },
+    { text: "🪱 Organic Pesticide", prompt: "How do I make organic pesticides at home using neem or other ingredients?" }
+  ], [isHindi]);
 
   const [chatHistories, setChatHistories] = useState<Record<string, Message[]>>({
     'default': [defaultMessage]
@@ -660,7 +676,7 @@ export default function FarmingAdvisor({
               </button>
 
               <button
-                onClick={() => setInput("What should I do on my farm today?")}
+                onClick={() => handleSend(t("advisor.daily_query"))}
                 className="action-card primary animate-in fade-in zoom-in duration-300 delay-75 p-2 md:p-4"
               >
                 <div className="action-card-icon w-8 h-8 md:w-12 md:h-12">
@@ -671,7 +687,7 @@ export default function FarmingAdvisor({
               </button>
 
               <button
-                onClick={() => setInput("How is the soil health for my current crops?")}
+                onClick={() => handleSend(t("advisor.soil_query"))}
                 className="action-card warning animate-in fade-in zoom-in duration-300 delay-150 p-2 md:p-4"
               >
                 <div className="action-card-icon w-8 h-8 md:w-12 md:h-12">
@@ -682,7 +698,7 @@ export default function FarmingAdvisor({
               </button>
 
               <button
-                onClick={() => setInput("How to improve my crop yield using local resources?")}
+                onClick={() => handleSend(t("advisor.yield_query"))}
                 className="action-card danger animate-in fade-in zoom-in duration-300 delay-200 p-2 md:p-4"
               >
                 <div className="action-card-icon w-8 h-8 md:w-12 md:h-12">
@@ -777,6 +793,19 @@ export default function FarmingAdvisor({
             </div>
           </div>
         )}
+
+        {/* Suggestion Chips */}
+        <div className="flex gap-2 overflow-x-auto py-1 scrollbar-hide shrink-0">
+          {suggestionChips.map((chip, idx) => (
+            <button
+              key={idx}
+              onClick={() => handleSend(chip.prompt)}
+              className="px-3 py-1.5 rounded-xl text-[11px] font-bold whitespace-nowrap bg-[var(--bg-input)] border border-[var(--border-input)] text-bento-text-muted hover:text-emerald-400 hover:border-emerald-500/25 active:scale-95 transition-all duration-300 cursor-pointer shrink-0"
+            >
+              {chip.text}
+            </button>
+          ))}
+        </div>
 
         <div className="flex gap-1.5 md:gap-2 items-center">
           <input
