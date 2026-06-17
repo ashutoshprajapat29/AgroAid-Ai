@@ -20,6 +20,15 @@ export default function Profile() {
   const [stats, setStats] = useState({ plots: 0, reports: 0 });
 
   useEffect(() => {
+    if (profile) {
+      setFormData({
+        displayName: profile.displayName || "",
+        preferredLanguage: profile.preferredLanguage || "English"
+      });
+    }
+  }, [profile]);
+
+  useEffect(() => {
     async function fetchStats() {
       if (!user) return;
       try {
@@ -33,7 +42,7 @@ export default function Profile() {
     fetchStats();
   }, [user]);
 
-  const languages = ["English", "Hindi", "Punjabi", "Marathi", "Tamil", "Telugu", "Kannada", "Bengali", "Gujarati"];
+  const languages = ["English", "Hindi"];
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
