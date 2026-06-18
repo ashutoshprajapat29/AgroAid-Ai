@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { getFarmingAdvice, analyzeFarmingImage, getTTSAudio, extractFarmUpdates } from "../services/gemini";
+import { getFarmingAdvice, analyzeFarmingImage, extractFarmUpdates } from "../services/gemini";
 import { useAuth } from "../lib/AuthContext";
 import { motion, AnimatePresence } from "motion/react";
 import {

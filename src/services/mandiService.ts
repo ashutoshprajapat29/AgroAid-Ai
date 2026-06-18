@@ -6,7 +6,7 @@
  * RSS feeds for real news. Gemini AI only for sentiment classification.
  */
 
-import { GoogleGenAI } from "@google/genai";
+
 import { cachedApiCall, cachedGeminiCall, cacheGet, cacheSet, TTL } from "../lib/apiCache";
 import { supabase, isSupabaseConfigured } from "../lib/supabase";
 
@@ -75,19 +75,7 @@ function timeRangeToDays(range: TimeRange): number {
   }
 }
 
-// ─── Gemini client (only for sentiment + news classification) ─────────────────
-const GEN_AI_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const GEN_AI_KEY2 = import.meta.env.VITE_GEMINI_API_KEY2;
-const ai = new GoogleGenAI({ apiKey: GEN_AI_KEY ?? GEN_AI_KEY2 ?? "" });
 
-async function geminiGenerate(prompt: string): Promise<string> {
-  const resp = await ai.models.generateContent({
-    model: "gemini-2.5-flash-lite",
-    contents: [{ parts: [{ text: prompt }] }],
-    config: { responseMimeType: "application/json" },
-  });
-  return resp.text ?? "[]";
-}
 
 // ─── Helper: Format commodity name ────────────────────────────────────────────
 function formatName(s: string): string {
@@ -479,13 +467,13 @@ export async function fetchMarketNews(language = "English"): Promise<NewsItem[]>
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// SENTIMENT (Gemini — user-triggered, unchanged)
+// SENTIMENT (via Cloud Function — server-side Gemini)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export async function fetchMarketSentiment(
   commodity: string,
-  priceHistory: PriceHistory[],
-  news: NewsItem[],
+  _priceHistory: PriceHistory[],
+  _news: NewsItem[],
   language = "English"
 ): Promise<SentimentResult> {
   const cacheKey = `sentiment_${commodity}_${language}`.replace(/\s+/g, "_").toLowerCase();
@@ -505,28 +493,24 @@ export async function fetchMarketSentiment(
     cacheKey,
     TTL.SENTIMENT,
     async () => {
-      const historyStr = priceHistory.length > 0
-        ? priceHistory.slice(-10).map((p) => `${p.date}: ₹${p.modal_price}`).join(", ")
-        : "No historical data";
-      const newsStr = news.length > 0
-        ? news.map((n) => `[${n.sentiment}] ${n.title}`).join("; ")
-        : "No specific news";
-      const langNote = language === "Hindi"
-        ? "Respond entirely in Hindi (Devanagari script)."
-        : "Respond in English.";
+      // Call the server-side getMarketSentiment Cloud Function
+      // which fetches price history and news on the server, then calls Gemini
+      const sentimentFn = httpsCallable<
+        { commodity: string; state: string; district?: string },
+        { sentiment: string; confidence: number; why: string; action: string }
+      >(functions, "getMarketSentiment");
 
-      const prompt = `You are an expert Indian agricultural commodity analyst.
-Context:
-- Commodity: ${commodity}
-- Recent Price History (last 10 days): ${historyStr}
-- Recent Market News: ${newsStr}
+      // Get current state/district from localStorage (set by MarketDashboard)
+      const state = localStorage.getItem("farmguide_state") || "Madhya Pradesh";
+      const district = localStorage.getItem("farmguide_district") || "Ratlam";
 
-${langNote}
-Analyze and return ONLY valid JSON:
-{ "sentiment": "Bullish"|"Bearish"|"Stable", "confidence": <0-100>, "why": "<3 plain sentences>", "action": "<1 farmer advice sentence>" }`;
-
-      const raw = await geminiGenerate(prompt);
-      return JSON.parse(raw) as SentimentResult;
+      const result = await sentimentFn({ commodity, state, district });
+      return {
+        sentiment: (result.data.sentiment as SentimentResult["sentiment"]) || "Stable",
+        confidence: result.data.confidence || 50,
+        why: result.data.why || fallback.why,
+        action: result.data.action || fallback.action,
+      };
     },
     fallback
   );

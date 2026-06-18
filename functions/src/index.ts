@@ -495,3 +495,291 @@ Return valid JSON: { "sentiment": "Bullish"|"Bearish"|"Stable", "confidence": nu
       };
     }
   });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HELPER: Advanced Gemini REST API call (system instructions, images, history)
+// ─────────────────────────────────────────────────────────────────────────────
+interface GeminiAdvancedOptions {
+  systemInstruction?: string;
+  contents: unknown[];
+  jsonMode?: boolean;
+  responseSchema?: unknown;
+  timeout?: number;
+}
+
+async function callGeminiAdvanced(opts: GeminiAdvancedOptions): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY not set in function environment");
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`;
+
+  const body: Record<string, unknown> = { contents: opts.contents };
+
+  if (opts.systemInstruction) {
+    body.systemInstruction = { parts: [{ text: opts.systemInstruction }] };
+  }
+
+  const genConfig: Record<string, unknown> = {};
+  if (opts.jsonMode) genConfig.responseMimeType = "application/json";
+  if (opts.responseSchema) genConfig.responseSchema = opts.responseSchema;
+  if (Object.keys(genConfig).length > 0) body.generationConfig = genConfig;
+
+  const res = await axios.post(url, body, { timeout: opts.timeout || 30000 });
+  return res.data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HELPER: Build farm context string from field/soil data
+// ─────────────────────────────────────────────────────────────────────────────
+function buildFarmContext(farmDetails?: string, fieldContext?: any, latestSoilReport?: any): string {
+  let ctx = farmDetails ? `General farm context: ${farmDetails}\n` : "";
+
+  if (fieldContext) {
+    ctx += `Specific Plot/Field Context:
+    - Name: ${fieldContext.name || "N/A"}
+    - Area: ${fieldContext.area || "N/A"} ${fieldContext.unit || ""}
+    - Soil Type: ${fieldContext.soilType || "N/A"}
+    - Location: ${fieldContext.location || "N/A"}
+    - Land Description: ${fieldContext.description || "N/A"}
+    - Current Crop: ${fieldContext.currentCrop || "None recorded"}
+    - Variety: ${fieldContext.variety || "N/A"}
+    - Planting Date: ${fieldContext.plantingDate || "N/A"}
+    - Previous Sprays: ${fieldContext.previousSprays || "None recorded"}
+    - Irrigation Schedule: ${fieldContext.irrigationTimings || "None recorded"}
+    - Other Details: ${fieldContext.otherDetails || "None"}\n`;
+  }
+
+  if (latestSoilReport) {
+    ctx += `Latest Soil Report for this Plot:
+    - Date: ${latestSoilReport.testDate || "N/A"}
+    - pH: ${latestSoilReport.ph || "N/A"}
+    - Nitrogen (N): ${latestSoilReport.nitrogen || "N/A"}
+    - Phosphorus (P): ${latestSoilReport.phosphorus || "N/A"}
+    - Potassium (K): ${latestSoilReport.potassium || "N/A"}
+    - Organic Carbon: ${latestSoilReport.organicCarbon || "N/A"}
+    - Notes: ${latestSoilReport.otherNotes || "N/A"}\n`;
+  }
+
+  return ctx;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FUNCTION 4: Farming Advice Proxy (authenticated, server-side Gemini)
+// ─────────────────────────────────────────────────────────────────────────────
+export const getFarmingAdviceProxy = functions
+  .runWith({ timeoutSeconds: 60, memory: "256MB" })
+  .https.onCall(async (data: any, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "Authentication required");
+    }
+
+    const { query, farmDetails, history, preferredLanguage = "English", fieldContext, latestSoilReport } = data;
+
+    if (!query || typeof query !== "string") {
+      throw new functions.https.HttpsError("invalid-argument", "query is required");
+    }
+    if (query.length > 10000) {
+      throw new functions.https.HttpsError("invalid-argument", "query too long (max 10000 chars)");
+    }
+
+    const contextStr = buildFarmContext(farmDetails, fieldContext, latestSoilReport);
+
+    const systemInstruction = `You are a professional, helpful agronomist and farming AI advisor.
+  - CURRENT DATE: Today is ${new Date().toLocaleDateString("en-GB", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}. Use this date to give seasonal and timely advice.
+  - CONTEXT USAGE: You are provided with "Specific Plot Context" and "Latest Soil Report". Use this context ONLY when it is directly relevant to answering the user's specific question. Do NOT provide a full action plan unless they ask for one or ask a question that requires it.
+  - STYLE: Concise, clear, easy to read. Use bullet points when listing steps or providing actionable advice.
+  - CONTENT: When giving specific agricultural advice, you may suggest fertilizers/sprays with brand names, and prioritize soil health.
+  - INTERACTIVE: Keep responses focused. End with a short, relevant follow-up question.
+  - LANGUAGE: Respond strictly in ${preferredLanguage}.
+  - SCOPE: Politely redirect non-farming queries to farming topics.
+  
+  ${contextStr ? `--- Farmer Context ---\n${contextStr}\n----------------------` : ""}`;
+
+    const historyToSend = (history || []).slice(-6);
+    const contents = [...historyToSend, { role: "user", parts: [{ text: query }] }];
+
+    try {
+      const text = await callGeminiAdvanced({ systemInstruction, contents, timeout: 25000 });
+      return { text: text || "I'm sorry, I couldn't generate a response at the moment. Please try again later." };
+    } catch (err: any) {
+      functions.logger.error("getFarmingAdviceProxy failed:", err.message);
+      return { text: "The AI advisor is taking longer than usual. Please check your internet connection or try a shorter question." };
+    }
+  });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FUNCTION 5: Image Analysis Proxy (authenticated, server-side Gemini vision)
+// ─────────────────────────────────────────────────────────────────────────────
+export const analyzeFarmingImageProxy = functions
+  .runWith({ timeoutSeconds: 90, memory: "512MB" })
+  .https.onCall(async (data: any, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "Authentication required");
+    }
+
+    const { images, userQuery, farmDetails, preferredLanguage = "English", fieldContext, latestSoilReport } = data;
+
+    if (!images || !Array.isArray(images) || images.length === 0) {
+      throw new functions.https.HttpsError("invalid-argument", "At least one image is required");
+    }
+    if (images.length > 4) {
+      throw new functions.https.HttpsError("invalid-argument", "Maximum 4 images allowed");
+    }
+
+    const contextStr = buildFarmContext(farmDetails, fieldContext, latestSoilReport);
+
+    const systemInstruction = `Professional agronomist advisor. Direct, high-precision, supportive.
+  - STYLE: Precise, immediate action-based, bullet points.
+  - INTERACTIVE: Mandatory short follow-up question.
+  - TASK: Analyze images + query + context to provide actionable advice.
+  - LANGUAGE: ${preferredLanguage}.
+  ${contextStr ? `Farmer Context:\n${contextStr}` : ""}`;
+
+    const imageParts = images.map((img: any) => ({
+      inlineData: { mimeType: img.mimeType, data: img.data },
+    }));
+
+    const contents = [{ role: "user", parts: [...imageParts, { text: userQuery || "Analyze these images." }] }];
+
+    try {
+      const text = await callGeminiAdvanced({ systemInstruction, contents, timeout: 35000 });
+      return { text: text || "I was unable to analyze the images. Please check if they are clear and try again." };
+    } catch (err: any) {
+      functions.logger.error("analyzeFarmingImageProxy failed:", err.message);
+      return { text: "Image analysis is taking unusually long. Please try again with fewer or smaller images." };
+    }
+  });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FUNCTION 6: Plant Disease Detection Proxy (authenticated, server-side)
+// ─────────────────────────────────────────────────────────────────────────────
+export const detectPlantDiseaseProxy = functions
+  .runWith({ timeoutSeconds: 60, memory: "512MB" })
+  .https.onCall(async (data: any, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "Authentication required");
+    }
+
+    const { base64Image, mimeType, language = "English" } = data;
+
+    if (!base64Image || typeof base64Image !== "string") {
+      throw new functions.https.HttpsError("invalid-argument", "base64Image is required");
+    }
+    if (!mimeType || typeof mimeType !== "string") {
+      throw new functions.https.HttpsError("invalid-argument", "mimeType is required");
+    }
+
+    const prompt = `Identify the plant and check for diseases. Be supportive and direct. If diseased, name it, cause, and immediate treatment. If healthy, skip explanations and give one growth tip. Use bullet points. End by asking if the user has noticed this on other parts of the plant or in other plots. Respond strictly in ${language}.`;
+
+    const contents = [{
+      role: "user",
+      parts: [
+        { inlineData: { mimeType, data: base64Image } },
+        { text: prompt },
+      ],
+    }];
+
+    try {
+      const text = await callGeminiAdvanced({ contents, timeout: 30000 });
+      return { text: text || "I was unable to detect any disease. Please check the image quality." };
+    } catch (err: any) {
+      functions.logger.error("detectPlantDiseaseProxy failed:", err.message);
+      throw new functions.https.HttpsError("internal", "Disease detection failed. Please try again.");
+    }
+  });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FUNCTION 7: Extract Farm Updates Proxy (authenticated, server-side JSON)
+// ─────────────────────────────────────────────────────────────────────────────
+export const extractFarmUpdatesProxy = functions
+  .runWith({ timeoutSeconds: 60, memory: "256MB" })
+  .https.onCall(async (data: any, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "Authentication required");
+    }
+
+    const { userQuery, botResponse, currentFieldData } = data;
+
+    if (!userQuery || !botResponse) {
+      return { fieldUpdates: {}, soilUpdates: {}, newTasks: [] };
+    }
+
+    const trimmedFieldData = currentFieldData ? {
+      name: currentFieldData.name,
+      currentCrop: currentFieldData.currentCrop,
+      variety: currentFieldData.variety,
+      plantingDate: currentFieldData.plantingDate,
+      previousSprays: currentFieldData.previousSprays,
+      irrigationTimings: currentFieldData.irrigationTimings,
+      otherDetails: currentFieldData.otherDetails,
+    } : {};
+
+    const prompt = `
+    Analyze the following conversation between a farmer and an AI advisor.
+    Extract any relevant technical updates for the farm plot (field) record AND any NEW soil test metrics.
+    
+    CURRENT DATE: ${new Date().toISOString().split("T")[0]} (Use this exact date when tasks are 'immediate' or 'today')
+    Current Field Data (if any): ${JSON.stringify(trimmedFieldData)}
+    
+    Farmer: ${userQuery}
+    AI Advisor: ${botResponse}
+    
+    Return a single JSON object with THREE keys: "fieldUpdates", "soilUpdates", and "newTasks".
+    
+    For "fieldUpdates", extract any of these if they have NEW/UPDATED info compared to Current Field Data:
+    - currentCrop (string)
+    - variety (string)
+    - plantingDate (string YYYY-MM-DD)
+    - previousSprays (string - append chronologically)
+    - irrigationTimings (string)
+    - otherDetails (string)
+    
+    For "soilUpdates", extract these ONLY if NEW metrics are introduced/confirmed in this exact exchange:
+    - ph (number - NEVER hallucinate, only extract if seen in text, e.g. "pH is 6.5")
+    - nitrogen (number)
+    - phosphorus (number)
+    - potassium (number)
+    - organicCarbon (number)
+    - otherNotes (string)
+    - testDate (ISO string)
+    
+    For "newTasks", extract any actionable recommendations the AI gave that should be scheduled as a task/reminder.
+    Return an array of objects. Each object must have:
+    - title (string)
+    - description (string)
+    - type ("irrigation", "fertilizer", "follow-up", "monitoring", "harvest", "other")
+    - dueDate (string YYYY-MM-DD, estimate based on AI advice, use current date if immediate)
+    
+    If nothing relevant is found for fields, leave "fieldUpdates": {}.
+    If nothing relevant is found for soil, leave "soilUpdates": {}.
+    If no new tasks are found, leave "newTasks": [].
+    Return ONLY a valid JSON object.`;
+
+    try {
+      const raw = await callGeminiAdvanced({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        jsonMode: true,
+        timeout: 25000,
+      });
+
+      const parsed = JSON.parse(raw || "{}");
+
+      // Ensure numbers for soil are correctly typed
+      if (parsed.soilUpdates) {
+        for (const key of ["ph", "nitrogen", "phosphorus", "potassium", "organicCarbon"]) {
+          if (parsed.soilUpdates[key] !== undefined && parsed.soilUpdates[key] !== null) {
+            parsed.soilUpdates[key] = Number(parsed.soilUpdates[key]);
+          }
+        }
+      }
+
+      return {
+        fieldUpdates: parsed.fieldUpdates || {},
+        soilUpdates: parsed.soilUpdates || {},
+        newTasks: parsed.newTasks || [],
+      };
+    } catch (err: any) {
+      functions.logger.warn("extractFarmUpdatesProxy failed:", err.message);
+      return { fieldUpdates: {}, soilUpdates: {}, newTasks: [] };
+    }
+  });
