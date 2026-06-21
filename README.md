@@ -34,12 +34,31 @@
     ```
 
 2.  **Environment Variables:**
-    Create a `.env` file in the root directory and configure the following variables:
+    Create a `.env` file in the root directory and configure the following variables (see `.env.example` for reference):
     ```env
-    VITE_GEMINI_API_KEY="your_gemini_api_key"
-    VITE_GEMINI_API_KEY2="your_fallback_gemini_api_key"
-    VITE_SUPABASE_URL="your_supabase_project_url"
-    VITE_SUPABASE_ANON_KEY="your_supabase_anon_key"
+    # Firebase Config
+    VITE_FIREBASE_API_KEY="your-firebase-api-key"
+    VITE_FIREBASE_AUTH_DOMAIN="your-project.firebaseapp.com"
+    VITE_FIREBASE_PROJECT_ID="your-project-id"
+    VITE_FIREBASE_STORAGE_BUCKET="your-project.firebasestorage.app"
+    VITE_FIREBASE_MESSAGING_SENDER_ID="000000000000"
+    VITE_FIREBASE_APP_ID="1:000000000000:web:0000000000000000"
+    VITE_FIREBASE_MEASUREMENT_ID="G-XXXXXXXXXX"
+
+    # Firebase Cloud Messaging (VAPID key for push notifications)
+    VITE_FIREBASE_VAPID_KEY="your-vapid-key"
+
+    # Supabase (for mandi market data)
+    VITE_SUPABASE_URL="https://your-project.supabase.co"
+    VITE_SUPABASE_ANON_KEY="your-supabase-anon-key"
+    ```
+
+    *Note: Backend secrets (like Gemini API keys and Supabase Service Role key) are handled securely by Firebase Cloud Functions. Create a `.env` file inside the `functions/` directory with:*
+    ```env
+    GEMINI_API_KEY="your_gemini_api_key"
+    DATA_GOV_API_KEY="your_data_gov_api_key"
+    SUPABASE_URL="your_supabase_project_url"
+    SUPABASE_SERVICE_ROLE_KEY="your_supabase_service_role_key"
     ```
 
 3.  **Start the Development Server:**
