@@ -13,35 +13,21 @@ export interface FirestoreErrorInfo {
   error: string;
   operationType: OperationType;
   path: string | null;
-  authInfo: {
-    userId?: string | null;
-    email?: string | null;
-    emailVerified?: boolean | null;
-    isAnonymous?: boolean | null;
-    tenantId?: string | null;
-    providerInfo?: {
-      providerId?: string | null;
-      email?: string | null;
-    }[];
-  }
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  // Log only non-PII data: operation type, path, and sanitized error message.
+  // Never log userId, email, or any user-identifiable information to the console.
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
-    authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-      tenantId: auth.currentUser?.tenantId,
-      providerInfo: auth.currentUser?.providerData?.map(provider => ({
-        providerId: provider.providerId,
-        email: provider.email,
-      })) || []
-    },
     operationType,
-    path
+    path,
+  };
+
+  // Only log auth status (not identity) in development
+  if (import.meta.env.DEV) {
+    console.error('Firestore Error:', JSON.stringify(errInfo), '| Authenticated:', !!auth.currentUser);
+  } else {
+    console.error('Firestore Error:', errInfo.operationType, errInfo.path);
   }
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
 }

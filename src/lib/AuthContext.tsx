@@ -100,14 +100,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       provider.setCustomParameters({ prompt: 'select_account' });
       await signInWithPopup(auth, provider);
     } catch (error: any) {
-      console.error("Auth Error:", error);
+      console.error("Auth Error:", error.code);
       if (error.code === 'auth/popup-blocked') {
         alert("The sign-in popup was blocked by your browser. Please allow popups for this site or try opening the app in a new tab.");
       } else if (error.code === 'auth/cancelled-popup-request') {
-        // This is often a harmless race condition in iframes, but we can log it
+        // Harmless race condition in iframes
         console.warn("Sign-in popup was closed or cancelled.");
       } else {
-        alert(`Authentication failed: ${error.message}`);
+        // User-friendly error messages — never expose raw error.message
+        const USER_FRIENDLY_ERRORS: Record<string, string> = {
+          'auth/user-disabled': 'Your account has been disabled. Please contact support.',
+          'auth/network-request-failed': 'Network error. Please check your connection and try again.',
+          'auth/too-many-requests': 'Too many sign-in attempts. Please wait a few minutes and try again.',
+          'auth/popup-closed-by-user': 'Sign-in was cancelled. Please try again.',
+          'auth/account-exists-with-different-credential': 'An account already exists with this email using a different sign-in method.',
+          'auth/invalid-credential': 'Invalid credentials. Please try again.',
+        };
+        alert(USER_FRIENDLY_ERRORS[error.code] || 'Sign-in failed. Please try again.');
       }
     } finally {
       setSigningIn(false);

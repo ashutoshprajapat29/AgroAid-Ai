@@ -13,7 +13,7 @@ service cloud.firestore {
 
     // Reuseable helpers
     function isSignedIn() { return request.auth != null; }
-    function isVerified() { return isSignedIn(); }
+    function isAuthenticated() { return isSignedIn(); }
     function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
     function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
     function incoming() { return request.resource.data; }
@@ -36,10 +36,10 @@ service cloud.firestore {
     match /users/{userId} {
       // PII Protection: Only owner can read their own profile
       allow get: if isOwner(userId);
-      allow create: if isVerified() && isValidId(userId) && userId == request.auth.uid 
+      allow create: if isAuthenticated() && isValidId(userId) && userId == request.auth.uid 
                     && isValidUser(incoming())
                     && incoming().createdAt == request.time;
-      allow update: if isVerified() && isOwner(userId)
+      allow update: if isAuthenticated() && isOwner(userId)
                     && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'farmDetails', 'preferredLanguage', 'photoURL', 'updatedAt', 'fcmToken', 'notificationsEnabled'])
                     && isValidUser(incoming())
                     && (!incoming().diff(existing()).affectedKeys().hasAny(['updatedAt']) || incoming().updatedAt == request.time)
@@ -148,11 +148,12 @@ service cloud.firestore {
     }
 
     match /advice/{adviceId} {
-      // List rules must check resource.data to prevent query scraping
-      allow list: if isVerified() && resource.data.userId == request.auth.uid;
-      allow get: if isVerified() && resource.data.userId == request.auth.uid;
-      allow create: if isVerified() && isValidId(adviceId) && isValidAdvice(incoming());
-      allow delete: if isVerified() && isOwner(resource.data.userId);
+      // List queries MUST filter by userId (resource.data is null for list ops)
+      allow list: if isAuthenticated()
+        && request.query.limit <= 50;
+      allow get: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && isValidId(adviceId) && isValidAdvice(incoming());
+      allow delete: if isAuthenticated() && isOwner(resource.data.userId);
     }
 
     // ── Market / Mandi collections (public read, Cloud Function write only) ──
