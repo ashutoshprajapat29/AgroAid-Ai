@@ -275,7 +275,7 @@ export default function DiseaseScanner() {
               <div className="bg-emerald-500/6 border border-emerald-500/12 rounded-xl p-3">
                 <label className="text-[9px] font-bold uppercase tracking-widest text-bento-text-muted block mb-1">{t("disease.confidence")}</label>
                 <span className={`text-lg font-extrabold ${result ? 'text-emerald-400' : 'text-bento-text-muted/40'}`}>
-                  {result ? "98.4%" : "—"}
+                  {result ? "High" : "—"}
                 </span>
               </div>
               <div className="border rounded-xl p-3" style={{ background: 'var(--bg-input)', borderColor: 'var(--border-input)' }}>

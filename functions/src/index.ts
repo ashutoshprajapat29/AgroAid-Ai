@@ -278,6 +278,8 @@ async function fetchRSSFeedServer(feedUrl: string, source: string): Promise<{ ti
     const resp = await axios.get(feedUrl, {
       timeout: 10000,
       headers: { "User-Agent": "AgroAid-AI/1.0 (+https://agroaid.app)" },
+      maxContentLength: 512 * 1024,
+      maxBodyLength: 512 * 1024,
     });
     const text: string = resp.data;
 
@@ -400,7 +402,11 @@ export const fetchAgriNews = functions
 // ─────────────────────────────────────────────────────────────────────────────
 export const getMarketSentiment = functions
   .runWith({ timeoutSeconds: 60, memory: "256MB" })
-  .https.onCall(async (data: { commodity: string; state: string; district?: string }) => {
+  .https.onCall(async (data: { commodity: string; state: string; district?: string }, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "Authentication required for market sentiment.");
+    }
+
     const { commodity, state, district } = data;
     if (!commodity || !state) {
       throw new functions.https.HttpsError("invalid-argument", "commodity and state are required");

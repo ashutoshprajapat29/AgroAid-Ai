@@ -178,6 +178,7 @@ export default function Profile() {
                 <div className="relative">
                   <input
                     type="text"
+                    maxLength={100}
                     value={formData.displayName}
                     onChange={e => setFormData({ ...formData, displayName: e.target.value })}
                     className="w-full theme-input rounded-2xl px-5 py-4 font-bold text-sm tracking-wide bg-[var(--bg-input)] border border-[var(--border-input)] text-bento-text-main focus:outline-none focus:ring-2 focus:ring-emerald-500/30 transition-all"
