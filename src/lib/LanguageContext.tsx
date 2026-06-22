@@ -19,6 +19,7 @@ const LanguageContext = createContext<LanguageContextValue>({
 // ─── Full translation map ──────────────────────────────────────
 export const translations: Record<string, { English: string; Hindi: string }> = {
   // Navigation
+  "nav.dashboard": { English: "Dashboard", Hindi: "डैशबोर्ड" },
   "nav.advisor":  { English: "Advisor",  Hindi: "सलाहकार" },
   "nav.health":   { English: "Health",   Hindi: "स्वास्थ्य" },
   "nav.plots":    { English: "Plots",    Hindi: "खेत" },
@@ -396,6 +397,45 @@ export const translations: Record<string, { English: string; Hindi: string }> = 
   "profile.color_theme":     { English: "Color Theme", Hindi: "रंग थीम" },
   "profile.farm_context":    { English: "Farm Context", Hindi: "खेत संदर्भ" },
   "profile.farm_context_desc":{ English: "Describe your environment. This enables the AI to provide surgically accurate, localized suggestions.", Hindi: "अपने परिवेश का वर्णन करें। इससे AI को सटीक, स्थानीय सुझाव देने में मदद मिलती है।" },
+
+  // Dashboard
+  "dashboard.welcome":       { English: "Welcome to AgroAid AI", Hindi: "AgroAid AI में आपका स्वागत है" },
+  "dashboard.greeting_morning": { English: "Good Morning, Farmer!", Hindi: "सुप्रभात, किसान भाई!" },
+  "dashboard.greeting_afternoon": { English: "Good Afternoon, Farmer!", Hindi: "नमस्कार, किसान भाई!" },
+  "dashboard.greeting_evening": { English: "Good Evening, Farmer!", Hindi: "शुभ संध्या, किसान भाई!" },
+  "dashboard.greeting_generic": { English: "Hello, Farmer!", Hindi: "नमस्ते, किसान भाई!" },
+  "dashboard.active_tasks":  { English: "Active Tasks", Hindi: "सक्रिय कार्य" },
+  "dashboard.mapped_acres":  { English: "Mapped Area", Hindi: "मैप किया गया क्षेत्र" },
+  "dashboard.diagnosed_diseases": { English: "Health Audits", Hindi: "स्वास्थ्य ऑडिट" },
+  
+  "dashboard.quick_scan":     { English: "Crop Health Scanner", Hindi: "पौध स्वास्थ्य स्कैनर" },
+  "dashboard.quick_scan_desc": { English: "Identify plant diseases instantly with AI-powered vision diagnostics.", Hindi: "AI-संचालित विज़न डायग्नोस्टिक्स के साथ तुरंत पौधों की बीमारियों की पहचान करें।" },
+  "dashboard.scan_btn":       { English: "Scan Specimen", Hindi: "नमूना जांचें" },
+  
+  "dashboard.my_plots":      { English: "My Fields & Soil", Hindi: "मेरे खेत और मिट्टी" },
+  "dashboard.my_plots_desc":  { English: "Map your farm segments, check soil reports, and analyze NPK trends.", Hindi: "अपने खेत के हिस्सों को मैप करें, मिट्टी रिपोर्ट देखें और NPK रुझानों का विश्लेषण करें।" },
+  "dashboard.plots_btn":      { English: "Manage Land", Hindi: "भूमि प्रबंधित करें" },
+  
+  "dashboard.tasks_schedule": { English: "Farm Task Manager", Hindi: "कार्य प्रबंधक" },
+  "dashboard.tasks_schedule_desc": { English: "Organize daily operations, fertilizer, and irrigation schedule.", Hindi: "दैनिक गतिविधियों, खाद और सिंचाई समय सारिणी को व्यवस्थित करें।" },
+  "dashboard.tasks_btn":      { English: "View To-Dos", Hindi: "कार्य सूची देखें" },
+  
+  "dashboard.mandi_rates":    { English: "Live Mandi Rates", Hindi: "लाइव बाज़ार भाव" },
+  "dashboard.mandi_rates_desc": { English: "Compare prices of agricultural commodities in nearby districts.", Hindi: "आसपास के जिलों में कृषि उपज के भावों की तुलना करें।" },
+  "dashboard.mandi_btn":      { English: "Check Prices", Hindi: "बाज़ार भाव देखें" },
+  
+  "dashboard.profile_settings": { English: "Profile & Settings", Hindi: "प्रोफ़ाइल और सेटिंग्स" },
+  "dashboard.profile_settings_desc": { English: "Configure language preference, theme, and farm profile context.", Hindi: "भाषा प्राथमिकता, थीम और खेत प्रोफ़ाइल संदर्भ को कॉन्फ़िगर करें।" },
+  "dashboard.profile_btn":    { English: "Open Profile", Hindi: "प्रोफ़ाइल खोलें" },
+  
+  "dashboard.ask_ai_placeholder": { English: "Ask AI advisor about crops, soil, pests...", Hindi: "फसल, मिट्टी, कीटों के बारे में AI सलाहकार से पूछें..." },
+  "dashboard.ask_ai_btn":     { English: "Ask Advisor", Hindi: "सलाहकार से पूछें" },
+  "dashboard.ask_ai_suggestions": { English: "Try asking:", Hindi: "पूछ कर देखें:" },
+  "dashboard.suggestion1":    { English: "What is the best irrigation schedule for wheat?", Hindi: "गेहूं के लिए सबसे अच्छा सिंचाई कार्यक्रम क्या है?" },
+  "dashboard.suggestion2":    { English: "How do I cure leaf curl disease in tomato?", Hindi: "टमाटर में लीफ कर्ल बीमारी का इलाज कैसे करें?" },
+  "dashboard.suggestion3":    { English: "What organic fertilizer increases crop yield?", Hindi: "फसल की उपज बढ़ाने के लिए कौन सा जैविक उर्वरक अच्छा है?" },
+  "dashboard.quick_complete": { English: "Completed!", Hindi: "पूर्ण हुआ!" },
+  "dashboard.no_tasks":       { English: "All caught up! No pending tasks.", Hindi: "सभी कार्य पूरे! कोई लंबित कार्य नहीं है।" },
 };
 
 // ─── Provider ──────────────────────────────────────────────────

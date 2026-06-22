@@ -116,7 +116,6 @@ export default function FieldManager() {
   // Detail Modal & General AI
   const [selectedPlotForDetail, setSelectedPlotForDetail] = useState<Field | null>(null);
   const [detailTab, setDetailTab] = useState<'details' | 'advisor'>('details');
-  const [showGeneralAI, setShowGeneralAI] = useState(false);
   const [prefilledAdvisorQuery, setPrefilledAdvisorQuery] = useState("");
   const [isTrendsOpen, setIsTrendsOpen] = useState(false);
 
@@ -140,7 +139,6 @@ export default function FieldManager() {
 
   // Handle hardware/browser back button for modals
   useBackButton(!!selectedPlotForDetail, () => setSelectedPlotForDetail(null), 'plotDetail');
-  useBackButton(showGeneralAI, () => setShowGeneralAI(false), 'generalAI');
   useBackButton(isAddingField, () => setIsAddingField(false), 'addingField');
   useBackButton(isAddingSoil, () => setIsAddingSoil(false), 'addingSoil');
 
@@ -1211,68 +1209,6 @@ export default function FieldManager() {
                   </motion.div>
                 )}
               </AnimatePresence>
-            </div>
-          </motion.div>
-        )}
-        </AnimatePresence>,
-        document.body
-      )}
-
-      {/* ── General AI FAB ────────────────────────────────── */}
-      {createPortal(
-        <AnimatePresence>
-        {!selectedPlotForDetail && (
-          <motion.button
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0, opacity: 0 }}
-            transition={{ type: 'spring', bounce: 0.4 }}
-            onClick={() => setShowGeneralAI(true)}
-            id="general-ai-fab"
-            className="fixed bottom-28 right-4 md:bottom-8 md:right-6 z-[100] w-14 h-14 bg-gradient-to-br from-emerald-500 to-green-700 text-white rounded-2xl shadow-2xl shadow-emerald-500/40 flex items-center justify-center hover:scale-110 active:scale-95 transition-all border border-emerald-400/30"
-            title={t('plots.ask_ai')}
-          >
-            <MessageSquare size={22} />
-          </motion.button>
-        )}
-        </AnimatePresence>,
-        document.body
-      )}
-
-      {/* ── General AI Modal ──────────────────────────────── */}
-      {createPortal(
-        <AnimatePresence>
-        {showGeneralAI && (
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 40 }}
-            transition={{ type: 'spring', damping: 22, stiffness: 260 }}
-            className="fixed inset-0 z-[200] flex flex-col bg-theme-base"
-          >
-            <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b glass-nav border-theme-input">
-              <button
-                onClick={() => setShowGeneralAI(false)}
-                className="p-2 rounded-xl hover:bg-[var(--bg-hover)] transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)]"
-                title="Back"
-                aria-label="Back"
-              >
-                <ChevronLeft size={22} />
-              </button>
-              <div className="w-8 h-8 bg-gradient-to-br from-emerald-400 to-green-700 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/25">
-                <Leaf size={16} className="text-white" />
-              </div>
-              <div className="flex-1">
-                <span className="font-serif font-bold text-base text-[var(--text-main)] block leading-tight">
-                  Agro<span className="text-gradient-green">Aid</span> AI
-                </span>
-                <p className="text-[9px] text-emerald-400 font-semibold uppercase tracking-widest leading-none mt-0.5">
-                  General Mode
-                </p>
-              </div>
-            </div>
-            <div className="flex-1 overflow-hidden">
-              <FarmingAdvisor isActive={true} hideHeader={true} />
             </div>
           </motion.div>
         )}

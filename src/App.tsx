@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "motion/react";
 import {
   MessageSquare, Camera, User as UserIcon, Loader2, Leaf,
   Compass, CheckCircle2, Activity, Smartphone, ArrowLeft, Globe, ShieldCheck,
+  LayoutDashboard,
 } from "lucide-react";
 import ThemeToggle from "./components/ThemeToggle";
 import LanguageToggle from "./components/LanguageToggle";
@@ -19,15 +20,18 @@ const WeatherAdvisoryBanner = lazy(() => import("./components/WeatherAdvisoryBan
 const FieldManager    = lazy(() => import("./components/FieldManager"));
 const TaskManager     = lazy(() => import("./components/TaskManager"));
 const MarketDashboard = lazy(() => import("./components/MarketDashboard"));
+const Dashboard       = lazy(() => import("./components/Dashboard"));
+const FarmingAdvisor   = lazy(() => import("./components/FarmingAdvisor"));
 
-type TabType = 'disease' | 'profile' | 'fields' | 'tasks' | 'market';
+type TabType = 'dashboard' | 'disease' | 'profile' | 'fields' | 'tasks' | 'market';
 
 const NAV_CONFIG: { id: TabType; icon: React.ElementType; labelKey: string }[] = [
-  { id: 'disease',  icon: Camera,        labelKey: 'nav.health'   },
-  { id: 'fields',   icon: Compass,       labelKey: 'nav.plots'    },
-  { id: 'tasks',    icon: CheckCircle2,  labelKey: 'nav.tasks'    },
-  { id: 'market',   icon: Activity,      labelKey: 'nav.market'   },
-  { id: 'profile',  icon: UserIcon,      labelKey: 'nav.profile'  },
+  { id: 'dashboard', icon: LayoutDashboard, labelKey: 'nav.dashboard' },
+  { id: 'disease',   icon: Camera,          labelKey: 'nav.health'    },
+  { id: 'fields',    icon: Compass,         labelKey: 'nav.plots'     },
+  { id: 'tasks',     icon: CheckCircle2,    labelKey: 'nav.tasks'     },
+  { id: 'market',    icon: Activity,        labelKey: 'nav.market'    },
+  { id: 'profile',   icon: UserIcon,        labelKey: 'nav.profile'   },
 ];
 
 /* ── Loading fallback ──────────────────────────────────────── */
@@ -44,15 +48,22 @@ function PageLoader() {
 
 /* ── Authenticated shell ───────────────────────────────────── */
 function AuthenticatedApp() {
-  const [activeTab, setActiveTab] = useState<TabType>('fields');
+  const [activeTab, setActiveTab] = useState<TabType>('dashboard');
+  const [showGeneralAI, setShowGeneralAI] = useState(false);
+  const [prefilledAIQuery, setPrefilledAIQuery] = useState("");
   const { t } = useLanguage();
   const NAV_ITEMS = NAV_CONFIG.map(item => ({ ...item, label: t(item.labelKey) }));
+
+  const handleOpenGeneralAI = (queryText: string) => {
+    setPrefilledAIQuery(queryText);
+    setShowGeneralAI(true);
+  };
 
   // Tab navigation back button support
   useEffect(() => {
     // Replace initial state with current tab if there is no tab in history state
     if (!window.history.state || !window.history.state.tab) {
-      window.history.replaceState({ tab: 'fields' }, '');
+      window.history.replaceState({ tab: 'dashboard' }, '');
     }
 
     const handlePopState = (e: PopStateEvent) => {
@@ -87,12 +98,23 @@ function AuthenticatedApp() {
       {/* Header */}
       <header className="relative z-[60] h-[60px] md:h-[66px] px-4 md:px-6 flex items-center justify-between glass-nav border-b">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-400 to-green-700 flex items-center justify-center shadow-lg shadow-emerald-500/25">
-            <Leaf size={16} className="text-white" />
+          {activeTab !== 'dashboard' && (
+            <button
+              onClick={() => handleTabChange('dashboard')}
+              className="mr-1.5 p-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-1.5 text-xs font-black uppercase tracking-wider cursor-pointer"
+            >
+              <ArrowLeft size={14} className="shrink-0" />
+              <span className="hidden sm:inline">{t("common.back")}</span>
+            </button>
+          )}
+          <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => handleTabChange('dashboard')}>
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-400 to-green-700 flex items-center justify-center shadow-lg shadow-emerald-500/25">
+              <Leaf size={16} className="text-white" />
+            </div>
+            <span className="font-serif font-bold text-[17px] tracking-tight text-bento-text-main">
+              Agro<span className="text-gradient-green">Aid</span> AI
+            </span>
           </div>
-          <span className="font-serif font-bold text-[17px] tracking-tight text-bento-text-main">
-            Agro<span className="text-gradient-green">Aid</span> AI
-          </span>
         </div>
 
         <div className="flex items-center gap-2">
@@ -114,12 +136,7 @@ function AuthenticatedApp() {
         {/* Sidebar / bottom nav */}
         <nav className="
           shrink-0 glass-nav
-          border-t border-emerald-500/10
-          px-1 py-2 pb-safe
-          flex flex-row justify-around items-center
-          gap-0.5
-          overflow-x-auto scrollbar-hide
-          md:flex-col md:justify-start md:items-stretch
+          hidden md:flex md:flex-col md:justify-start md:items-stretch
           md:w-[86px] md:px-2 md:py-5 md:gap-1
           md:border-t-0 md:border-r md:border-emerald-500/10
           z-[55]
@@ -140,6 +157,11 @@ function AuthenticatedApp() {
           <div className="h-full max-w-7xl mx-auto relative">
 
             <Suspense fallback={<PageLoader />}>
+              {activeTab === 'dashboard' && (
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className="h-full overflow-y-auto p-3 md:p-6">
+                  <Dashboard onTabChange={handleTabChange} onOpenGeneralAI={handleOpenGeneralAI} />
+                </motion.div>
+              )}
               {activeTab === 'disease' && (
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className="h-full overflow-y-auto p-3 md:p-6">
                   <DiseaseScanner />
@@ -169,6 +191,75 @@ function AuthenticatedApp() {
           </div>
         </main>
       </div>
+
+      {/* ── Global General AI FAB ─────────────────────────── */}
+      <AnimatePresence>
+        {activeTab !== 'profile' && !showGeneralAI && (
+          <motion.button
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0, opacity: 0 }}
+            transition={{ type: 'spring', bounce: 0.4 }}
+            onClick={() => {
+              setPrefilledAIQuery("");
+              setShowGeneralAI(true);
+            }}
+            id="general-ai-fab"
+            className="fixed bottom-6 right-4 md:bottom-8 md:right-6 z-[100] w-14 h-14 bg-gradient-to-br from-emerald-400 to-green-700 text-white rounded-2xl shadow-2xl shadow-emerald-500/40 flex items-center justify-center hover:scale-110 active:scale-95 transition-all border border-emerald-400/30 cursor-pointer"
+            title={t('plots.ask_ai')}
+          >
+            <MessageSquare size={22} />
+          </motion.button>
+        )}
+      </AnimatePresence>
+
+      {/* ── Global General AI Modal ───────────────────────── */}
+      <AnimatePresence>
+        {showGeneralAI && (
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 40 }}
+            transition={{ type: 'spring', damping: 22, stiffness: 260 }}
+            className="fixed inset-0 z-[200] flex flex-col bg-theme-base"
+          >
+            <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b glass-nav border-theme-input">
+              <button
+                onClick={() => {
+                  setShowGeneralAI(false);
+                  setPrefilledAIQuery("");
+                }}
+                className="p-2 rounded-xl hover:bg-[var(--bg-hover)] transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] cursor-pointer"
+                title={t("common.back")}
+                aria-label={t("common.back")}
+              >
+                <ArrowLeft size={22} />
+              </button>
+              <div className="w-8 h-8 bg-gradient-to-br from-emerald-400 to-green-700 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/25">
+                <Leaf size={16} className="text-white" />
+              </div>
+              <div className="flex-1">
+                <span className="font-serif font-bold text-base text-[var(--text-main)] block leading-tight">
+                  Agro<span className="text-gradient-green">Aid</span> AI
+                </span>
+                <p className="text-[9px] text-emerald-400 font-semibold uppercase tracking-widest leading-none mt-0.5">
+                  General Mode
+                </p>
+              </div>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <Suspense fallback={<PageLoader />}>
+                <FarmingAdvisor 
+                  isActive={true} 
+                  hideHeader={true} 
+                  initialQuery={prefilledAIQuery}
+                  onQueryClear={() => setPrefilledAIQuery("")}
+                />
+              </Suspense>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
