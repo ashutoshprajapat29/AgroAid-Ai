@@ -111,7 +111,7 @@ export const translations: Record<string, { English: string; Hindi: string }> = 
   "advisor.no_plots":        { English: "No plots mapped yet", Hindi: "अभी कोई प्लॉट मैप नहीं हुआ" },
   "advisor.voice_placeholder":{ English: "Speaking… ask your farming question", Hindi: "बोलें… अपना खेती का सवाल पूछें" },
   "advisor.updates_saved":   { English: "Farm data updated from conversation", Hindi: "बातचीत से खेत डेटा अपडेट हुआ" },
-  "advisor.task_added":      { English: "Task added from AI advice",    Hindi: "AI सलाह से कार्य जोड़ा गया" },
+  "advisor.task_added":      { English: "Task added from AI advice",    Hindi: "AI से कार्य जोड़ा गया" },
 
   // Market
   "market.title":         { English: "Live Market Prices", Hindi: "लाइव बाज़ार भाव" },
