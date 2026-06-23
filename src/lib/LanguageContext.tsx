@@ -355,7 +355,7 @@ export const translations: Record<string, { English: string; Hindi: string }> = 
   "plots.soil_info":       { English: "Record the exact metrics from your laboratory soil test. You can also upload photos of your report via the AI Advisor to log this automatically.", Hindi: "अपने प्रयोगशाला मिट्टी परीक्षण के सटीक मेट्रिक्स दर्ज करें। आप AI सलाहकार के माध्यम से रिपोर्ट की फ़ोटो भी अपलोड कर सकते हैं।" },
   "plots.action_required": { English: "Action Required", Hindi: "कार्रवाई आवश्यक" },
   "plots.link_to_plot":    { English: "Assign to Plot", Hindi: "प्लॉट से जोड़ें" },
-  "plots.plot_link":       { English: "Plot Link", Hindi: "प्लॉट लिंक" },
+  "plots.plot_link":       { English: "Plot Link", Hindi: "प्लॉट लिंक करे" },
   "plots.log_soil":        { English: "Log Soil Test Results", Hindi: "मिट्टी की जांच की रिपोर्ट दर्ज करें" },
 
   // Merged Plots + Advisor UI
