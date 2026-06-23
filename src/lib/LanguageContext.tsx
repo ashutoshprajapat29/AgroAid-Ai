@@ -310,7 +310,7 @@ export const translations: Record<string, { English: string; Hindi: string }> = 
   "disease.confidence":         { English: "Confidence", Hindi: "विश्वसनीयता" },
   "disease.model_label":        { English: "Model", Hindi: "मॉडल" },
   "disease.model_name":         { English: "Gemini Vision", Hindi: "Gemini दृष्टि" },
-  "disease.analyzing_msg":      { English: "Analyzing specimen…", Hindi: "नमूने का विश्लेषण हो रहा है…" },
+  "disease.analyzing_msg":      { English: "Analyzing specimen…", Hindi: "विश्लेषण हो रहा है…" },
 
   // Voice extras
   "voice.advisor_title":  { English: "Voice Advisor", Hindi: "वॉइस सलाहकार" },
