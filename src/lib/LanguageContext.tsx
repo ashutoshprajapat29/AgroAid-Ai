@@ -295,7 +295,7 @@ export const translations: Record<string, { English: string; Hindi: string }> = 
   "disease.error_analyze":      { English: "Failed to analyze image. Please try again.", Hindi: "छवि विश्लेषण विफल। कृपया पुनः प्रयास करें।" },
   "disease.synced":             { English: "Diagnostic Synced", Hindi: "निदान सिंक हुआ" },
   "disease.ai_vision":          { English: "AI Vision", Hindi: "AI दृष्टि" },
-  "disease.scanner_title":      { English: "Plant Health Scanner", Hindi: "पौध स्वास्थ्य स्कैनर" },
+  "disease.scanner_title":      { English: "Plant Health Scanner", Hindi: "स्वास्थ्य स्कैनर" },
   "disease.scanner_desc":       { English: "Identify crop diseases instantly with Gemini AI vision.", Hindi: "Gemini AI दृष्टि से फसल रोगों की तुरंत पहचान करें।" },
   "disease.general_scan":       { English: "General Scan", Hindi: "सामान्य स्कैन" },
   "disease.detection_badge":    { English: "Disease Detection · AI", Hindi: "रोग पहचान · AI" },
@@ -303,7 +303,7 @@ export const translations: Record<string, { English: string; Hindi: string }> = 
   "disease.tap_upload":         { English: "Tap to Upload or Drop", Hindi: "अपलोड करें या ड्रॉप करें" },
   "disease.crops_hint":         { English: "Maize · Wheat · Tomato · Rice", Hindi: "मक्का · गेहूँ · टमाटर · चावल" },
   "disease.start_analysis":     { English: "Start AI Analysis", Hindi: "AI विश्लेषण शुरू करें" },
-  "disease.analyzing_specimen": { English: "Analyzing Specimen…", Hindi: "नमूना विश्लेषण हो रहा है…" },
+  "disease.analyzing_specimen": { English: "Analyzing Specimen…", Hindi: "विश्लेषण किया जा रहा है…" },
   "disease.examining":          { English: "Gemini AI is examining your image", Hindi: "Gemini AI आपकी छवि की जाँच कर रहा है" },
   "disease.ready_title":        { English: "Ready for Inspection", Hindi: "निरीक्षण के लिए तैयार" },
   "disease.ready_desc":         { English: "Upload or take a photo of the affected plant part to begin the AI diagnostic process.", Hindi: "AI निदान प्रक्रिया शुरू करने के लिए प्रभावित पौधे के भाग की फ़ोटो अपलोड या खींचें।" },
@@ -356,7 +356,7 @@ export const translations: Record<string, { English: string; Hindi: string }> = 
   "plots.action_required": { English: "Action Required", Hindi: "कार्रवाई आवश्यक" },
   "plots.link_to_plot":    { English: "Assign to Plot", Hindi: "प्लॉट से जोड़ें" },
   "plots.plot_link":       { English: "Plot Link", Hindi: "प्लॉट लिंक" },
-  "plots.log_soil":        { English: "Log Soil Test Results", Hindi: "मिट्टी परीक्षण परिणाम दर्ज करें" },
+  "plots.log_soil":        { English: "Log Soil Test Results", Hindi: "मिट्टी की जांच की रिपोर्ट दर्ज करें" },
 
   // Merged Plots + Advisor UI
   "plots.ask_ai":          { English: "Ask Farm AI",     Hindi: "Farm AI से पूछें" },
