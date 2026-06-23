@@ -165,7 +165,7 @@ export const translations: Record<string, { English: string; Hindi: string }> = 
   "plots.soil_title":     { English: "Log Soil Test Results", Hindi: "मिट्टी परीक्षण परिणाम दर्ज करें" },
   "plots.soil_update":    { English: "Update Soil Report", Hindi: "मिट्टी रिपोर्ट अपडेट करें" },
   "plots.map_title":      { English: "Map New Plot",       Hindi: "नया प्लॉट मैप करें" },
-  "plots.map_subtitle":   { English: "Define boundaries for targeted soil tracking.", Hindi: "लक्षित मिट्टी ट्रैकिंग के लिए सीमाएं निर्धारित करें।" },
+  "plots.map_subtitle":   { English: "Define boundaries for targeted soil tracking.", Hindi: "मिट्टी ट्रैकिंग के लिए सीमाएं निर्धारित करें।" },
   "plots.save_soil":      { English: "Save Report",        Hindi: "रिपोर्ट सहेजें" },
   "plots.update_soil":    { English: "Update Report",      Hindi: "रिपोर्ट अपडेट करें" },
   "plots.soil_analytics": { English: "Soil Analytics Intake", Hindi: "मिट्टी विश्लेषण इनपुट" },
@@ -236,7 +236,7 @@ export const translations: Record<string, { English: string; Hindi: string }> = 
   "profile.dark_mode":    { English: "Dark Mode",          Hindi: "डार्क मोड" },
   "profile.light_mode":   { English: "Light Mode",         Hindi: "लाइट मोड" },
   "profile.save":         { English: "Save Changes",       Hindi: "बदलाव सहेजें" },
-  "profile.saving":       { English: "Saving…",            Hindi: "सहेजा जा रहा है…" },
+  "profile.saving":       { English: "Saving…",            Hindi: "सेव किया जा रहा है…" },
   "profile.saved":        { English: "Profile saved successfully!", Hindi: "प्रोफ़ाइल सफलतापूर्वक सहेजी गई!" },
   "profile.sign_out":     { English: "Sign Out",           Hindi: "साइन आउट" },
   "profile.verified":     { English: "Verified Farmer",    Hindi: "सत्यापित किसान" },
@@ -252,7 +252,7 @@ export const translations: Record<string, { English: string; Hindi: string }> = 
   "voice.subtitle":       { English: "Talk to your AI farm advisor", Hindi: "अपने AI खेत सलाहकार से बात करें" },
   "voice.tap_speak":      { English: "Tap to speak",        Hindi: "बोलने के लिए टैप करें" },
   "voice.listening":      { English: "Listening…",          Hindi: "सुन रहा है…" },
-  "voice.processing":     { English: "Processing…",         Hindi: "प्रसंस्करण हो रहा है…" },
+  "voice.processing":     { English: "Processing…",         Hindi: "प्रोसेस हो रहा है…" },
 
   // Theme toggle
   "theme.dark":   { English: "Dark",  Hindi: "डार्क" },
