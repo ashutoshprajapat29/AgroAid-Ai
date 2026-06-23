@@ -316,7 +316,7 @@ export const translations: Record<string, { English: string; Hindi: string }> = 
   "voice.advisor_title":  { English: "Voice Advisor", Hindi: "वॉइस सलाहकार" },
   "voice.talk_realtime":  { English: "Talk real-time with AgroAid AI", Hindi: "AgroAid AI से रियल-टाइम बात करें" },
   "voice.establishing":   { English: "Establishing Link...", Hindi: "कनेक्शन स्थापित हो रहा है..." },
-  "voice.listening_msg":  { English: "AgroAid is listening... Just speak your question!", Hindi: "AgroAid सुन रहा है... बस अपना सवाल बोलें!" },
+  "voice.listening_msg":  { English: "AgroAid is listening... Just speak your question!", Hindi: "AgroAid सुन रहा है.. बस अपना सवाल बोलें!" },
   "voice.tap_mic":        { English: "Tap the mic below and ask anything about your crops, soil, or weather.", Hindi: "नीचे माइक पर टैप करें और फसल, मिट्टी या मौसम के बारे में कुछ भी पूछें।" },
   "voice.tip":            { English: "Works best in a quiet place. Say \"Help me with my wheat crops\" to start.", Hindi: "शांत जगह में सबसे अच्छा काम करता है। शुरू करने के लिए \"मेरी गेहूँ की फसल में मदद करें\" बोलें।" },
 
