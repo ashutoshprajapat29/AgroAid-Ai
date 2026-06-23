@@ -381,7 +381,7 @@ export const translations: Record<string, { English: string; Hindi: string }> = 
   "weather.forecast_3day": { English: "3-Day Forecast", Hindi: "3-दिन का पूर्वानुमान" },
 
   // SoilHealthChart
-  "soilchart.title":    { English: "Soil Health Trends", Hindi: "मिट्टी स्वास्थ्य रुझान" },
+  "soilchart.title":    { English: "Soil Health Trends", Hindi: "मिट्टी के जांच की रिपोर्ट" },
   "soilchart.subtitle": { English: "Historical NPK & pH Levels", Hindi: "ऐतिहासिक NPK और pH स्तर" },
 
   // Profile extras
