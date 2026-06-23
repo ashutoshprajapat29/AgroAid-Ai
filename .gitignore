@@ -5,7 +5,8 @@ coverage/
 .DS_Store
 *.log
 .env*
-!.env.example
+.env.example
+.agignore
 
 # Debug & scratch scripts
 check_fetch.js
