@@ -74,15 +74,119 @@ const PRIORITY_STATES = [
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
+// HELPER: Fetch all mandi records for a single state + date from data.gov.in
+// Returns parsed rows ready for Supabase upsert
+// ─────────────────────────────────────────────────────────────────────────────
+async function fetchStateDate(
+  apiUrl: string,
+  apiKey: string,
+  state: string,
+  targetDate: string
+): Promise<{ rows: Record<string, unknown>[]; errors: number }> {
+  const stateRecords: Record<string, unknown>[] = [];
+  let offset = 0;
+  const limit = 100;
+  let errors = 0;
+
+  while (true) {
+    let retries = 3;
+    let success = false;
+    let records: any[] = [];
+
+    while (retries > 0 && !success) {
+      try {
+        const response = await axios.get(apiUrl, {
+          params: {
+            "api-key": apiKey,
+            format: "json",
+            limit,
+            offset,
+            "filters[State]": state,
+            "filters[Arrival_Date]": targetDate,
+          },
+          timeout: 120000,
+        });
+
+        records = response.data?.records ?? [];
+        success = true;
+      } catch (err: any) {
+        retries--;
+        functions.logger.warn(`Fetch failed for ${state} date=${targetDate} offset=${offset}. Retries left: ${retries}. Error:`, err.message ?? err);
+        if (retries === 0) {
+          errors++;
+          break;
+        }
+        // Exponential backoff: 5s, 10s, 20s
+        const backoff = 5000 * Math.pow(2, 3 - retries);
+        await new Promise((resolve) => setTimeout(resolve, backoff));
+      }
+    }
+
+    if (!success) break;
+    if (!records.length) break;
+
+    for (const r of records) {
+      const arrivalStr = parseArrivalDate(r.Arrival_Date || r.arrival_date || "");
+
+      const row = {
+        state: (r.State || r.state || "").trim(),
+        district: (r.District || r.district || "").trim(),
+        market_name: (r.Market || r.market || "").trim(),
+        commodity: (r.Commodity || r.commodity || "").trim(),
+        variety: (r.Variety || r.variety || "").trim(),
+        min_price: parseInt(r.Min_Price || r.min_price) || 0,
+        max_price: parseInt(r.Max_Price || r.max_price) || 0,
+        modal_price: parseInt(r.Modal_Price || r.modal_price) || 0,
+        arrival_date: arrivalStr,
+      };
+
+      if (row.state && row.commodity && row.modal_price > 0) {
+        stateRecords.push(row);
+      }
+    }
+
+    if (records.length < limit) break;
+    offset += limit;
+
+    // Rate limit delay between successful pagination requests
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+
+  return { rows: stateRecords, errors };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HELPER: Build an array of DD/MM/YYYY date strings for the last N days in IST
+// ─────────────────────────────────────────────────────────────────────────────
+function getBackfillDatesIST(daysBack: number): string[] {
+  const dates: string[] = [];
+  const now = new Date();
+  // Convert current UTC time to IST
+  const istNow = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+
+  for (let i = 1; i <= daysBack; i++) {
+    const d = new Date(istNow);
+    d.setUTCDate(d.getUTCDate() - i);
+    const day = String(d.getUTCDate()).padStart(2, "0");
+    const month = String(d.getUTCMonth() + 1).padStart(2, "0");
+    const year = d.getUTCFullYear();
+    dates.push(`${day}/${month}/${year}`);
+  }
+
+  return dates;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // FUNCTION 1: Sync Mandi Prices to Supabase (replaces old Firestore ingestion)
-// Runs every day at 7:00 AM IST (data.gov.in publishes previous day's data by morning)
+// Runs twice daily at 7:30 AM and 2:00 PM IST for maximum data coverage.
+// Fetches a rolling 3-day window to automatically backfill any missed days.
 // ─────────────────────────────────────────────────────────────────────────────
 export const syncMandiToSupabase = functions
   .runWith({ timeoutSeconds: 540, memory: "1GB" })
-  .pubsub.schedule("0 7 * * *")
+  .pubsub.schedule("30 7,14 * * *")
   .timeZone("Asia/Kolkata")
   .onRun(async (context: functions.EventContext) => {
-    functions.logger.info("Starting Mandi → Supabase sync for priority states...");
+    functions.logger.info("Starting Mandi → Supabase sync (rolling 3-day backfill)...");
 
     // Historical endpoint — data persists permanently, uses PascalCase field names
     const API_URL = "https://api.data.gov.in/resource/35985678-0d79-46b4-9ed6-6f13308a1d24";
@@ -97,131 +201,64 @@ export const syncMandiToSupabase = functions
     let totalErrors = 0;
     const startTime = Date.now();
 
-    // Calculate yesterday's date in IST (the sync targets previous day's trading data)
-    const now = new Date();
-    const istYesterday = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
-    istYesterday.setUTCDate(istYesterday.getUTCDate() - 1);
+    // Rolling 3-day window: yesterday, day-before-yesterday, and 3 days ago
+    const targetDates = getBackfillDatesIST(3);
+    functions.logger.info(`Target dates: ${targetDates.join(", ")}`);
 
-    const day = String(istYesterday.getUTCDate()).padStart(2, "0");
-    const month = String(istYesterday.getUTCMonth() + 1).padStart(2, "0");
-    const year = istYesterday.getUTCFullYear();
-    const targetDate = `${day}/${month}/${year}`;
-    functions.logger.info(`Target date: ${targetDate}`);
+    for (const targetDate of targetDates) {
+      for (const state of PRIORITY_STATES) {
+        // Early exit if approaching 9-minute timeout (at 7.5 mins = 450000ms)
+        if (Date.now() - startTime > 450000) {
+          functions.logger.warn("Approaching function timeout. Halting processing early to finish gracefully.");
+          break;
+        }
 
-    for (const state of PRIORITY_STATES) {
-      // Early exit if approaching 9-minute timeout (e.g. at 8 mins = 480000ms)
-      if (Date.now() - startTime > 480000) {
-        functions.logger.warn("Approaching function timeout. Halting processing early to finish gracefully.");
+        const { rows: stateRecords, errors: fetchErrors } = await fetchStateDate(API_URL, API_KEY, state, targetDate);
+        totalErrors += fetchErrors;
+
+        // Deduplicate records to prevent "ON CONFLICT DO UPDATE command cannot affect row a second time"
+        const uniqueRecordsMap = new Map();
+        for (const r of stateRecords) {
+          const key = `${r.state}|${r.district}|${r.market_name}|${r.commodity}|${r.variety}|${r.arrival_date}`;
+          uniqueRecordsMap.set(key, r);
+        }
+        const uniqueStateRecords = Array.from(uniqueRecordsMap.values());
+
+        // Batch upsert into Supabase (max 500 rows per call)
+        for (let i = 0; i < uniqueStateRecords.length; i += 500) {
+          const batch = uniqueStateRecords.slice(i, i + 500);
+          try {
+            const { error } = await getSupabaseAdmin()
+              .from("mandi_prices")
+              .upsert(batch as any, {
+                onConflict: "state,district,market_name,commodity,variety,arrival_date",
+              });
+
+            if (error) {
+              functions.logger.warn(`Upsert error for ${state} ${targetDate}:`, error.message);
+              totalErrors++;
+            } else {
+              totalUpserted += batch.length;
+            }
+          } catch (err: any) {
+            functions.logger.warn(`Upsert exception for ${state} ${targetDate}:`, err.message ?? err);
+            totalErrors++;
+          }
+        }
+
+        functions.logger.info(`[${state}][${targetDate}] ${uniqueStateRecords.length} records processed`);
+
+        // Brief delay between states to prevent overwhelming the API
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+      }
+
+      // Check timeout again between date passes
+      if (Date.now() - startTime > 450000) {
+        functions.logger.warn("Approaching function timeout after date pass. Stopping.");
         break;
       }
 
-      const stateRecords: Record<string, unknown>[] = [];
-        let offset = 0;
-        const limit = 100; // Reduced from 500 to make smaller, faster DB queries to data.gov.in
-
-        // Paginate through records for this state + date
-        while (true) {
-          let retries = 3;
-          let success = false;
-          let records: any[] = [];
-
-          while (retries > 0 && !success) {
-            try {
-              const response = await axios.get(API_URL, {
-                params: {
-                  "api-key": API_KEY,
-                  format: "json",
-                  limit,
-                  offset,
-                  "filters[State]": state,
-                  "filters[Arrival_Date]": targetDate,
-                },
-                timeout: 120000,
-              });
-
-              records = response.data?.records ?? [];
-              success = true;
-            } catch (err: any) {
-              retries--;
-              functions.logger.warn(`Fetch failed for ${state} date=${targetDate} offset=${offset}. Retries left: ${retries}. Error:`, err.message ?? err);
-              if (retries === 0) {
-                  totalErrors++;
-                  break;
-              }
-              // Exponential backoff: 5s, 10s, 20s
-              const backoff = 5000 * Math.pow(2, 3 - retries);
-              await new Promise((resolve) => setTimeout(resolve, backoff));
-            }
-          }
-
-          if (!success) {
-              break; // Skip pagination for this state/date if all retries failed
-          }
-
-          if (!records.length) break;
-
-          for (const r of records) {
-            // Historical endpoint uses PascalCase keys
-            const arrivalStr = parseArrivalDate(r.Arrival_Date || r.arrival_date || "");
-
-            const row = {
-              state: (r.State || r.state || "").trim(),
-              district: (r.District || r.district || "").trim(),
-              market_name: (r.Market || r.market || "").trim(),
-              commodity: (r.Commodity || r.commodity || "").trim(),
-              variety: (r.Variety || r.variety || "").trim(),
-              min_price: parseInt(r.Min_Price || r.min_price) || 0,
-              max_price: parseInt(r.Max_Price || r.max_price) || 0,
-              modal_price: parseInt(r.Modal_Price || r.modal_price) || 0,
-              arrival_date: arrivalStr,
-            };
-
-            if (row.state && row.commodity && row.modal_price > 0) {
-              stateRecords.push(row);
-            }
-          }
-
-        if (records.length < limit) break;
-        offset += limit;
-
-        // Rate limit delay between successful pagination requests
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-      }
-
-      // Deduplicate records to prevent "ON CONFLICT DO UPDATE command cannot affect row a second time"
-      const uniqueRecordsMap = new Map();
-      for (const r of stateRecords) {
-        const key = `${r.state}|${r.district}|${r.market_name}|${r.commodity}|${r.variety}|${r.arrival_date}`;
-        uniqueRecordsMap.set(key, r);
-      }
-      const uniqueStateRecords = Array.from(uniqueRecordsMap.values());
-
-      // Batch upsert into Supabase (max 500 rows per call)
-      for (let i = 0; i < uniqueStateRecords.length; i += 500) {
-        const batch = uniqueStateRecords.slice(i, i + 500);
-        try {
-          const { error } = await getSupabaseAdmin()
-            .from("mandi_prices")
-            .upsert(batch as any, {
-              onConflict: "state,district,market_name,commodity,variety,arrival_date",
-            });
-
-          if (error) {
-            functions.logger.warn(`Upsert error for ${state}:`, error.message);
-            totalErrors++;
-          } else {
-            totalUpserted += batch.length;
-          }
-        } catch (err: any) {
-          functions.logger.warn(`Upsert exception for ${state}:`, err.message ?? err);
-          totalErrors++;
-        }
-      }
-
-      functions.logger.info(`[${state}] ${uniqueStateRecords.length} records processed`);
-      
-      // Add a brief delay between states to prevent overwhelming the API
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      functions.logger.info(`Completed backfill for date ${targetDate}`);
     }
 
     // Purge records older than 45 days to keep DB size in check
@@ -258,6 +295,7 @@ export const syncMandiToSupabase = functions
       total_errors: totalErrors,
       duration_seconds: parseFloat(duration),
       states: PRIORITY_STATES.length,
+      dates_covered: targetDates.length,
     });
 
     return null;

@@ -7,7 +7,9 @@ coverage/
 .env*
 .env.example
 .agignore
-
+AGENTS.md
+security_spec.md
+SYSTEM_ARCHITECTURE.md
 # Debug & scratch scripts
 check_fetch.js
 check_fetch_exact.js
@@ -31,6 +33,7 @@ dev-dist/
 check_mandi.js
 test_gemini.js
 test_supabase.js
+functions/backfill.js
 
 # Firebase
 .firebase/
