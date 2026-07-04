@@ -178,12 +178,12 @@ function getBackfillDatesIST(daysBack: number): string[] {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FUNCTION 1: Sync Mandi Prices to Supabase (replaces old Firestore ingestion)
-// Runs twice daily at 7:30 AM and 2:00 PM IST for maximum data coverage.
+// Runs once daily at 7:00 AM IST.
 // Fetches a rolling 3-day window to automatically backfill any missed days.
 // ─────────────────────────────────────────────────────────────────────────────
 export const syncMandiToSupabase = functions
   .runWith({ timeoutSeconds: 540, memory: "1GB" })
-  .pubsub.schedule("30 7,14 * * *")
+  .pubsub.schedule("0 7 * * *")
   .timeZone("Asia/Kolkata")
   .onRun(async (context: functions.EventContext) => {
     functions.logger.info("Starting Mandi → Supabase sync (rolling 3-day backfill)...");

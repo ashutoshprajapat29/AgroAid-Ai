@@ -396,6 +396,14 @@ export const translations: Record<string, { English: string; Hindi: string }> = 
   "profile.color_theme":     { English: "Color Theme", Hindi: "रंग थीम" },
   "profile.farm_context":    { English: "Farm Context", Hindi: "खेत संदर्भ" },
   "profile.farm_context_desc":{ English: "Describe your environment. This enables the AI to provide surgically accurate, localized suggestions.", Hindi: "अपने परिवेश का वर्णन करें। इससे AI को सटीक, स्थानीय सुझाव देने में मदद मिलती है।" },
+
+  // SEO page titles
+  "seo.landing.title":  { English: "AgroAid AI — Smart Farming Assistant", Hindi: "AgroAid AI — स्मार्ट खेती सहायक" },
+  "seo.fields.title":   { English: "My Fields — AgroAid AI", Hindi: "मेरे खेत — AgroAid AI" },
+  "seo.health.title":   { English: "Crop Health Scanner — AgroAid AI", Hindi: "फसल स्वास्थ्य स्कैनर — AgroAid AI" },
+  "seo.tasks.title":    { English: "Farm Tasks — AgroAid AI", Hindi: "खेत कार्य — AgroAid AI" },
+  "seo.market.title":   { English: "Mandi Rates — AgroAid AI", Hindi: "मंडी भाव — AgroAid AI" },
+  "seo.profile.title":  { English: "Profile — AgroAid AI", Hindi: "प्रोफ़ाइल — AgroAid AI" },
 };
 
 // ─── Provider ──────────────────────────────────────────────────
