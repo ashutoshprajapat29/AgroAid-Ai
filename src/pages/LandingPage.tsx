@@ -35,6 +35,22 @@ export default function LandingPage() {
     }
   }, [user, loading, navigate]);
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-theme-base">
+        <div className="flex flex-col items-center gap-4">
+          <div className="relative">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-green-700 flex items-center justify-center shadow-2xl shadow-emerald-500/30">
+              <Leaf size={32} className="text-white" />
+            </div>
+            <div className="absolute inset-0 rounded-2xl border-2 border-emerald-500/30 animate-ping" />
+          </div>
+          <p className="text-sm font-medium text-theme-muted">{t("app.loading")}</p>
+        </div>
+      </div>
+    );
+  }
+
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const card = e.currentTarget;
     const rect = card.getBoundingClientRect();
