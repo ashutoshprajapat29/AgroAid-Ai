@@ -8,7 +8,7 @@ service cloud.firestore {
 
     // Connection test rule
     match /test/connection {
-      allow get: if isAuthenticated();
+      allow get;
     }
 
     // agri_news_cache Collection

@@ -2,7 +2,8 @@ import { createContext, useContext, useEffect, useState, useRef } from "react";
 import { 
   User as FirebaseUser, 
   onAuthStateChanged, 
-  signInWithPopup, 
+  signInWithPopup,
+  signInWithRedirect,
   GoogleAuthProvider, 
   signOut,
   RecaptchaVerifier,
@@ -55,7 +56,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     testConnection();
   }, []);
-
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
@@ -102,17 +102,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error: any) {
       console.error("Auth Error:", error.code);
       if (error.code === 'auth/popup-blocked') {
-        alert("The sign-in popup was blocked by your browser. Please allow popups for this site or try opening the app in a new tab.");
-      } else if (error.code === 'auth/cancelled-popup-request') {
-        // Harmless race condition in iframes
-        console.warn("Sign-in popup was closed or cancelled.");
+        // Popup blocked — silently fall back to redirect
+        try {
+          const fallbackProvider = new GoogleAuthProvider();
+          fallbackProvider.setCustomParameters({ prompt: 'select_account' });
+          await signInWithRedirect(auth, fallbackProvider);
+          return; // Page will navigate away
+        } catch (redirectErr: any) {
+          console.error("Redirect fallback failed:", redirectErr);
+          alert('Sign-in failed. Please allow popups for this site and try again.');
+        }
+      } else if (error.code === 'auth/cancelled-popup-request' || error.code === 'auth/popup-closed-by-user') {
+        // User closed the popup — not an error
       } else {
-        // User-friendly error messages — never expose raw error.message
         const USER_FRIENDLY_ERRORS: Record<string, string> = {
           'auth/user-disabled': 'Your account has been disabled. Please contact support.',
           'auth/network-request-failed': 'Network error. Please check your connection and try again.',
           'auth/too-many-requests': 'Too many sign-in attempts. Please wait a few minutes and try again.',
-          'auth/popup-closed-by-user': 'Sign-in was cancelled. Please try again.',
           'auth/account-exists-with-different-credential': 'An account already exists with this email using a different sign-in method.',
           'auth/invalid-credential': 'Invalid credentials. Please try again.',
         };
