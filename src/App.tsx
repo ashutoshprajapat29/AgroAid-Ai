@@ -35,8 +35,8 @@ export default function App() {
                     <Route path="/profile" element={<ProfilePage />} />
                   </Route>
 
-                  {/* Catch-all: redirect to fields (auth guard will bounce to / if not logged in) */}
-                  <Route path="*" element={<Navigate to="/fields" replace />} />
+                  {/* Catch-all: redirect to market (auth guard will bounce to / if not logged in) */}
+                  <Route path="*" element={<Navigate to="/market" replace />} />
                 </Routes>
               </Suspense>
             </BrowserRouter>

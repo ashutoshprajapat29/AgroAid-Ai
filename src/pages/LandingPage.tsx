@@ -28,10 +28,10 @@ export default function LandingPage() {
   // Set SEO title
   useEffect(() => { document.title = t('seo.landing.title'); }, [t]);
 
-  // Redirect authenticated users to /fields
+  // Redirect authenticated users to /market
   useEffect(() => {
     if (user && !loading) {
-      navigate('/fields', { replace: true });
+      navigate('/market', { replace: true });
     }
   }, [user, loading, navigate]);
 
@@ -93,6 +93,8 @@ export default function LandingPage() {
       const code = err.code || "";
       if (code === 'auth/invalid-phone-number' || msg.includes('invalid-phone-number')) {
         setError(lang === 'Hindi' ? "कृपया सही मोबाइल नंबर दर्ज करें" : "Please enter correct mobile number");
+      } else if (code === 'auth/invalid-app-credential' || msg.includes('invalid-app-credential')) {
+        setError(lang === 'Hindi' ? "सत्यापन विफल। कृपया पुनः प्रयास करें।" : "Verification failed. Please try again.");
       } else if (code === 'auth/quota-exceeded' || msg.includes('quota-exceeded')) {
         setError(lang === 'Hindi' ? "एसएमएस कोटा समाप्त हो गया है। कृपया बाद में प्रयास करें या गूगल लॉगिन का उपयोग करें।" : "SMS quota exceeded. Please try again later or use Google Login.");
       } else if (msg.includes('operation-not-allowed') || msg.includes('region enabled')) {
@@ -262,23 +264,12 @@ export default function LandingPage() {
                 </div>
 
                 <button
-                  onClick={async () => {
-                    setActionLoading(true);
-                    try {
-                      await login();
-                    } finally {
-                      setActionLoading(false);
-                    }
-                  }}
+                  onClick={() => setStep('phone')}
                   disabled={actionLoading}
                   className="w-full px-6 py-4 bg-emerald-500 hover:bg-emerald-400 text-white rounded-2xl font-black text-sm uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-3 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/35 hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
                 >
-                  {actionLoading ? (
-                    <Loader2 className="animate-spin" size={18} />
-                  ) : (
-                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5 bg-white p-0.5 rounded-full" alt="Google" />
-                  )}
-                  <span>{t("auth.google")}</span>
+                  <Smartphone size={18} className="text-white" />
+                  <span>{t("auth.phone")}</span>
                 </button>
 
                 <div className="relative flex items-center py-2">
@@ -288,12 +279,23 @@ export default function LandingPage() {
                 </div>
 
                 <button
-                  onClick={() => setStep('phone')}
+                  onClick={async () => {
+                    setActionLoading(true);
+                    try {
+                      await login();
+                    } finally {
+                      setActionLoading(false);
+                    }
+                  }}
                   disabled={actionLoading}
                   className="w-full px-6 py-4 bg-[var(--bg-input)] border border-[var(--border-input)] text-bento-text-main rounded-2xl font-black text-xs uppercase tracking-wider hover:bg-[var(--bg-hover)] hover:border-emerald-500/25 transition-all duration-300 flex items-center justify-center gap-3 active:scale-[0.98] cursor-pointer disabled:opacity-50"
                 >
-                  <Smartphone size={18} className="text-emerald-400" />
-                  <span>{t("auth.phone")}</span>
+                  {actionLoading ? (
+                    <Loader2 className="animate-spin" size={18} />
+                  ) : (
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5 bg-white p-0.5 rounded-full" alt="Google" />
+                  )}
+                  <span>{t("auth.google")}</span>
                 </button>
               </motion.div>
             )}

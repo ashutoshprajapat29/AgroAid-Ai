@@ -44,25 +44,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
   const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
 
-  // Connection test on boot
-  useEffect(() => {
-    async function testConnection() {
-      try {
-        await getDocFromServer(doc(db, 'test', 'connection'));
-      } catch (error) {
-        // Non-fatal: just log connectivity issues, don't crash
-        console.warn('Firestore connection test failed (may be offline):', error instanceof Error ? error.message : error);
-      }
-    }
-    testConnection();
-  }, []);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
       if (user) {
         try {
           const docRef = doc(db, "users", user.uid);
-          const docSnap = await getDoc(docRef);
+          let docSnap;
+          
+          try {
+            // Try fetching directly from server first to bypass stale local cache
+            docSnap = await getDocFromServer(docRef);
+          } catch (readErr) {
+            console.warn("getDocFromServer failed, falling back to cached getDoc:", readErr);
+            try {
+              docSnap = await getDoc(docRef);
+            } catch (fallbackErr) {
+              handleFirestoreError(fallbackErr, OperationType.GET, `users/${user.uid}`);
+              throw fallbackErr;
+            }
+          }
           
           if (docSnap.exists()) {
             setProfile(docSnap.data() as UserProfile);
@@ -77,11 +79,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               farmDetails: "",
               preferredLanguage: savedLang
             };
-            await setDoc(docRef, { ...newProfile, createdAt: serverTimestamp() });
-            setProfile(newProfile);
+            try {
+              await setDoc(docRef, { ...newProfile, createdAt: serverTimestamp() });
+              setProfile(newProfile);
+            } catch (writeErr) {
+              handleFirestoreError(writeErr, OperationType.CREATE, `users/${user.uid}`);
+              throw writeErr;
+            }
           }
         } catch (error) {
-          handleFirestoreError(error, OperationType.WRITE, `users/${user.uid}`);
+          // Outer error handler - silent fallback
         }
       } else {
         setProfile(null);
@@ -134,10 +141,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return signOut(auth);
   };
 
-  const setupRecaptcha = (containerId: string) => {
+  const clearRecaptcha = () => {
     if (recaptchaVerifierRef.current) {
-      return recaptchaVerifierRef.current;
+      try { recaptchaVerifierRef.current.clear(); } catch (_) { /* ignore */ }
+      recaptchaVerifierRef.current = null;
     }
+    // Flush any rendered reCAPTCHA widget from the DOM to prevent
+    // "reCAPTCHA has already been rendered in this element" on retry
+    const container = document.getElementById('recaptcha-container');
+    if (container) container.innerHTML = '';
+  };
+
+  const setupRecaptcha = (containerId: string) => {
+    // Always clear stale verifier to avoid reuse after failure
+    clearRecaptcha();
 
     const verifier = new RecaptchaVerifier(auth, containerId, {
       size: 'invisible',
@@ -155,8 +172,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const result = await signInWithPhoneNumber(auth, phoneNumber, verifier);
       setConfirmationResult(result);
     } catch (error: any) {
+      // Clear verifier on ANY failure so the next attempt gets a fresh reCAPTCHA
+      clearRecaptcha();
       console.error("SMS Send Error:", error);
-      if (error.code === 'auth/operation-not-allowed' || error.message.includes('region enabled')) {
+      if (error.code === 'auth/invalid-app-credential') {
+        throw new Error("auth/invalid-app-credential: reCAPTCHA verification failed. Please try again.");
+      }
+      if (error.code === 'auth/operation-not-allowed' || error.message?.includes('region enabled')) {
         throw new Error("Phone authentication or your specific region is not enabled in the Firebase Console. Please enable it in Authentication > Settings > SMS Regions.");
       }
       if (error.code === 'auth/billing-not-enabled') {
