@@ -138,6 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = () => {
     setConfirmationResult(null);
+    clearRecaptcha();
     return signOut(auth);
   };
 
@@ -146,17 +147,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try { recaptchaVerifierRef.current.clear(); } catch (_) { /* ignore */ }
       recaptchaVerifierRef.current = null;
     }
-    // Flush any rendered reCAPTCHA widget from the DOM to prevent
-    // "reCAPTCHA has already been rendered in this element" on retry
+    // Remove the old container completely from the DOM
     const container = document.getElementById('recaptcha-container');
-    if (container) container.innerHTML = '';
+    if (container && container.parentNode) {
+      container.parentNode.removeChild(container);
+    }
   };
 
-  const setupRecaptcha = (containerId: string) => {
-    // Always clear stale verifier to avoid reuse after failure
+  const setupRecaptcha = () => {
+    // Always clear stale verifier and DOM element first
     clearRecaptcha();
 
-    const verifier = new RecaptchaVerifier(auth, containerId, {
+    // Create a brand new container element dynamically
+    const container = document.createElement('div');
+    container.id = 'recaptcha-container';
+    // Style it invisible and place it offscreen
+    container.style.position = 'fixed';
+    container.style.visibility = 'hidden';
+    container.style.pointerEvents = 'none';
+    document.body.appendChild(container);
+
+    const verifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
       size: 'invisible',
       callback: () => {
         // reCAPTCHA solved
@@ -168,7 +179,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const sendOTP = async (phoneNumber: string) => {
     try {
-      const verifier = setupRecaptcha('recaptcha-container');
+      const verifier = setupRecaptcha();
       const result = await signInWithPhoneNumber(auth, phoneNumber, verifier);
       setConfirmationResult(result);
     } catch (error: any) {
@@ -196,6 +207,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await confirmationResult.confirm(code);
       setConfirmationResult(null);
+      // Clean up verifier after successful login
+      clearRecaptcha();
     } catch (error: any) {
       console.error("OTP Verification Error:", error);
       throw error;
@@ -223,7 +236,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return (
     <AuthContext.Provider value={{ user, profile, loading, login, sendOTP, verifyOTP, logout, updateProfile }}>
       {children}
-      <div id="recaptcha-container"></div>
     </AuthContext.Provider>
   );
 }
