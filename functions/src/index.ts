@@ -36,7 +36,7 @@ async function callGemini(prompt: string, jsonMode = false): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY not set in function environment");
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`;
   const body: Record<string, unknown> = {
     contents: [{ parts: [{ text: prompt }] }],
   };
@@ -555,7 +555,7 @@ async function callGeminiAdvanced(opts: GeminiAdvancedOptions): Promise<string> 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY not set in function environment");
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`;
 
   const body: Record<string, unknown> = { contents: opts.contents };
 

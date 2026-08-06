@@ -156,7 +156,7 @@ service cloud.firestore {
     match /advice/{adviceId} {
       // List queries MUST filter by userId (resource.data is null for list ops)
       allow list: if isAuthenticated()
-        && request.query.limit <= 50;
+        && request.query.limit <= 200;
       allow get: if isAuthenticated() && resource.data.userId == request.auth.uid;
       allow create: if isAuthenticated() && isValidId(adviceId) && isValidAdvice(incoming());
       allow delete: if isAuthenticated() && isOwner(resource.data.userId);

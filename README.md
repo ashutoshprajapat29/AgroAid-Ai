@@ -22,7 +22,7 @@
 *   **Frontend:** React, Vite, Tailwind CSS, Lucide Icons, React-Leaflet
 *   **Backend / Database:** Supabase (PostgreSQL) for storing historical Mandi prices, caching, and market data.
 *   **Serverless / Cloud:** Firebase Cloud Functions for backend web scraping and scheduled background tasks. Firebase Hosting for frontend delivery.
-*   **AI Integrations:** Google Gemini 2.5 Flash API (Text generation, Vision, Translation, and Sentiment Classification).
+*   **AI Integrations:** Google Gemini 3.5 Flash API (Text generation, Vision, Translation, and Sentiment Classification).
 
 ## Run Locally
 

@@ -75,7 +75,7 @@ export default function LiveVoiceAdvisor() {
 
       // Connect to Live API
       const sessionPromise = ai.live.connect({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.1-flash-live-preview",
         callbacks: {
           onopen: () => {
             console.log("Live API connected");
