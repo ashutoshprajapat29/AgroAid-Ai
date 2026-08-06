@@ -440,12 +440,12 @@ export const fetchAgriNews = functions
 // ─────────────────────────────────────────────────────────────────────────────
 export const getMarketSentiment = functions
   .runWith({ timeoutSeconds: 60, memory: "256MB" })
-  .https.onCall(async (data: { commodity: string; state: string; district?: string }, context) => {
+  .https.onCall(async (data: { commodity: string; state: string; district?: string; language?: string }, context) => {
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "Authentication required for market sentiment.");
     }
 
-    const { commodity, state, district } = data;
+    const { commodity, state, district, language = "English" } = data;
     if (!commodity || !state) {
       throw new functions.https.HttpsError("invalid-argument", "commodity and state are required");
     }
@@ -483,7 +483,8 @@ export const getMarketSentiment = functions
     // 2. Fetch latest news summaries from Firestore
     let newsItems: NewsItem[] = [];
     try {
-      const newsDoc = await db.collection("agri_news_cache").doc("news_english").get();
+      const cacheDocId = `news_${language.toLowerCase()}`;
+      const newsDoc = await db.collection("agri_news_cache").doc(cacheDocId).get();
       if (newsDoc.exists) {
         newsItems = newsDoc.data()?.items ?? [];
       }
@@ -509,10 +510,10 @@ ${newsStr}
 
 Task: As an expert Indian agricultural commodity analyst, analyze the price trend momentum and news sentiment.
 Do NOT guess exact future prices. Provide:
-1. A sentiment indicator: exactly one of "Bullish", "Bearish", or "Stable"
+1. A sentiment indicator: exactly one of "Bullish", "Bearish", or "Stable" (in English)
 2. A confidence score 0-100
-3. A "why" explanation in exactly 3 plain-language sentences that a farmer can understand
-4. A recommended action for the farmer (1 sentence)
+3. A "why" explanation in exactly 3 plain-language sentences that a farmer can understand. Respond strictly in ${language}.
+4. A recommended action for the farmer (1 sentence). Respond strictly in ${language}.
 
 Return valid JSON: { "sentiment": "Bullish"|"Bearish"|"Stable", "confidence": number, "why": string, "action": string }`;
 
@@ -522,8 +523,8 @@ Return valid JSON: { "sentiment": "Bullish"|"Bearish"|"Stable", "confidence": nu
       return {
         sentiment: result.sentiment ?? "Stable",
         confidence: result.confidence ?? 50,
-        why: result.why ?? "Market data is insufficient for a confident analysis.",
-        action: result.action ?? "Monitor prices daily before selling.",
+        why: result.why ?? (language === "Hindi" ? "बाज़ार डेटा एक विश्वसनीय विश्लेषण के लिए अपर्याप्त है।" : "Market data is insufficient for a confident analysis."),
+        action: result.action ?? (language === "Hindi" ? "बेचने से पहले दैनिक कीमतों की निगरानी करें।" : "Monitor prices daily before selling."),
         priceHistory,
         newsItems,
       };
@@ -532,8 +533,12 @@ Return valid JSON: { "sentiment": "Bullish"|"Bearish"|"Stable", "confidence": nu
       return {
         sentiment: "Stable",
         confidence: 40,
-        why: "Unable to analyze market sentiment at this time. Please check back later.",
-        action: "Hold and monitor the market for the next 2-3 days.",
+        why: language === "Hindi"
+          ? "इस समय बाजार के रुझान का विश्लेषण करने में असमर्थ। कृपया बाद में पुनः प्रयास करें।"
+          : "Unable to analyze market sentiment at this time. Please check back later.",
+        action: language === "Hindi"
+          ? "अगले 2-3 दिनों तक बाजार पर नजर रखें और प्रतीक्षा करें।"
+          : "Hold and monitor the market for the next 2-3 days.",
         priceHistory,
         newsItems,
       };

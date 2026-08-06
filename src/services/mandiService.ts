@@ -496,7 +496,7 @@ export async function fetchMarketSentiment(
       // Call the server-side getMarketSentiment Cloud Function
       // which fetches price history and news on the server, then calls Gemini
       const sentimentFn = httpsCallable<
-        { commodity: string; state: string; district?: string },
+        { commodity: string; state: string; district?: string; language?: string },
         { sentiment: string; confidence: number; why: string; action: string }
       >(functions, "getMarketSentiment");
 
@@ -504,7 +504,7 @@ export async function fetchMarketSentiment(
       const state = localStorage.getItem("farmguide_state") || "Madhya Pradesh";
       const district = localStorage.getItem("farmguide_district") || "Ratlam";
 
-      const result = await sentimentFn({ commodity, state, district });
+      const result = await sentimentFn({ commodity, state, district, language });
       return {
         sentiment: (result.data.sentiment as SentimentResult["sentiment"]) || "Stable",
         confidence: result.data.confidence || 50,
