@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">AgroAid</string>
+    <string name="title_activity_main">AgroAid</string>
+    <string name="package_name">com.agroaid.app</string>
+    <string name="custom_url_scheme">com.agroaid.app</string>
+</resources>
