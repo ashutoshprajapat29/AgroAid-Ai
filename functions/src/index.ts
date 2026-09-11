@@ -433,32 +433,83 @@ export const getMarketSentiment = functions
 
     functions.logger.info(`Sentiment request: ${commodity} in ${state}/${district}`);
 
-    // 1. Fetch last 30 days of modal prices from Supabase
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const cutoffDate = thirtyDaysAgo.toISOString().split("T")[0];
+    // 1. Fetch historical modal prices from Supabase (up to 60-90 days of daily aggregated data)
+    const daysToFetch = Math.min(Math.max((data as any).days || 60, 7), 90);
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - daysToFetch);
+    const cutoffDate = startDate.toISOString().split("T")[0];
 
     let priceHistory: { date: string; modal_price: number; min_price: number; max_price: number }[] = [];
-    try {
-      const { data: rows, error } = await getSupabaseAdmin()
-        .from("mandi_prices")
-        .select("arrival_date, modal_price, min_price, max_price")
-        .eq("commodity", commodity)
-        .eq("state", state)
-        .gte("arrival_date", cutoffDate)
-        .order("arrival_date", { ascending: true })
-        .limit(30);
+    const admin = getSupabaseAdmin();
 
-      if (!error && rows) {
-        priceHistory = rows.map((r: any) => ({
-          date: r.arrival_date,
-          modal_price: r.modal_price,
-          min_price: r.min_price,
-          max_price: r.max_price,
-        }));
+    // Try localized district history via RPC first if district provided
+    if (district) {
+      try {
+        const { data: rpcRows, error: rpcErr } = await (admin as any).rpc("get_price_history", {
+          p_commodity: commodity,
+          p_state: state,
+          p_district: district,
+          p_days: daysToFetch,
+        });
+
+        if (!rpcErr && Array.isArray(rpcRows) && rpcRows.length >= 3) {
+          priceHistory = (rpcRows as any[]).map((r: any) => ({
+            date: r.arrival_date,
+            modal_price: Number(r.avg_modal) || 0,
+            min_price: Number(r.avg_min) || 0,
+            max_price: Number(r.avg_max) || 0,
+          })).filter((p: any) => p.modal_price > 0);
+        }
+      } catch (rpcEx) {
+        functions.logger.warn("RPC get_price_history district lookup failed:", rpcEx);
       }
-    } catch (e) {
-      functions.logger.warn("Supabase price history query failed:", e);
+    }
+
+    // Fallback or broader state aggregation if district data is sparse (< 3 distinct days)
+    if (priceHistory.length < 3) {
+      try {
+        const { data: rows, error } = await (admin as any)
+          .from("mandi_prices")
+          .select("arrival_date, modal_price, min_price, max_price")
+          .ilike("commodity", commodity)
+          .eq("state", state)
+          .gte("arrival_date", cutoffDate)
+          .order("arrival_date", { ascending: true })
+          .limit(1000);
+
+        if (!error && Array.isArray(rows) && rows.length > 0) {
+          // Aggregate multiple markets/varieties into one true daily average per arrival_date
+          const dailyMap = new Map<string, { totalModal: number; min: number; max: number; count: number }>();
+          for (const r of (rows as any[])) {
+            const date = r.arrival_date;
+            const modal = Number(r.modal_price) || 0;
+            const min = Number(r.min_price) || modal;
+            const max = Number(r.max_price) || modal;
+            if (!date || modal <= 0) continue;
+
+            const current = dailyMap.get(date);
+            if (current) {
+              current.totalModal += modal;
+              current.count += 1;
+              current.min = Math.min(current.min, min);
+              current.max = Math.max(current.max, max);
+            } else {
+              dailyMap.set(date, { totalModal: modal, min, max, count: 1 });
+            }
+          }
+
+          priceHistory = Array.from(dailyMap.entries())
+            .map(([date, stats]) => ({
+              date,
+              modal_price: Math.round(stats.totalModal / stats.count),
+              min_price: stats.min,
+              max_price: stats.max,
+            }))
+            .sort((a, b) => a.date.localeCompare(b.date));
+        }
+      } catch (e) {
+        functions.logger.warn("Supabase state price history query failed:", e);
+      }
     }
 
     // 2. Fetch latest news summaries from Firestore
@@ -473,7 +524,23 @@ export const getMarketSentiment = functions
       functions.logger.warn("Could not fetch news:", e);
     }
 
-    // 3. Call Gemini for sentiment analysis
+    // 3. Compute concrete price momentum metrics for Gemini
+    let trendStatsStr = "Insufficient historical price points.";
+    if (priceHistory.length >= 2) {
+      const firstPoint = priceHistory[0];
+      const lastPoint = priceHistory[priceHistory.length - 1];
+      const priceDiff = lastPoint.modal_price - firstPoint.modal_price;
+      const pctChange = ((priceDiff / firstPoint.modal_price) * 100).toFixed(1);
+      const direction = priceDiff > 0 ? "UP" : priceDiff < 0 ? "DOWN" : "STABLE";
+
+      trendStatsStr = `Calculated Price Movement:
+- Historical window: ${priceHistory.length} distinct trading days across past ${daysToFetch} days
+- Earliest recorded price: ₹${firstPoint.modal_price}/qtl on ${firstPoint.date}
+- Latest recorded price: ₹${lastPoint.modal_price}/qtl on ${lastPoint.date}
+- Net change: ${direction} by ₹${Math.abs(priceDiff)}/qtl (${pctChange}%)`;
+    }
+
+    // 4. Call Gemini for sentiment analysis
     const historyStr = priceHistory.length > 0
       ? priceHistory.map((p) => `${p.date}: ₹${p.modal_price}/qtl`).join(", ")
       : "No historical data available — use general market knowledge for this commodity";
@@ -485,7 +552,10 @@ export const getMarketSentiment = functions
     const prompt = `Context:
 - Commodity: ${commodity}
 - Region: ${district ? `${district}, ` : ""}${state}
-- 30-Day Price History: ${historyStr}
+- ${daysToFetch}-Day Daily Aggregated Price History (${priceHistory.length} trading days):
+${historyStr}
+- Trend Analysis:
+${trendStatsStr}
 - Recent Trade/Regulatory News:
 ${newsStr}
 
