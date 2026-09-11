@@ -261,27 +261,8 @@ export const syncMandiToSupabase = functions
       functions.logger.info(`Completed backfill for date ${targetDate}`);
     }
 
-    // Purge records older than 45 days to keep DB size in check
+    // Mandi price retention: Automatic purging disabled to continuously store all historical data in Supabase.
     let purgedRows = 0;
-    try {
-      const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - 45);
-      const cutoffStr = cutoff.toISOString().split("T")[0];
-
-      const { error, count } = await getSupabaseAdmin()
-        .from("mandi_prices")
-        .delete({ count: "exact" })
-        .lt("arrival_date", cutoffStr);
-
-      if (error) {
-        functions.logger.warn("Purge error:", error.message);
-      } else {
-        purgedRows = count ?? 0;
-        functions.logger.info(`Purged ${purgedRows} rows older than ${cutoffStr}`);
-      }
-    } catch (err: any) {
-      functions.logger.warn("Purge exception:", err.message ?? err);
-    }
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
     functions.logger.info(`Sync complete: ${totalUpserted} rows upserted, ${purgedRows} purged, ${totalErrors} errors, ${duration}s`);
