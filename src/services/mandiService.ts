@@ -39,12 +39,18 @@ export interface VarietyPrice {
 }
 
 export interface NewsItem {
+  id?: string;
   title: string;
   impact: string;
   sentiment: "Positive" | "Negative" | "Neutral";
   commodity?: string;
+  commodity_hi?: string;
+  category?: string;
   source?: string;
   link?: string;
+  pubDate?: string;
+  publishedAt?: string;
+  timeAgo?: string;
 }
 
 export interface SentimentResult {
@@ -443,27 +449,90 @@ import { httpsCallable } from "firebase/functions";
 import dynamicTranslations from "../lib/mandi_translations.json";
 import { functions } from "../lib/firebase";
 
-export async function fetchMarketNews(language = "English"): Promise<NewsItem[]> {
-  const cacheKey = `news_rss_${language}`.toLowerCase();
+export async function fetchMarketNews(language = "English", forceRefresh = false): Promise<NewsItem[]> {
+  const cacheKey = `news_rss_v2_${language}`.toLowerCase();
+
+  // Clear any old stale caches if forcing refresh
+  if (forceRefresh) {
+    try {
+      localStorage.removeItem(`apicache_${cacheKey}`);
+      localStorage.removeItem(`apicache_news_rss_${language.toLowerCase()}`);
+    } catch {}
+  }
 
   return cachedApiCall(
     cacheKey,
-    TTL.NEWS,
+    forceRefresh ? 0 : TTL.NEWS,
     async () => {
+      // 1. Try local dev server endpoint (/api/agri-news)
       try {
-        const fetchNewsFn = httpsCallable<{ language: string }, { items: NewsItem[]; cached: boolean }>(
-          functions,
-          "fetchAgriNews"
-        );
-        const result = await fetchNewsFn({ language });
-        return result.data.items || [];
+        const devRes = await fetch(`/api/agri-news?language=${encodeURIComponent(language)}&force=${forceRefresh}`);
+        if (devRes.ok) {
+          const json = await devRes.json();
+          if (Array.isArray(json.items) && json.items.length > 3) {
+            return json.items;
+          }
+        }
+      } catch {
+        // Dev server endpoint not reachable or running in static build
+      }
+
+      // 2. Call Firebase Cloud Function (used in production once deployed)
+      try {
+        const fetchNewsFn = httpsCallable<
+          { language: string; forceRefresh?: boolean },
+          { items: NewsItem[]; cached: boolean; totalCount?: number }
+        >(functions, "fetchAgriNews");
+        const result = await fetchNewsFn({ language, forceRefresh });
+        if (Array.isArray(result.data?.items) && result.data.items.length > 0) {
+          return result.data.items;
+        }
       } catch (e) {
         console.error("Failed to fetch agri news from Cloud Function:", e);
-        return [];
       }
+
+      return [];
     },
     [] as NewsItem[]
   );
+}
+
+/**
+ * Group news items by commodity.
+ * Returns record with commodity name as key, sorted by count descending.
+ */
+export function groupNewsByCommodity(news: NewsItem[], isHindi = false): Record<string, NewsItem[]> {
+  const groups: Record<string, NewsItem[]> = {};
+
+  for (const item of news) {
+    const key = (isHindi && item.commodity_hi) ? item.commodity_hi : (item.commodity || "General Agriculture");
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(item);
+  }
+
+  // Sort keys by number of articles descending
+  const sortedKeys = Object.keys(groups).sort((a, b) => {
+    if (a.includes("General") || a.includes("सामान्य")) return 1;
+    if (b.includes("General") || b.includes("सामान्य")) return -1;
+    return groups[b].length - groups[a].length;
+  });
+
+  const sortedRecord: Record<string, NewsItem[]> = {};
+  for (const k of sortedKeys) {
+    sortedRecord[k] = groups[k];
+  }
+  return sortedRecord;
+}
+
+/**
+ * Get list of commodities with their article count.
+ */
+export function getCommodityNewsCounts(news: NewsItem[], isHindi = false): { commodity: string; count: number }[] {
+  const grouped = groupNewsByCommodity(news, isHindi);
+  return Object.entries(grouped).map(([commodity, items]) => ({
+    commodity,
+    count: items.length,
+  }));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

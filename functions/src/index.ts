@@ -23,10 +23,18 @@ function getSupabaseAdmin() {
 // TYPES
 // ─────────────────────────────────────────────────────────────────────────────
 interface NewsItem {
+  id: string;
   title: string;
   impact: string;
   sentiment: "Positive" | "Negative" | "Neutral";
+  commodity: string;
+  commodity_hi: string;
+  category?: string;
   source?: string;
+  link?: string;
+  pubDate?: string;
+  publishedAt?: string;
+  timeAgo?: string;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -283,134 +291,280 @@ export const syncMandiToSupabase = functions
   });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FUNCTION 2: RSS Agri News Aggregator + Gemini Sentiment (HTTP endpoint)
-// Called from frontend — replaces allorigins.win proxy
-// Results cached 12 hours in Firestore
+// FUNCTION 2: Live Multi-Source Agri News Aggregator + Commodity Grouping
+// Aggregates real-time news from verified Indian agriculture RSS feeds:
+// - The Hindu BusinessLine (Agri-business)
+// - Google News India Agriculture (English & Hindi)
+// - Krishi Jagran
+// Grouped by commodity with sentiment analysis and cached for 1 hour
 // ─────────────────────────────────────────────────────────────────────────────
+
 const RSS_FEEDS = [
-  { url: "https://www.krishijagran.com/rss/news.xml", source: "Krishi Jagran" },
-  { url: "https://economictimes.indiatimes.com/news/economy/agriculture/rssfeeds/68880913.cms", source: "ET Agriculture" },
+  { url: "https://www.thehindubusinessline.com/economy/agri-business/feeder/default.rss", defaultSource: "The Hindu BusinessLine", lang: "en" },
+  { url: "https://news.google.com/rss/search?q=agriculture+india+mandi+crop+prices&hl=en-IN&gl=IN&ceid=IN:en", defaultSource: "Google News", lang: "en" },
+  { url: "https://news.google.com/rss/search?q=%E0%A4%95%E0%A5%83%E0%A4%B7%E0%A4%BF+%E0%A4%AE%E0%A4%82%E0%A4%A1%E0%A5%80+%E0%A4%AB%E0%A4%B8%E0%A4%B2+%E0%A4%AD%E0%A4%BE%E0%A4%B5&hl=hi&gl=IN&ceid=IN:hi", defaultSource: "Google News Hindi", lang: "hi" },
+  { url: "https://krishijagran.com/feeds/rss", defaultSource: "Krishi Jagran", lang: "en" },
 ];
 
-async function fetchRSSFeedServer(feedUrl: string, source: string): Promise<{ title: string; description: string; link: string; source: string }[]> {
+function cleanXmlText(str: string): string {
+  if (!str) return "";
+  return str
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&#8216;|&#8217;/g, "'")
+    .replace(/&#8220;|&#8221;/g, '"')
+    .replace(/&#8230;/g, "...")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+const COMMODITY_TAXONOMY = [
+  { name: "Wheat", hi: "गेहूँ", patterns: [/\bwheat\b/i, /\bgehu\b/i, /गेहूं/, /गेहूँ/] },
+  { name: "Paddy / Rice", hi: "धान / चावल", patterns: [/\bpaddy\b/i, /\brice\b/i, /\bdhan\b/i, /धान/, /चावल/, /बासमती/, /\bbasmati\b/i] },
+  { name: "Soybean", hi: "सोयाबीन", patterns: [/\bsoybean\b/i, /\bsoya\b/i, /सोयाबीन/, /सोया/] },
+  { name: "Cotton", hi: "कपास", patterns: [/\bcotton\b/i, /\bkapas\b/i, /\bnarma\b/i, /कपास/, /नरमा/, /सूत/] },
+  { name: "Mustard", hi: "सरसों", patterns: [/\bmustard\b/i, /\bsarson\b/i, /\brapeseed\b/i, /सरसों/, /राई/, /तारामीरा/] },
+  { name: "Onion", hi: "प्याज", patterns: [/\bonion\b/i, /\bpyaz\b/i, /प्याज/, /कांदा/] },
+  { name: "Potato", hi: "आलू", patterns: [/\bpotato\b/i, /\baloo\b/i, /आलू/] },
+  { name: "Tomato", hi: "टमाटर", patterns: [/\btomato\b/i, /\btamatar\b/i, /टमाटर/] },
+  { name: "Maize / Corn", hi: "मक्का", patterns: [/\bmaize\b/i, /\bcorn\b/i, /\bmakka\b/i, /मक्का/, /भुट्टा/] },
+  { name: "Gram / Chana", hi: "चना", patterns: [/\bchana\b/i, /\bchickpea\b/i, /\bgram\b/i, /चना/, /छोले/, /काबुली/] },
+  { name: "Pulses / Dal", hi: "दालें / दलहन", patterns: [/\bpulses?\b/i, /\bdal\b/i, /\btur\b/i, /\barhar\b/i, /\bmoong\b/i, /\burad\b/i, /\bmasoor\b/i, /दलहन/, /दाल/, /अरहर/, /मूंग/, /उड़द/, /मसूर/] },
+  { name: "Garlic & Ginger", hi: "लहसुन व अदरक", patterns: [/\bgarlic\b/i, /\bginger\b/i, /\blahsun\b/i, /\badrak\b/i, /लहसुन/, /अदरक/] },
+  { name: "Spices", hi: "मसाले", patterns: [/\bspices?\b/i, /\bjeera\b/i, /\bcumin\b/i, /\bcoriander\b/i, /\bdhaniya\b/i, /\bturmeric\b/i, /\bhaldi\b/i, /\bchilli\b/i, /\bcardamom\b/i, /मसाले/, /जीरा/, /हल्दी/, /धनिया/, /मिर्च/, /इलायची/] },
+  { name: "Sugarcane", hi: "गन्ना", patterns: [/\bsugarcane\b/i, /\bsugar\b/i, /\bganna\b/i, /गन्ना/, /चीनी/, /गुड़/, /\bjaggery\b/i] },
+  { name: "Edible Oils", hi: "खाद्य तेल", patterns: [/\bedible oils?\b/i, /\boilseeds?\b/i, /\bpalm oil\b/i, /तिलहन/, /खाद्य तेल/, /तेल/] },
+  { name: "Fruits & Vegetables", hi: "फल व सब्जियां", patterns: [/\bfruits?\b/i, /\bvegetables?\b/i, /\bapple\b/i, /\bmango\b/i, /\bbanana\b/i, /फल/, /सब्ज/] },
+  { name: "Dairy & Livestock", hi: "डेयरी व पशुपालन", patterns: [/\bmilk\b/i, /\bdairy\b/i, /\bcattle\b/i, /\blivestock\b/i, /\bpoultry\b/i, /दूध/, /डेयरी/, /पशु/, /गोपालन/] },
+  { name: "Fertilizer & Seeds", hi: "उर्वरक व बीज", patterns: [/\bfertilizer\b/i, /\burea\b/i, /\bdap\b/i, /\bseeds?\b/i, /खाद/, /उर्वरक/, /यूरिया/, /बीज/] },
+  { name: "Weather & Monsoon", hi: "मौसम व मानसून", patterns: [/\bmonsoon\b/i, /\brainfall\b/i, /\bweather\b/i, /\bdrought\b/i, /\bflood\b/i, /\brain\b/i, /बारिश/, /मानसून/, /मौसम/, /सूखा/, /बाढ़/] },
+  { name: "Policy & MSP", hi: "नीति व एमएसपी", patterns: [/\bmsp\b/i, /\bprocurement\b/i, /\bsubsidy\b/i, /\bscheme\b/i, /\bkisan\b/i, /एमएसपी/, /सब्सिडी/, /खरीद/, /योजना/, /नीति/] }
+];
+
+function classifyCommodity(text: string): { commodity: string; commodity_hi: string } {
+  for (const item of COMMODITY_TAXONOMY) {
+    for (const pat of item.patterns) {
+      if (pat.test(text)) {
+        return { commodity: item.name, commodity_hi: item.hi };
+      }
+    }
+  }
+  return { commodity: "General Agriculture", commodity_hi: "सामान्य कृषि" };
+}
+
+function classifySentiment(text: string): "Positive" | "Negative" | "Neutral" {
+  const posRegex = /\b(surge|jump|ris(e|ing|en)|gains?|hike|rally|higher|boom|record|bumper|profit|bullish|relief|boost|upswing)\b|तेजी|उछाल|बढ़ोतरी|रिकॉर्ड|मुनाफा|बंपर|खुश|राहत|मजबूत|वृद्धि|ऊंचे|फायदा/i;
+  const negRegex = /\b(crash|falls?|falling|fallen|drop|plunge|slump|decline|loss(es)?|pest|damage|rot|delay|drought|flood|dip|bearish|slashing|glut)\b|गिरावट|मंदी|नुकसान|घाटा|कीट|रोग|सूखा|बाढ़|कमी|गिरे|कम|चुनौती|संकट|असर/i;
+
+  if (posRegex.test(text)) return "Positive";
+  if (negRegex.test(text)) return "Negative";
+  return "Neutral";
+}
+
+function generateImpact(desc: string, _title: string, commodity: string, commodity_hi: string, sentiment: "Positive" | "Negative" | "Neutral", isHindi: boolean): string {
+  if (desc && desc.length > 25) {
+    const cleaned = desc.slice(0, 180);
+    return cleaned.endsWith(".") ? cleaned : cleaned + "...";
+  }
+  if (isHindi) {
+    if (sentiment === "Positive") {
+      return `इस घटनाक्रम से ${commodity_hi} के बाजार भाव व मांग में सकारात्मक रुझान देखने को मिल सकता है।`;
+    } else if (sentiment === "Negative") {
+      return `इस खबर से ${commodity_hi} की स्थानीय आवक व मंडी कीमतों पर दबाव रहने की संभावना है।`;
+    }
+    return `${commodity_hi} से जुड़ी नवीनतम गतिविधियों पर किसान मंडी भाव व आगामी नीतियों के अनुसार निर्णय लें।`;
+  } else {
+    if (sentiment === "Positive") {
+      return `Positive developments indicate supportive price momentum and steady trade demand for ${commodity}.`;
+    } else if (sentiment === "Negative") {
+      return `Market signals suggest cautious arrivals or downward price pressure for ${commodity}.`;
+    }
+    return `Stay updated on mandi arrivals and trading volume trends regarding ${commodity}.`;
+  }
+}
+
+function getRelativeTime(dateStr?: string, isHindi = false): string {
+  if (!dateStr) return isHindi ? "ताज़ा" : "Recent";
+  try {
+    const timestamp = Date.parse(dateStr);
+    if (isNaN(timestamp)) return isHindi ? "ताज़ा" : "Recent";
+    const diffMs = Date.now() - timestamp;
+    if (diffMs < 0 || diffMs < 60 * 1000) return isHindi ? "अभी-अभी" : "Just now";
+    const mins = Math.floor(diffMs / (60 * 1000));
+    const hours = Math.floor(diffMs / (60 * 60 * 1000));
+    const days = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+    if (mins < 60) return isHindi ? `${mins} मिनट पहले` : `${mins}m ago`;
+    if (hours < 24) return isHindi ? `${hours} घंटे पहले` : `${hours}h ago`;
+    if (days === 1) return isHindi ? "कल" : "Yesterday";
+    return isHindi ? `${days} दिन पहले` : `${days}d ago`;
+  } catch {
+    return isHindi ? "ताज़ा" : "Recent";
+  }
+}
+
+async function fetchRSSFeedServer(
+  feedUrl: string,
+  defaultSource: string,
+  isHindiLang: boolean
+): Promise<NewsItem[]> {
   try {
     const resp = await axios.get(feedUrl, {
       timeout: 10000,
-      headers: { "User-Agent": "AgroAid-AI/1.0 (+https://agroaid.app)" },
-      maxContentLength: 512 * 1024,
-      maxBodyLength: 512 * 1024,
+      headers: { "User-Agent": "AgroAid-AI/2.0 (+https://agroaid.app)" },
+      maxContentLength: 1024 * 1024,
+      maxBodyLength: 1024 * 1024,
     });
     const text: string = resp.data;
-
-    const articles: { title: string; description: string; link: string; source: string }[] = [];
+    const articles: NewsItem[] = [];
     const itemRegex = /<item>([\s\S]*?)<\/item>/gi;
     let match;
-    while ((match = itemRegex.exec(text)) !== null && articles.length < 5) {
-      const item = match[1];
-      const title = item.match(/<title><!\[CDATA\[(.*?)\]\]>|<title>(.*?)<\/title>/)?.[1] || item.match(/<title>(.*?)<\/title>/)?.[1] || "";
-      const desc  = item.match(/<description><!\[CDATA\[(.*?)\]\]>|<description>(.*?)<\/description>/)?.[1] || item.match(/<description>(.*?)<\/description>/)?.[1] || "";
-      const link  = item.match(/<link>(.*?)<\/link>/)?.[1] || "";
-      if (title.trim()) {
-        articles.push({
-          title: title.replace(/<[^>]+>/g, "").trim(),
-          description: desc.replace(/<[^>]+>/g, "").trim().slice(0, 200),
-          link: link.trim(),
-          source,
-        });
+
+    while ((match = itemRegex.exec(text)) !== null) {
+      const itemXml = match[1];
+      const title = cleanXmlText(itemXml.match(/<title>([\s\S]*?)<\/title>/)?.[1] || "");
+      if (!title || title.length < 8) continue;
+
+      const desc = cleanXmlText(itemXml.match(/<description>([\s\S]*?)<\/description>/)?.[1] || "");
+      const link = cleanXmlText(itemXml.match(/<link>([\s\S]*?)<\/link>/)?.[1] || "");
+      const pubDate = cleanXmlText(itemXml.match(/<pubDate>([\s\S]*?)<\/pubDate>/)?.[1] || "");
+      const itemSource = cleanXmlText(itemXml.match(/<source[^>]*>([\s\S]*?)<\/source>/)?.[1] || "") || defaultSource;
+
+      const fullContent = `${title} ${desc}`;
+      const { commodity, commodity_hi } = classifyCommodity(fullContent);
+      const sentiment = classifySentiment(fullContent);
+      const impact = generateImpact(desc, title, commodity, commodity_hi, sentiment, isHindiLang);
+      const timeAgo = getRelativeTime(pubDate, isHindiLang);
+
+      // Create a deterministic clean ID
+      const cleanSlug = title.toLowerCase().replace(/[^a-z0-9\u0900-\u097F]/g, "").slice(0, 30);
+      const id = `${cleanSlug}-${Date.parse(pubDate) || articles.length}`;
+
+      let publishedAt = new Date().toISOString();
+      if (pubDate) {
+        const parsed = Date.parse(pubDate);
+        if (!isNaN(parsed)) publishedAt = new Date(parsed).toISOString();
       }
+
+      articles.push({
+        id,
+        title,
+        impact,
+        sentiment,
+        commodity,
+        commodity_hi,
+        source: itemSource,
+        link,
+        pubDate,
+        publishedAt,
+        timeAgo,
+      });
     }
     return articles;
   } catch (e) {
-    functions.logger.warn(`RSS feed ${source} failed:`, e);
+    functions.logger.warn(`RSS feed ${defaultSource} failed:`, e);
     return [];
   }
 }
 
 export const fetchAgriNews = functions
   .runWith({ timeoutSeconds: 60, memory: "256MB" })
-  .https.onCall(async (data: { language?: string }, context) => {
+  .https.onCall(async (data: { language?: string; forceRefresh?: boolean }, context) => {
     const language = data.language || "English";
+    const isHindi = language === "Hindi";
     const cacheDocId = `news_${language.toLowerCase()}`;
+    const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour fresh cache
 
-    // Check Firestore cache (12hr)
-    try {
-      const doc = await db.collection("agri_news_cache").doc(cacheDocId).get();
-      if (doc.exists) {
-        const cacheData = doc.data()!;
-        const ageMs = Date.now() - (cacheData.cached_at?.toMillis() ?? 0);
-        if (ageMs < 12 * 60 * 60 * 1000) {
-          return { items: cacheData.items, cached: true };
+    // Check Firestore cache unless forceRefresh
+    if (!data.forceRefresh) {
+      try {
+        const doc = await db.collection("agri_news_cache").doc(cacheDocId).get();
+        if (doc.exists) {
+          const cacheData = doc.data()!;
+          const ageMs = Date.now() - (cacheData.cached_at?.toMillis() ?? 0);
+          if (ageMs < CACHE_TTL_MS && Array.isArray(cacheData.items) && cacheData.items.length > 0) {
+            return { items: cacheData.items, cached: true, totalCount: cacheData.items.length };
+          }
         }
+      } catch (e) {
+        functions.logger.warn("Cache read failed:", e);
       }
-    } catch (e) {
-      functions.logger.warn("Cache read failed:", e);
     }
 
     // Fetch RSS feeds in parallel
     const feedResults = await Promise.allSettled(
-      RSS_FEEDS.map((f) => fetchRSSFeedServer(f.url, f.source))
+      RSS_FEEDS.map((f) => fetchRSSFeedServer(f.url, f.defaultSource, isHindi))
     );
-    const allArticles: { title: string; description: string; link: string; source: string }[] = [];
+
+    const allArticles: NewsItem[] = [];
+    const seenTitles = new Set<string>();
+
     for (const result of feedResults) {
-      if (result.status === "fulfilled") allArticles.push(...result.value);
-    }
-
-    let items: NewsItem[] = [];
-
-    if (allArticles.length > 0) {
-      const top = allArticles.slice(0, 5);
-      const langNote = language === "Hindi"
-        ? "Translate title and impact to Hindi (Devanagari script)."
-        : "Keep in English.";
-      const prompt = `Classify the sentiment of these agricultural news articles. ${langNote}\nArticles:\n${top.map((a, i) => `${i + 1}. "${a.title}" — ${a.description}`).join("\n")}\n\nReturn ONLY a JSON array. For each: {\"title\":string,\"impact\":string (2 short sentences),\"sentiment\":\"Positive\"|\"Negative\"|\"Neutral\",\"commodity\":string,\"source\":string,\"link\":string}`;
-      try {
-        const raw = await callGemini(prompt, true);
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          items = parsed.map((item: any, i: number) => ({
-            ...item,
-            source: top[i]?.source ?? item.source ?? "",
-            link: top[i]?.link ?? item.link ?? "",
-          })).slice(0, 4);
+      if (result.status === "fulfilled") {
+        for (const item of result.value) {
+          const normTitle = item.title.toLowerCase().replace(/[^a-z0-9\u0900-\u097F]/g, "").slice(0, 45);
+          if (!seenTitles.has(normTitle)) {
+            seenTitles.add(normTitle);
+            allArticles.push(item);
+          }
         }
-      } catch (e) {
-        functions.logger.warn("Gemini classification failed, using raw articles");
-        items = top.slice(0, 4).map((a) => ({
-          title: a.title,
-          impact: a.description,
-          sentiment: "Neutral" as const,
-          commodity: "General",
-          source: a.source,
-          link: a.link,
-        }));
       }
     }
 
-    // Fallback: AI-generated news
-    if (items.length === 0) {
-      const langNote = language === "Hindi" ? "Write in Hindi (Devanagari)." : "Write in English.";
-      const prompt = `Generate 3 realistic agricultural news items for Indian farmers today. Cover: MSP/government policy, monsoon/weather, export/import. ${langNote}\nReturn ONLY JSON array of 3: {\"title\":string,\"impact\":string,\"sentiment\":\"Positive\"|\"Negative\"|\"Neutral\",\"commodity\":string}`;
-      try {
-        const raw = await callGemini(prompt, true);
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) items = parsed.slice(0, 3);
-      } catch (e) {
-        functions.logger.error("Fallback news generation failed:", e);
-      }
+    // Sort by publication timestamp descending (freshest first)
+    allArticles.sort((a, b) => {
+      const timeA = a.publishedAt ? Date.parse(a.publishedAt) : 0;
+      const timeB = b.publishedAt ? Date.parse(b.publishedAt) : 0;
+      return timeB - timeA;
+    });
+
+    // If language is Hindi, prioritize Hindi articles at top, then English articles
+    if (isHindi) {
+      allArticles.sort((a, b) => {
+        const isHindiA = /[\u0900-\u097F]/.test(a.title) ? 1 : 0;
+        const isHindiB = /[\u0900-\u097F]/.test(b.title) ? 1 : 0;
+        return isHindiB - isHindiA;
+      });
     }
 
-    // Cache result
+    // Fallback: in case all network feeds were unreachable
+    if (allArticles.length === 0) {
+      allArticles.push({
+        id: "fallback-news-1",
+        title: isHindi
+          ? "मंडियों में नई रबी फसलों की आवक सामान्य, समर्थन मूल्य पर खरीद जारी"
+          : "Mandi arrivals for rabi crops remain steady, procurement active at MSP",
+        impact: isHindi
+          ? "प्रमुख कृषि उपज मंडियों में सामान्य व्यापारिक कारोबार जारी है।"
+          : "Trading continues normally across major agricultural markets in the region.",
+        sentiment: "Neutral",
+        commodity: "Wheat",
+        commodity_hi: "गेहूँ",
+        source: "AgroAid Market Desk",
+        timeAgo: isHindi ? "आज" : "Today",
+        publishedAt: new Date().toISOString(),
+      });
+    }
+
+    // Cache results in Firestore
     try {
       await db.collection("agri_news_cache").doc(cacheDocId).set({
-        items,
+        items: allArticles,
         cached_at: admin.firestore.Timestamp.now(),
         language,
+        totalCount: allArticles.length,
       });
     } catch (e) {
       functions.logger.warn("Cache write failed:", e);
     }
 
-    return { items, cached: false };
+    return { items: allArticles, cached: false, totalCount: allArticles.length };
   });
 
 
@@ -545,8 +699,16 @@ export const getMarketSentiment = functions
       ? priceHistory.map((p) => `${p.date}: ₹${p.modal_price}/qtl`).join(", ")
       : "No historical data available — use general market knowledge for this commodity";
 
-    const newsStr = newsItems.length > 0
-      ? newsItems.map((n) => `[${n.sentiment}] ${n.title}: ${n.impact}`).join("\n")
+    // Filter news specific to this commodity, or general news if sparse
+    const relevantNews = newsItems.filter((n) =>
+      (n.commodity && n.commodity.toLowerCase().includes(commodity.toLowerCase())) ||
+      (commodity.toLowerCase().includes(n.commodity?.toLowerCase() || "")) ||
+      n.title.toLowerCase().includes(commodity.toLowerCase())
+    );
+    const chosenNews = relevantNews.length > 0 ? relevantNews.slice(0, 6) : newsItems.slice(0, 4);
+
+    const newsStr = chosenNews.length > 0
+      ? chosenNews.map((n) => `[${n.sentiment} | ${n.commodity}] ${n.title}: ${n.impact}`).join("\n")
       : "No specific news — use general seasonal patterns";
 
     const prompt = `Context:

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useBackButton } from "../hooks/useBackButton";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -11,12 +11,14 @@ import {
   Brain, Loader2, AlertCircle, BarChart2, Search,
   ArrowUpRight, ArrowDownRight, Navigation,
   Store, Filter, X, ChevronLeft, ExternalLink, Clock,
+  Maximize2, Layers, List,
 } from "lucide-react";
 import {
   fetchLatestPrices, fetchPriceHistory, fetchMarketNews,
   fetchMarketSentiment, fetchNearbyPrices, searchMandiPrices,
   fetchMarketComparison, fetchStates, fetchDistricts, fetchMarkets,
   fetchCommodityVarieties,
+  groupNewsByCommodity, getCommodityNewsCounts,
   INDIA_STATES_DISTRICTS,
   COMMON_COMMODITIES, COMMON_COMMODITIES_HI, COMMON_LOCATIONS_HI,
   MandiPrice, PriceHistory, NewsItem, SentimentResult, MarketCompare,
@@ -142,51 +144,91 @@ function SentimentBadge({ s, isHindi }: { s: SentimentResult; isHindi: boolean }
 }
 
 // ─── News Card ────────────────────────────────────────────────────────────────
-function NewsCard({ item, index }: { item: NewsItem; index: number }) {
-  // Guard: fallback for unexpected sentiment values to prevent crashes
+function NewsCard({ item, index, isHindi = false }: { item: NewsItem; index: number; isHindi?: boolean }) {
   const sentConf = ({
-    Positive: { bg: "bg-emerald-500/10", border: "border-emerald-500/20", badge: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30", dot: "bg-emerald-400" },
-    Negative: { bg: "bg-rose-500/10", border: "border-rose-500/20", badge: "bg-rose-500/20 text-rose-400 border-rose-500/30", dot: "bg-rose-400" },
-    Neutral: { bg: "bg-amber-500/10", border: "border-amber-500/20", badge: "bg-amber-500/20 text-amber-400 border-amber-500/30", dot: "bg-amber-400" },
-  } as Record<string, { bg: string; border: string; badge: string; dot: string }>)[item.sentiment]
-    ?? { bg: "bg-slate-500/10", border: "border-slate-500/20", badge: "bg-slate-500/20 text-slate-400 border-slate-500/30", dot: "bg-slate-400" };
+    Positive: {
+      bg: "bg-emerald-500/10",
+      border: "border-emerald-500/20",
+      badge: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+      dot: "bg-emerald-400",
+      label: isHindi ? "सकारात्मक" : "Positive",
+    },
+    Negative: {
+      bg: "bg-rose-500/10",
+      border: "border-rose-500/20",
+      badge: "bg-rose-500/20 text-rose-400 border-rose-500/30",
+      dot: "bg-rose-400",
+      label: isHindi ? "नकारात्मक" : "Negative",
+    },
+    Neutral: {
+      bg: "bg-amber-500/10",
+      border: "border-amber-500/20",
+      badge: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+      dot: "bg-amber-400",
+      label: isHindi ? "तटस्थ" : "Neutral",
+    },
+  } as Record<string, { bg: string; border: string; badge: string; dot: string; label: string }>)[item.sentiment]
+    ?? {
+      bg: "bg-slate-500/10",
+      border: "border-slate-500/20",
+      badge: "bg-slate-500/20 text-slate-400 border-slate-500/30",
+      dot: "bg-slate-400",
+      label: item.sentiment,
+    };
+
+  const commodityLabel = isHindi && item.commodity_hi
+    ? item.commodity_hi
+    : (item.commodity || "");
 
   return (
     <motion.div
-      initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: index * 0.1 }}
-      className={`rounded-2xl p-4 border ${sentConf.bg} ${sentConf.border}`}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: Math.min(index * 0.04, 0.4) }}
+      className={`rounded-2xl p-4 border transition-all duration-200 hover:border-emerald-500/30 ${sentConf.bg} ${sentConf.border}`}
     >
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border ${sentConf.badge}`}>
-          <div className={`inline-block w-1 h-1 rounded-full mr-1 ${sentConf.dot}`} />
-          {item.sentiment}
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border flex items-center gap-1 ${sentConf.badge}`}>
+          <div className={`w-1.5 h-1.5 rounded-full ${sentConf.dot}`} />
+          {sentConf.label}
         </span>
-        {item.commodity && item.commodity !== "General" && (
-          <span className="text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border input-surface text-theme-subtle">
-            {item.commodity}
+        {commodityLabel && commodityLabel !== "General" && commodityLabel !== "सामान्य कृषि" && (
+          <span className="text-[9px] font-bold tracking-wide px-2 py-0.5 rounded-full border input-surface text-theme-subtle">
+            {commodityLabel}
           </span>
         )}
       </div>
       <h4 className="text-sm font-bold leading-snug mb-1.5 text-theme-main">
         {item.title}
       </h4>
-      <p className="text-xs leading-relaxed text-theme-muted">
+      <p className="text-xs leading-relaxed text-theme-muted line-clamp-3">
         {item.impact}
       </p>
-      {item.source && (
-        <div className="flex items-center justify-between mt-2 pt-2 border-t border-theme-card">
-          <span className="text-[8px] font-bold uppercase tracking-widest text-theme-subtle">
-            {item.source}
-          </span>
-          {item.link && (
-            <a href={item.link} target="_blank" rel="noopener noreferrer" className="text-[8px] font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-0.5 transition-colors">
-              Read <ExternalLink size={8} />
-            </a>
+      <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-theme-card text-[9px]">
+        <div className="flex items-center gap-2 text-theme-subtle font-medium">
+          {item.source && (
+            <span className="font-bold text-theme-main/80 truncate max-w-[130px]">
+              {item.source}
+            </span>
+          )}
+          {item.timeAgo && (
+            <span className="flex items-center gap-0.5 text-theme-subtle">
+              <Clock size={9} />
+              {item.timeAgo}
+            </span>
           )}
         </div>
-      )}
+        {item.link && (
+          <a
+            href={item.link}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 transition-colors px-2 py-0.5 rounded-md bg-emerald-500/10 hover:bg-emerald-500/20"
+          >
+            {isHindi ? "पूरी खबर" : "Read"} <ExternalLink size={9} />
+          </a>
+        )}
+      </div>
     </motion.div>
   );
 }
@@ -369,6 +411,13 @@ export default function MarketDashboard() {
   const [prices, setPrices] = useState<MandiPrice[]>([]);
   const [priceHistory, setPriceHistory] = useState<PriceHistory[]>([]);
   const [news, setNews] = useState<NewsItem[]>([]);
+  const [selectedNewsCommodity, setSelectedNewsCommodity] = useState<string>("All");
+  const [newsSearchQuery, setNewsSearchQuery] = useState("");
+  const [newsViewMode, setNewsViewMode] = useState<"stream" | "grouped">("stream");
+  const [isAllNewsModalOpen, setIsAllNewsModalOpen] = useState(false);
+  const [newsVisibleCount, setNewsVisibleCount] = useState(6);
+  const [showAllDetailNews, setShowAllDetailNews] = useState(false);
+  const [sentimentFilter, setSentimentFilter] = useState<string>("All");
   const [sentiment, setSentiment] = useState<SentimentResult | null>(null);
   const [marketComparison, setMarketComparison] = useState<MarketCompare[]>([]);
 
@@ -490,11 +539,11 @@ export default function MarketDashboard() {
   }, [selectedState, selectedDistrict, selectedMarket, language, isHindi]);
 
   // ── Load news ─────────────────────────────────────────────────────────────
-  const loadNews = useCallback(async () => {
+  const loadNews = useCallback(async (force = false) => {
     setLoadingNews(true);
     setNewsError(false);
     try {
-      const data = await fetchMarketNews(language);
+      const data = await fetchMarketNews(language, force);
       setNews(data);
       if (data.length === 0) setNewsError(true);
     } catch (e) {
@@ -706,13 +755,60 @@ export default function MarketDashboard() {
 
   // ── Filtered news for selected commodity ──────────────────────────────────
   const detailNews = detailCommodity
-    ? news.filter(
-      (n) =>
-        !n.commodity ||
-        n.commodity === "General" ||
-        n.commodity.toLowerCase() === detailCommodity.commodity.toLowerCase()
-    )
+    ? news.filter((n) => {
+      const comm = detailCommodity.commodity.toLowerCase();
+      const nComm = (n.commodity || "").toLowerCase();
+      const nCommHi = (n.commodity_hi || "");
+      const title = n.title.toLowerCase();
+      return (
+        nComm.includes(comm) ||
+        comm.includes(nComm) ||
+        title.includes(comm) ||
+        (nCommHi && detailCommodity.commodity.includes(nCommHi)) ||
+        (nCommHi && nCommHi.includes(detailCommodity.commodity))
+      );
+    })
     : [];
+
+  // ── News Commodity Counts & Filtered News for Sidebar / News Center ────────
+  const commodityNewsCounts = useMemo(() => {
+    return getCommodityNewsCounts(news, isHindi);
+  }, [news, isHindi]);
+
+  const filteredNews = useMemo(() => {
+    return news.filter((item) => {
+      // Commodity filter
+      if (selectedNewsCommodity !== "All") {
+        if (
+          item.commodity !== selectedNewsCommodity &&
+          item.commodity_hi !== selectedNewsCommodity
+        ) {
+          return false;
+        }
+      }
+
+      // Sentiment filter
+      if (sentimentFilter !== "All" && item.sentiment !== sentimentFilter) {
+        return false;
+      }
+
+      // Search query filter
+      if (newsSearchQuery.trim()) {
+        const q = newsSearchQuery.toLowerCase();
+        const inTitle = item.title.toLowerCase().includes(q);
+        const inImpact = item.impact.toLowerCase().includes(q);
+        const inComm = (item.commodity || "").toLowerCase().includes(q) || (item.commodity_hi || "").includes(q);
+        const inSource = (item.source || "").toLowerCase().includes(q);
+        if (!inTitle && !inImpact && !inComm && !inSource) return false;
+      }
+
+      return true;
+    });
+  }, [news, selectedNewsCommodity, sentimentFilter, newsSearchQuery, isHindi]);
+
+  const groupedNewsData = useMemo(() => {
+    return groupNewsByCommodity(filteredNews, isHindi);
+  }, [filteredNews, isHindi]);
 
   return (
     <div className="max-w-[1400px] mx-auto pb-20 space-y-5">
@@ -1349,17 +1445,36 @@ export default function MarketDashboard() {
                 {/* Related News for this commodity */}
                 {detailNews.length > 0 && (
                   <div className="rounded-2xl p-5 border card-surface">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="p-2 rounded-xl bg-amber-500/12 border border-amber-500/20">
-                        <Newspaper size={16} className="text-amber-400" />
+                    <div className="flex items-center justify-between gap-3 mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-xl bg-amber-500/12 border border-amber-500/20">
+                          <Newspaper size={16} className="text-amber-400" />
+                        </div>
+                        <div>
+                          <h3 className="font-black text-sm text-theme-main">
+                            {isHindi ? `${translate(detailCommodity.commodity)} समाचार` : `${detailCommodity.commodity} News`}
+                          </h3>
+                          <p className="text-[10px] text-theme-subtle">
+                            {isHindi ? `${detailNews.length} समाचार रिपोर्ट उपलब्ध` : `${detailNews.length} market reports found`}
+                          </p>
+                        </div>
                       </div>
-                      <h3 className="font-black text-sm text-theme-main">
-                        {isHindi ? "संबंधित समाचार" : "Related News"}
-                      </h3>
                     </div>
                     <div className="space-y-3">
-                      {detailNews.slice(0, 3).map((item, i) => <NewsCard key={i} item={item} index={i} />)}
+                      {(showAllDetailNews ? detailNews : detailNews.slice(0, 3)).map((item, i) => (
+                        <NewsCard key={item.id || i} item={item} index={i} isHindi={isHindi} />
+                      ))}
                     </div>
+                    {detailNews.length > 3 && (
+                      <button
+                        onClick={() => setShowAllDetailNews((prev) => !prev)}
+                        className="mt-3 w-full py-2.5 rounded-xl border border-emerald-500/20 bg-emerald-500/8 text-xs font-bold text-emerald-400 hover:bg-emerald-500/15 transition-colors flex items-center justify-center gap-1.5"
+                      >
+                        {showAllDetailNews
+                          ? (isHindi ? "कम दिखाएं" : "Show Less")
+                          : (isHindi ? `सभी ${detailNews.length} समाचार देखें` : `View all ${detailNews.length} articles`)}
+                      </button>
+                    )}
                   </div>
                 )}
               </motion.div>
@@ -1437,23 +1552,130 @@ export default function MarketDashboard() {
 
         {/* RIGHT: News Sidebar ─────────────────────────────────────────────── */}
         <div className="space-y-4">
-          <div
-            className="rounded-2xl p-5 border sticky top-4 card-surface"
-          >
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 rounded-xl bg-amber-500/12 border border-amber-500/20">
-                <Newspaper size={16} className="text-amber-400" />
+          <div className="rounded-2xl p-4 md:p-5 border sticky top-4 card-surface">
+            {/* Header with Title, Live Badge, Refresh, and Expand */}
+            <div className="flex items-center justify-between gap-2 mb-3.5">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-amber-500/12 border border-amber-500/20">
+                  <Newspaper size={16} className="text-amber-400" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <h3 className="font-black text-sm text-theme-main">
+                      {isHindi ? "कृषि समाचार फ़ीड" : "Agri News Feed"}
+                    </h3>
+                    <span className="flex h-1.5 w-1.5 relative">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                    </span>
+                  </div>
+                  <p className="text-[9px] font-semibold text-theme-subtle">
+                    {news.length > 0
+                      ? (isHindi ? `${news.length} ताज़ा ख़बरें · फसल अनुसार` : `${news.length} reports · grouped by crop`)
+                      : (isHindi ? "ताज़ा बाज़ार समाचार" : "Live market news")}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-black text-sm text-theme-main">
-                  {isHindi ? "कृषि समाचार" : "Agri News Feed"}
-                </h3>
-                <p className="text-[9px] font-semibold uppercase tracking-widest mt-0.5 text-theme-subtle">
-                  {isHindi ? "बाज़ार प्रभाव समाचार" : "Market impact news"}
-                </p>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => loadNews(true)}
+                  disabled={loadingNews}
+                  title={isHindi ? "ताज़ा करें" : "Refresh news"}
+                  className="p-1.5 rounded-lg border border-theme-card input-surface text-theme-subtle hover:text-theme-main transition-colors disabled:opacity-50"
+                >
+                  <RefreshCw size={12} className={loadingNews ? "animate-spin text-emerald-400" : ""} />
+                </button>
+                <button
+                  onClick={() => setIsAllNewsModalOpen(true)}
+                  title={isHindi ? "सभी समाचार विस्तार से देखें" : "View all news in full screen"}
+                  className="p-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+                >
+                  <Maximize2 size={12} />
+                </button>
               </div>
             </div>
 
+            {/* Commodity Filter Chips (Horizontal Scrollable) */}
+            {news.length > 0 && (
+              <div className="mb-3">
+                <div className="flex items-center gap-1 overflow-x-auto pb-1.5 no-scrollbar">
+                  <button
+                    onClick={() => setSelectedNewsCommodity("All")}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-bold whitespace-nowrap transition-all ${
+                      selectedNewsCommodity === "All"
+                        ? "bg-emerald-500 text-slate-950 font-black shadow-sm"
+                        : "input-surface text-theme-muted hover:text-theme-main"
+                    }`}
+                  >
+                    {isHindi ? "सभी" : "All"} ({news.length})
+                  </button>
+                  {commodityNewsCounts.map(({ commodity, count }) => (
+                    <button
+                      key={commodity}
+                      onClick={() => setSelectedNewsCommodity(commodity)}
+                      className={`px-2 py-1 rounded-lg text-[10px] font-bold whitespace-nowrap transition-all flex items-center gap-1 ${
+                        selectedNewsCommodity === commodity
+                          ? "bg-emerald-500 text-slate-950 font-black shadow-sm"
+                          : "input-surface text-theme-muted hover:text-theme-main"
+                      }`}
+                    >
+                      <span>{commodity}</span>
+                      <span className="text-[8px] opacity-75 font-semibold">({count})</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Search & View Mode Switcher */}
+            {news.length > 0 && (
+              <div className="flex items-center gap-1.5 mb-3.5">
+                <div className="relative flex-1">
+                  <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-theme-subtle" />
+                  <input
+                    type="text"
+                    value={newsSearchQuery}
+                    onChange={(e) => setNewsSearchQuery(e.target.value)}
+                    placeholder={isHindi ? "समाचार खोजें..." : "Filter news..."}
+                    className="w-full pl-7 pr-6 py-1.5 rounded-lg text-[11px] input-surface border border-theme-card text-theme-main placeholder:text-theme-subtle focus:outline-none focus:border-emerald-500/40"
+                  />
+                  {newsSearchQuery && (
+                    <button
+                      onClick={() => setNewsSearchQuery("")}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-theme-subtle hover:text-theme-main"
+                    >
+                      <X size={10} />
+                    </button>
+                  )}
+                </div>
+
+                {/* View Mode Toggle */}
+                <div className="flex items-center rounded-lg border border-theme-card p-0.5 input-surface">
+                  <button
+                    onClick={() => setNewsViewMode("stream")}
+                    title={isHindi ? "सूची दृश्य" : "Stream View"}
+                    className={`p-1 rounded-md transition-colors ${
+                      newsViewMode === "stream" ? "bg-emerald-500/20 text-emerald-400" : "text-theme-subtle hover:text-theme-main"
+                    }`}
+                  >
+                    <List size={12} />
+                  </button>
+                  <button
+                    onClick={() => setNewsViewMode("grouped")}
+                    title={isHindi ? "फसल अनुसार समूह" : "Grouped by Commodity"}
+                    className={`p-1 rounded-md transition-colors ${
+                      newsViewMode === "grouped" ? "bg-emerald-500/20 text-emerald-400" : "text-theme-subtle hover:text-theme-main"
+                    }`}
+                  >
+                    <Layers size={12} />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* News Items Content */}
             {loadingNews ? (
               <div className="space-y-3">
                 {[0, 1, 2].map((i) => (
@@ -1472,21 +1694,79 @@ export default function MarketDashboard() {
                   {isHindi ? "समाचार लोड नहीं हुए।" : "Could not load news."}
                 </p>
                 <button
-                  onClick={loadNews}
+                  onClick={() => loadNews(true)}
                   className="flex items-center gap-1.5 mx-auto text-[10px] font-bold text-emerald-400 hover:text-emerald-300 transition-colors px-3 py-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/8"
                 >
                   <RefreshCw size={10} />
                   {isHindi ? "पुनः प्रयास" : "Retry"}
                 </button>
               </div>
+            ) : filteredNews.length === 0 ? (
+              <div className="text-center py-6 px-3">
+                <AlertCircle size={18} className="mx-auto mb-1.5 text-theme-subtle" />
+                <p className="text-xs font-semibold text-theme-muted">
+                  {isHindi ? "कोई समाचार नहीं मिला" : "No articles found"}
+                </p>
+                <p className="text-[10px] text-theme-subtle mt-0.5">
+                  {isHindi ? "फ़िल्टर या खोज शब्द बदलें" : "Try clearing your search or filter"}
+                </p>
+                <button
+                  onClick={() => { setSelectedNewsCommodity("All"); setNewsSearchQuery(""); }}
+                  className="mt-2 text-[10px] font-bold text-emerald-400 hover:underline"
+                >
+                  {isHindi ? "फ़िल्टर हटाएं" : "Clear filters"}
+                </button>
+              </div>
+            ) : newsViewMode === "grouped" ? (
+              <div className="space-y-4 max-h-[600px] overflow-y-auto pr-1 no-scrollbar">
+                {Object.entries(groupedNewsData).map(([commName, items]) => (
+                  <div key={commName} className="space-y-2">
+                    <div className="flex items-center justify-between pb-1 border-b border-theme-card">
+                      <span className="text-xs font-black text-emerald-400 flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                        {commName}
+                      </span>
+                      <span className="text-[9px] font-bold text-theme-subtle px-1.5 py-0.5 rounded-full input-surface">
+                        {items.length} {isHindi ? "ख़बरें" : "items"}
+                      </span>
+                    </div>
+                    <div className="space-y-2.5">
+                      {items.slice(0, 3).map((item, i) => (
+                        <NewsCard key={item.id || i} item={item} index={i} isHindi={isHindi} />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : (
               <div className="space-y-3">
-                {news.map((item, i) => <NewsCard key={i} item={item} index={i} />)}
+                {filteredNews.slice(0, newsVisibleCount).map((item, i) => (
+                  <NewsCard key={item.id || i} item={item} index={i} isHindi={isHindi} />
+                ))}
+
+                {/* Show More / View All CTA in Sidebar */}
+                {filteredNews.length > newsVisibleCount && (
+                  <div className="pt-2 flex flex-col gap-1.5">
+                    <button
+                      onClick={() => setNewsVisibleCount((prev) => prev + 6)}
+                      className="w-full py-2 rounded-xl border border-theme-card input-surface text-xs font-bold text-theme-muted hover:text-theme-main transition-colors text-center"
+                    >
+                      {isHindi ? `और समाचार दिखाएं (+6)` : `Show More (+6)`}
+                    </button>
+                    <button
+                      onClick={() => setIsAllNewsModalOpen(true)}
+                      className="w-full py-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 text-xs font-black text-emerald-400 hover:bg-emerald-500/20 transition-colors flex items-center justify-center gap-1.5"
+                    >
+                      <Maximize2 size={11} />
+                      {isHindi ? `सभी ${filteredNews.length} समाचार देखें` : `View All ${filteredNews.length} News`}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
             {/* Legend */}
-            <div className="mt-4 pt-4 border-t grid grid-cols-3 gap-2 border-theme-card">
+            <div className="mt-4 pt-3 border-t grid grid-cols-3 gap-2 border-theme-card">
               {[
                 { color: "bg-emerald-400", label: isHindi ? "सकारात्मक" : "Positive" },
                 { color: "bg-rose-400", label: isHindi ? "नकारात्मक" : "Negative" },
@@ -1500,14 +1780,175 @@ export default function MarketDashboard() {
             </div>
 
             {/* Data source */}
-            <p className="text-[8px] mt-4 leading-relaxed text-theme-subtle">
+            <p className="text-[8px] mt-3 leading-relaxed text-theme-subtle">
               {isHindi
-                ? "* मंडी भाव: data.gov.in (Agmarknet)। समाचार: Krishi Jagran, ET Agriculture। AI विश्लेषण सलाहकार उद्देश्य के लिए है।"
-                : "* Mandi prices sourced from data.gov.in (Agmarknet). News: Krishi Jagran, ET Agriculture. AI analysis is advisory."}
+                ? "* स्रोत: BusinessLine, Google News, Krishi Jagran। AI भावना वर्गीकरण सलाहकार उद्देश्य के लिए है।"
+                : "* Sourced from BusinessLine, Google News, Krishi Jagran. AI sentiment classification is advisory."}
             </p>
           </div>
         </div>
       </div>
+
+      {/* ── ALL NEWS CENTER MODAL ────────────────────────────────────────── */}
+      <AnimatePresence>
+        {isAllNewsModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-6 bg-black/80 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              transition={{ duration: 0.2 }}
+              className="w-full max-w-5xl h-[90vh] flex flex-col rounded-3xl border border-emerald-500/20 bg-theme-base shadow-2xl overflow-hidden"
+            >
+              {/* Modal Header */}
+              <div className="p-4 md:p-6 border-b border-theme-card flex items-center justify-between gap-4 card-surface">
+                <div className="flex items-center gap-3.5">
+                  <div className="p-3 rounded-2xl bg-amber-500/15 border border-amber-500/25">
+                    <Newspaper size={22} className="text-amber-400" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-base md:text-xl font-black text-theme-main">
+                        {isHindi ? "संपूर्ण कृषि समाचार केंद्र" : "Agricultural News Center"}
+                      </h2>
+                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                        Live
+                      </span>
+                    </div>
+                    <p className="text-xs text-theme-subtle mt-0.5">
+                      {isHindi
+                        ? `कुल ${news.length} ताज़ा समाचार · विभिन्न फसलों एवं मंडियों के अनुसार समूहीकृत`
+                        : `Total ${news.length} live reports aggregated and grouped by commodity`}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsAllNewsModalOpen(false)}
+                  className="p-2.5 rounded-xl border border-theme-card text-theme-subtle hover:text-theme-main hover:bg-white/5 transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Filters Bar in Modal */}
+              <div className="p-4 border-b border-theme-card space-y-3 bg-theme-card/30">
+                {/* Commodity Chips */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
+                  <button
+                    onClick={() => setSelectedNewsCommodity("All")}
+                    className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap text-xs transition-all ${
+                      selectedNewsCommodity === "All"
+                        ? "bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20 font-black"
+                        : "input-surface text-theme-muted hover:text-theme-main"
+                    }`}
+                  >
+                    {isHindi ? "सभी फसलें" : "All Commodities"} ({news.length})
+                  </button>
+                  {commodityNewsCounts.map(({ commodity, count }) => (
+                    <button
+                      key={commodity}
+                      onClick={() => setSelectedNewsCommodity(commodity)}
+                      className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap text-xs transition-all flex items-center gap-1 ${
+                        selectedNewsCommodity === commodity
+                          ? "bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20 font-black"
+                          : "input-surface text-theme-muted hover:text-theme-main"
+                      }`}
+                    >
+                      <span>{commodity}</span>
+                      <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-black/20 font-semibold">{count}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Search + Sentiment Filter */}
+                <div className="flex flex-col sm:flex-row items-center gap-3">
+                  <div className="relative w-full sm:flex-1">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-subtle" />
+                    <input
+                      type="text"
+                      value={newsSearchQuery}
+                      onChange={(e) => setNewsSearchQuery(e.target.value)}
+                      placeholder={isHindi ? "समाचार, फसल या मंडी खोजें..." : "Search news, commodity or mandi..."}
+                      className="w-full pl-9 pr-8 py-2 rounded-xl text-xs input-surface border border-theme-card text-theme-main placeholder:text-theme-subtle focus:outline-none focus:border-emerald-500/40"
+                    />
+                    {newsSearchQuery && (
+                      <button
+                        onClick={() => setNewsSearchQuery("")}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-theme-subtle hover:text-theme-main"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Sentiment Filter Tabs */}
+                  <div className="flex items-center gap-1 w-full sm:w-auto overflow-x-auto">
+                    {["All", "Positive", "Negative", "Neutral"].map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => setSentimentFilter(s)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                          sentimentFilter === s
+                            ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                            : "text-theme-subtle hover:text-theme-main"
+                        }`}
+                      >
+                        {s === "All"
+                          ? (isHindi ? "सभी भावनाएं" : "All Sentiment")
+                          : s === "Positive"
+                          ? (isHindi ? "सकारात्मक" : "Positive")
+                          : s === "Negative"
+                          ? (isHindi ? "नकारात्मक" : "Negative")
+                          : (isHindi ? "तटस्थ" : "Neutral")}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Body: News Cards Grid */}
+              <div className="flex-1 overflow-y-auto p-4 md:p-6">
+                {filteredNews.length === 0 ? (
+                  <div className="text-center py-16">
+                    <Newspaper size={36} className="mx-auto mb-3 text-theme-subtle opacity-50" />
+                    <p className="text-sm font-bold text-theme-main">
+                      {isHindi ? "कोई समाचार नहीं मिला" : "No matching news found"}
+                    </p>
+                    <p className="text-xs text-theme-muted mt-1">
+                      {isHindi ? "कृपया दूसरा फ़िल्टर चुनें या खोज शब्द बदलें।" : "Try adjusting your commodity filter or search keywords."}
+                    </p>
+                    <button
+                      onClick={() => { setSelectedNewsCommodity("All"); setNewsSearchQuery(""); setSentimentFilter("All"); }}
+                      className="mt-4 px-4 py-2 rounded-xl text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                    >
+                      {isHindi ? "फ़िल्टर रीसेट करें" : "Reset Filters"}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {filteredNews.map((item, i) => (
+                      <NewsCard key={item.id || i} item={item} index={i} isHindi={isHindi} />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-3 md:p-4 border-t border-theme-card flex items-center justify-between text-[11px] text-theme-subtle card-surface">
+                <span>
+                  {isHindi
+                    ? `${filteredNews.length} समाचार प्रदर्शित (कुल ${news.length} में से)`
+                    : `Showing ${filteredNews.length} of ${news.length} live articles`}
+                </span>
+                <span>
+                  {isHindi ? "* स्रोत: BusinessLine, Google News, Krishi Jagran" : "* Sources: BusinessLine, Google News, Krishi Jagran"}
+                </span>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

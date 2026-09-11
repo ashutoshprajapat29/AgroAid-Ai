@@ -3,11 +3,39 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig, loadEnv} from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { getLiveAgriNews } from './server/agriNewsHandler.js';
+
+function agriNewsDevPlugin() {
+  return {
+    name: 'agri-news-dev-endpoint',
+    configureServer(server: any) {
+      server.middlewares.use(async (req: any, res: any, next: any) => {
+        if (req.url && req.url.startsWith('/api/agri-news')) {
+          try {
+            const urlObj = new URL(req.url, 'http://localhost');
+            const language = urlObj.searchParams.get('language') || 'English';
+            const force = urlObj.searchParams.get('force') === 'true';
+            const items = await getLiveAgriNews(language, force);
+            res.setHeader('Content-Type', 'application/json');
+            res.statusCode = 200;
+            res.end(JSON.stringify({ items, totalCount: items.length }));
+          } catch (err: any) {
+            res.statusCode = 500;
+            res.end(JSON.stringify({ error: err.message, items: [] }));
+          }
+          return;
+        }
+        next();
+      });
+    }
+  };
+}
 
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
   return {
     plugins: [
+      agriNewsDevPlugin(),
       react(), 
       tailwindcss(),
       VitePWA({
