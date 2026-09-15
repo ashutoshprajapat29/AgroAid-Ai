@@ -1,12 +1,12 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Space+Grotesk:wght@500;600;700;800&display=swap');
 @import "tailwindcss";
 
 @theme {
   --font-sans: "Inter", system-ui, -apple-system, sans-serif;
-  --font-serif: "Space Grotesk", system-ui, sans-serif;
+  --font-serif: "Plus Jakarta Sans", "Space Grotesk", system-ui, sans-serif;
 
   /* Static design tokens – stay constant across themes */
-  --color-bento-primary: #22c55e;
+  --color-bento-primary: #10b981;
   --color-bento-accent:  #f59e0b;
 
   /* Aliased design tokens - map to the CSS properties */
@@ -23,41 +23,41 @@
    ║  THEME TOKENS via CSS custom properties          ║
    ╚══════════════════════════════════════════════════╝ */
 
-/* ── Dark theme (default) ─────────────────────────── */
+/* ── Dark theme (Stitch: AgroAid Precision Intelligence) ── */
 :root,
 [data-theme="dark"] {
-  --bg-base:        #04090a;
-  --bg-surface:     #071209;
-  --bg-card:        rgba(4, 14, 6, 0.82);
-  --bg-nav:         rgba(4, 12, 5, 0.90);
-  --bg-input:       rgba(255,255,255,0.05);
-  --bg-input-focus: rgba(255,255,255,0.07);
-  --bg-hover:       rgba(34, 197, 94, 0.05);
+  --bg-base:        #001711;
+  --bg-surface:     #00251c;
+  --bg-card:        rgba(0, 37, 28, 0.88);
+  --bg-nav:         rgba(0, 23, 17, 0.94);
+  --bg-input:       rgba(16, 185, 129, 0.06);
+  --bg-input-focus: rgba(16, 185, 129, 0.12);
+  --bg-hover:       rgba(16, 185, 129, 0.08);
 
-  --text-main:      #ecfdf5;
-  --text-muted:     #3d6b50;
-  --text-subtle:    rgba(255,255,255,0.35);
+  --text-main:      #f0fdf4;
+  --text-muted:     #86948a;
+  --text-subtle:    rgba(187, 202, 191, 0.65);
 
-  --border-default: rgba(34, 197, 94, 0.13);
-  --border-strong:  rgba(34, 197, 94, 0.26);
-  --border-input:   rgba(255,255,255,0.08);
-  --border-card:    rgba(34, 197, 94, 0.13);
+  --border-default: rgba(16, 185, 129, 0.18);
+  --border-strong:  rgba(16, 185, 129, 0.38);
+  --border-input:   rgba(16, 185, 129, 0.20);
+  --border-card:    rgba(16, 185, 129, 0.16);
 
-  --shadow-card:    0 6px 32px rgba(0,0,0,0.50);
-  --shadow-glass:   0 1px 0 rgba(34,197,94,0.06) inset, 0 6px 32px rgba(0,0,0,0.50);
-  --shadow-glow:    0 0 30px rgba(34,197,94,0.08);
+  --shadow-card:    0 8px 32px -4px rgba(0, 17, 12, 0.70);
+  --shadow-glass:   0 1px 0 rgba(16, 185, 129, 0.12) inset, 0 8px 32px rgba(0, 17, 12, 0.70);
+  --shadow-glow:    0 0 28px rgba(16, 185, 129, 0.22);
 
-  --glass-bg:       rgba(4, 14, 6, 0.78);
-  --glass-nav-bg:   rgba(4, 12, 5, 0.88);
+  --glass-bg:       rgba(0, 37, 28, 0.82);
+  --glass-nav-bg:   rgba(0, 23, 17, 0.92);
 
-  --ambient-top:    rgba(34, 197, 94, 0.075);
-  --ambient-bot:    rgba(245, 158, 11, 0.04);
+  --ambient-top:    rgba(16, 185, 129, 0.14);
+  --ambient-bot:    rgba(245, 158, 11, 0.06);
 
-  --scrollbar-thumb: rgba(34, 197, 94, 0.18);
-  --scrollbar-hover: rgba(34, 197, 94, 0.35);
+  --scrollbar-thumb: rgba(16, 185, 129, 0.25);
+  --scrollbar-hover: rgba(16, 185, 129, 0.45);
 
-  --bg-base-95:     rgba(4, 9, 10, 0.95);
-  --bg-base-60:     rgba(4, 9, 10, 0.60);
+  --bg-base-95:     rgba(0, 23, 17, 0.95);
+  --bg-base-60:     rgba(0, 23, 17, 0.60);
 
   color-scheme: dark;
 }
@@ -132,6 +132,17 @@
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 100px; }
   ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover); }
+}
+
+@keyframes livePulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.9); }
+}
+.live-pulse {
+  animation: livePulse 2.5s infinite;
+}
+.font-stat-currency {
+  font-feature-settings: "tnum" 1, "cv05" 1;
 }
 
 /* ╔══════════════════════════════════════════════════╗

@@ -148,63 +148,74 @@ function NewsCard({ item, index, isHindi = false }: { item: NewsItem; index: num
   const sentConf = ({
     Positive: {
       bg: "bg-emerald-500/10",
-      border: "border-emerald-500/20",
-      badge: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+      border: "border-emerald-500/25",
+      badge: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
       dot: "bg-emerald-400",
-      label: isHindi ? "सकारात्मक" : "Positive",
+      label: isHindi ? "तेज़ी / सकारात्मक" : "Bullish / Positive",
     },
     Negative: {
       bg: "bg-rose-500/10",
-      border: "border-rose-500/20",
-      badge: "bg-rose-500/20 text-rose-400 border-rose-500/30",
+      border: "border-rose-500/25",
+      badge: "bg-rose-500/15 text-rose-400 border-rose-500/30",
       dot: "bg-rose-400",
-      label: isHindi ? "नकारात्मक" : "Negative",
+      label: isHindi ? "मंदी / सतर्क" : "Bearish / Negative",
     },
     Neutral: {
       bg: "bg-amber-500/10",
-      border: "border-amber-500/20",
-      badge: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+      border: "border-amber-500/25",
+      badge: "bg-amber-500/15 text-amber-400 border-amber-500/30",
       dot: "bg-amber-400",
-      label: isHindi ? "तटस्थ" : "Neutral",
+      label: isHindi ? "तटस्थ / सलाह" : "Neutral / Advisory",
     },
   } as Record<string, { bg: string; border: string; badge: string; dot: string; label: string }>)[item.sentiment]
     ?? {
       bg: "bg-slate-500/10",
       border: "border-slate-500/20",
-      badge: "bg-slate-500/20 text-slate-400 border-slate-500/30",
+      badge: "bg-slate-500/15 text-slate-400 border-slate-500/30",
       dot: "bg-slate-400",
-      label: item.sentiment,
+      label: item.sentiment || "Market Update",
     };
 
   const commodityLabel = isHindi && item.commodity_hi
     ? item.commodity_hi
     : (item.commodity || "");
 
+  const cleanImpact = item.impact
+    ? item.impact.replace(/<[^>]*>/g, "").replace(/https?:\/\/\S+/g, "").trim()
+    : "";
+
   return (
-    <motion.div
+    <motion.article
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: Math.min(index * 0.04, 0.4) }}
-      className={`rounded-2xl p-4 border transition-all duration-200 hover:border-emerald-500/30 ${sentConf.bg} ${sentConf.border}`}
+      className={`rounded-2xl p-4 border transition-all duration-200 hover:border-emerald-500/35 card-surface shadow-sm ${sentConf.border}`}
     >
       <div className="flex items-center justify-between gap-2 mb-2">
-        <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border flex items-center gap-1 ${sentConf.badge}`}>
-          <div className={`w-1.5 h-1.5 rounded-full ${sentConf.dot}`} />
-          {sentConf.label}
-        </span>
-        {commodityLabel && commodityLabel !== "General" && commodityLabel !== "सामान्य कृषि" && (
-          <span className="text-[9px] font-bold tracking-wide px-2 py-0.5 rounded-full border input-surface text-theme-subtle">
-            {commodityLabel}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border flex items-center gap-1 ${sentConf.badge}`}>
+            <div className={`w-1.5 h-1.5 rounded-full ${sentConf.dot}`} />
+            {sentConf.label}
           </span>
-        )}
+          {commodityLabel && commodityLabel !== "General" && commodityLabel !== "सामान्य कृषि" && (
+            <span className="text-[9px] font-bold tracking-wide px-2 py-0.5 rounded-full border input-surface text-theme-subtle">
+              {commodityLabel}
+            </span>
+          )}
+        </div>
       </div>
-      <h4 className="text-sm font-bold leading-snug mb-1.5 text-theme-main">
+
+      <h4 className="text-sm md:text-[15px] font-bold leading-snug mb-1.5 text-theme-main font-headline-sm">
         {item.title}
       </h4>
-      <p className="text-xs leading-relaxed text-theme-muted line-clamp-3">
-        {item.impact ? item.impact.replace(/<[^>]*>/g, "").replace(/https?:\/\/\S+/g, "").trim() : ""}
-      </p>
-      <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-theme-card text-[9px]">
+
+      {cleanImpact && (
+        <p className="text-xs leading-relaxed text-theme-muted line-clamp-2">
+          {cleanImpact}
+        </p>
+      )}
+
+      <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-theme-card text-[10px]">
         <div className="flex items-center gap-2 text-theme-subtle font-medium">
           {item.source && (
             <span className="font-bold text-theme-main/80 truncate max-w-[130px]">
@@ -213,7 +224,7 @@ function NewsCard({ item, index, isHindi = false }: { item: NewsItem; index: num
           )}
           {item.timeAgo && (
             <span className="flex items-center gap-0.5 text-theme-subtle">
-              <Clock size={9} />
+              <Clock size={10} />
               {item.timeAgo}
             </span>
           )}
@@ -223,92 +234,215 @@ function NewsCard({ item, index, isHindi = false }: { item: NewsItem; index: num
             href={item.link}
             target="_blank"
             rel="noopener noreferrer"
-            className="font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 transition-colors px-2 py-0.5 rounded-md bg-emerald-500/10 hover:bg-emerald-500/20"
+            className="font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 transition-colors px-2 py-0.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 active:scale-95"
           >
-            {isHindi ? "पूरी खबर" : "Read"} <ExternalLink size={9} />
+            {isHindi ? "पूरी खबर" : "Read analysis"} <ExternalLink size={10} />
           </a>
         )}
       </div>
-    </motion.div>
+    </motion.article>
   );
 }
 
-// ─── Price Card ───────────────────────────────────────────────────────────────
-function PriceCard({ item, selected, onClick, sentiment }: {
+// ─── Price Card (Stitch Bento Precision Intelligence) ──────────────────────────
+function PriceCard({
+  item,
+  selected,
+  onClick,
+  sentiment,
+  isFeatured = false,
+}: {
   item: MandiPrice;
   selected: boolean;
   onClick: () => void;
   sentiment?: SentimentResult;
+  isFeatured?: boolean;
 }) {
   const { t, isHindi } = useLanguage();
   const change = item.max_price - item.min_price;
   const changePercent = item.min_price > 0 ? ((change / item.min_price) * 100).toFixed(1) : "0";
   const formatName = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+  const commodityName = formatName(item.commodity);
+  const hindiName = translateName(commodityName, true);
+  const marketOrLoc = translateName(item.market_name || item.variety || item.district || "", isHindi);
 
+  // Spread calculation for visual range track
+  const spreadWidth = item.max_price > item.min_price
+    ? Math.min(100, Math.max(15, Math.round(((item.modal_price - item.min_price) / (item.max_price - item.min_price)) * 100)))
+    : 50;
+
+  if (isFeatured) {
+    return (
+      <motion.button
+        layout
+        onClick={onClick}
+        whileHover={{ y: -2 }}
+        whileTap={{ scale: 0.99 }}
+        className={`relative w-full text-left rounded-2xl md:rounded-[1.75rem] p-5 md:p-6 border transition-all duration-300 overflow-hidden ${
+          selected
+            ? "border-emerald-500/50 bg-emerald-500/10 shadow-[0_0_25px_rgba(16,185,129,0.2)]"
+            : "border-emerald-500/30 hover:border-emerald-500/50 card-surface shadow-lg"
+        }`}
+      >
+        {/* Subtle Ambient Glow */}
+        <div className="absolute -right-8 -top-8 w-36 h-36 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
+
+        <div className="relative z-10">
+          {/* Header Row */}
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 px-2 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30">
+                  {isHindi ? "उच्चतम आवक" : "TOP SPOT VOLUME"}
+                </span>
+                <span className="text-[11px] font-semibold text-theme-muted">
+                  • {marketOrLoc}
+                </span>
+              </div>
+              <h3 className="text-xl md:text-2xl font-black text-theme-main tracking-tight mt-1">
+                {isHindi ? hindiName : commodityName}
+              </h3>
+              {isHindi ? (
+                <p className="text-xs font-semibold text-theme-muted mt-0.5">
+                  {commodityName} {item.variety ? `• ${item.variety}` : "• Grade FAQ"}
+                </p>
+              ) : (
+                hindiName !== commodityName && (
+                  <p className="text-xs font-semibold text-theme-muted mt-0.5">
+                    {hindiName} {item.variety ? `• ${item.variety}` : "• Grade FAQ"}
+                  </p>
+                )
+              )}
+            </div>
+
+            {/* Trend Pill / Sentiment */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              {sentiment ? (
+                <SentimentBadge s={sentiment} isHindi={isHindi} />
+              ) : (
+                <div className={`flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-bold ${
+                  parseFloat(changePercent) > 0
+                    ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                    : "bg-theme-input text-theme-muted border-theme-card"
+                }`}>
+                  <ArrowUpRight size={13} className="text-emerald-400" />
+                  <span>+{changePercent}%</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Price & Metric Hero */}
+          <div className="mt-4 flex items-baseline justify-between flex-wrap gap-2">
+            <div>
+              <div className="flex items-baseline gap-1">
+                <IndianRupee size={22} className="text-emerald-400 mb-0.5 shrink-0" />
+                <span className="font-stat-currency text-3xl md:text-4xl font-black text-emerald-400 tracking-tight">
+                  {item.modal_price.toLocaleString("en-IN")}
+                </span>
+                <span className="text-xs md:text-sm font-bold text-theme-subtle ml-1">/quintal</span>
+              </div>
+              <p className="text-[11px] font-semibold text-theme-muted mt-0.5">
+                {t("market.modal")} ({isHindi ? "औसत थोक भाव" : "Modal Spot Price"})
+              </p>
+            </div>
+
+            <div className="text-right">
+              <div className="text-xs md:text-sm font-bold text-theme-main">
+                {item.variety || (isHindi ? "मानक ग्रेड" : "Standard Grade")}
+              </div>
+              <p className="text-[10px] font-medium text-theme-subtle">
+                {isHindi ? "e-NAM सत्यापित मंडी" : "e-NAM Verified Mandi"}
+              </p>
+            </div>
+          </div>
+
+          {/* Daily Spread Range Bar */}
+          <div className="mt-4 pt-3.5 border-t border-theme-card">
+            <div className="flex items-center justify-between text-[11px] font-bold text-theme-muted mb-1.5">
+              <span>{t("market.min")}: <strong className="text-theme-main">₹{item.min_price.toLocaleString("en-IN")}</strong></span>
+              <span className="text-emerald-400 font-bold text-[10px] uppercase tracking-wider">
+                {isHindi ? "दैनिक विस्तार" : "Daily Spread Range"}
+              </span>
+              <span>{t("market.max")}: <strong className="text-theme-main">₹{item.max_price.toLocaleString("en-IN")}</strong></span>
+            </div>
+            {/* Visual Range Track */}
+            <div className="w-full h-2 rounded-full overflow-hidden bg-emerald-950/40 border border-emerald-500/20 flex relative">
+              <div
+                className="h-full bg-gradient-to-r from-emerald-500/40 via-emerald-400 to-emerald-300 rounded-full transition-all duration-700 shadow-[0_0_8px_rgba(16,185,129,0.8)]"
+                style={{ width: `${spreadWidth}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Footer Meta */}
+          <div className="mt-3 flex items-center justify-between text-[10px] font-medium text-theme-subtle">
+            <span className="flex items-center gap-1 text-emerald-400/80">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 live-pulse" />
+              {isHindi ? "लाइव एपीएमसी डेटा" : "Live APMC Spot"}
+            </span>
+            <span>
+              {t("market.data_as_of")} {new Date(item.date).toLocaleDateString("en-IN", { day: 'numeric', month: 'short' })}
+            </span>
+          </div>
+        </div>
+      </motion.button>
+    );
+  }
+
+  // 2-Column Responsive Bento Card (for secondary commodities)
   return (
     <motion.button
       layout
       onClick={onClick}
       whileHover={{ y: -2 }}
       whileTap={{ scale: 0.98 }}
-      className={`relative w-full text-left rounded-[1.5rem] p-5 border transition-all duration-300 overflow-hidden ${selected
-          ? "border-emerald-500/40 bg-emerald-500/8"
-          : "hover:border-emerald-500/20 card-surface"
-        }`}
+      className={`relative w-full text-left rounded-2xl p-4 border transition-all duration-300 flex flex-col justify-between overflow-hidden ${
+        selected
+          ? "border-emerald-500/50 bg-emerald-500/10 shadow-[0_0_15px_rgba(16,185,129,0.15)]"
+          : "border-theme-card hover:border-emerald-500/30 card-surface shadow-sm"
+      }`}
     >
-      {selected && (
-        <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/6 to-transparent pointer-events-none" />
-      )}
-
-      <div className="relative z-10">
-        <div className="flex justify-between items-start mb-3">
-          <div>
-            <h3 className="font-black text-base tracking-tight text-theme-main">
-              {isHindi ? translateName(formatName(item.commodity), isHindi) : formatName(item.commodity)}
-            </h3>
-            <p className="text-[10px] font-semibold uppercase tracking-wider mt-0.5 text-theme-muted">
-              {isHindi ? translateName(item.market_name || item.variety || item.district || "", isHindi) : (item.market_name || item.variety || item.district)}
-            </p>
-          </div>
-          {sentiment && <SentimentBadge s={sentiment} isHindi={false} />}
-        </div>
-
-        <div className="flex items-baseline gap-1 mb-3">
-          <IndianRupee size={18} className="text-emerald-400 mb-0.5 shrink-0" />
-          <span className="text-3xl font-extrabold text-emerald-400 tracking-tighter">
-            {item.modal_price.toLocaleString("en-IN")}
+      <div>
+        {/* Top bar: Market name + trend pill */}
+        <div className="flex items-center justify-between gap-1 mb-1.5">
+          <span className="text-[10px] font-bold text-theme-muted truncate max-w-[110px]" title={marketOrLoc}>
+            {marketOrLoc}
           </span>
-          <span className="text-xs font-bold ml-1 text-theme-subtle">/qtl</span>
-        </div>
-
-        <div className="grid grid-cols-3 gap-2 pt-3 border-t border-theme-card">
-          {[
-            { label: t("market.min"), value: item.min_price, color: "text-blue-400" },
-            { label: t("market.modal"), value: item.modal_price, color: "text-emerald-400" },
-            { label: t("market.max"), value: item.max_price, color: "text-rose-400" },
-          ].map((m) => (
-            <div key={m.label} className="text-center">
-              <p className="text-[8px] font-black uppercase tracking-widest mb-0.5 text-theme-subtle">{m.label}</p>
-              <p className={`text-xs font-black ${m.color}`}>{m.value.toLocaleString("en-IN")}</p>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-2 flex items-center justify-between">
-          <div className="flex items-center gap-1">
-            {parseFloat(changePercent) > 15 ? (
-              <ArrowUpRight size={12} className="text-amber-400" />
-            ) : (
-              <Minus size={12} className="text-theme-subtle" />
-            )}
-            <span className="text-[10px] font-bold text-theme-muted">
-              {t("market.spread")} ₹{change.toLocaleString("en-IN")} · {changePercent}%
-            </span>
-          </div>
-          <span className="text-[9px] font-semibold text-theme-subtle">
-            {t("market.data_as_of")} {new Date(item.date).toLocaleDateString("en-IN", { day: 'numeric', month: 'short' })}
+          <span className={`text-[10px] font-black flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border ${
+            parseFloat(changePercent) > 10
+              ? "text-emerald-400 bg-emerald-500/15 border-emerald-500/25"
+              : "text-theme-muted bg-theme-input border-theme-card"
+          }`}>
+            <ArrowUpRight size={10} className="text-emerald-400" />
+            <span>+{changePercent}%</span>
           </span>
         </div>
+
+        {/* Commodity Name & Hindi translation */}
+        <h4 className="text-sm md:text-base font-black text-theme-main truncate">
+          {isHindi ? hindiName : commodityName}
+        </h4>
+        <p className="text-[11px] font-semibold text-theme-muted truncate">
+          {isHindi ? commodityName : (hindiName !== commodityName ? hindiName : "")}
+        </p>
+
+        {/* Price Hero */}
+        <div className="mt-2.5">
+          <div className="font-stat-currency text-xl font-black text-emerald-400 tracking-tight leading-tight flex items-baseline gap-0.5">
+            <span>₹{item.modal_price.toLocaleString("en-IN")}</span>
+            <span className="text-[11px] font-semibold text-theme-subtle">/qtl</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Min to Max Range */}
+      <div className="mt-3 pt-2 border-t border-theme-card text-[10px] font-bold text-theme-muted flex items-center justify-between">
+        <span>₹{item.min_price.toLocaleString("en-IN")}</span>
+        <span className="text-[9px] text-theme-subtle font-medium uppercase tracking-wider">
+          {isHindi ? "से" : "to"}
+        </span>
+        <span>₹{item.max_price.toLocaleString("en-IN")}</span>
       </div>
     </motion.button>
   );
@@ -384,6 +518,9 @@ export default function MarketDashboard() {
   const [searchResults, setSearchResults] = useState<MandiPrice[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const prevLocation = useRef("");
+
+  // Crop Category Chip Filter (Stitch Bento Precision Intelligence)
+  const [selectedCropCategory, setSelectedCropCategory] = useState<string>("All");
 
   // Cascading market filter
   const [selectedMarket, setSelectedMarket] = useState("All");
@@ -743,10 +880,30 @@ export default function MarketDashboard() {
       ? (isHindi ? `${selectedMarket} मंडी भाव` : `${selectedMarket} Mandi Rates`)
       : (isHindi ? "आज के मंडी भाव" : "Today's Mandi Rates");
 
-  // Reset visible count when filters or search change
+  // Crop Categories for Stitch horizontal filter chips
+  const cropCategories = useMemo(() => {
+    const unique = Array.from(new Set(displayPrices.map((p) => p.commodity))).filter(Boolean);
+    return unique.slice(0, 12);
+  }, [displayPrices]);
+
+  // Filter prices by selected horizontal category chip
+  const categoryFilteredPrices = useMemo(() => {
+    if (selectedCropCategory === "All") return displayPrices;
+    const filterLower = selectedCropCategory.toLowerCase();
+    return displayPrices.filter((p) => {
+      const comm = (p.commodity || "").toLowerCase();
+      const commHi = translateName(p.commodity, true).toLowerCase();
+      return comm.includes(filterLower) || commHi.includes(filterLower);
+    });
+  }, [displayPrices, selectedCropCategory, isHindi]);
+
+  // Reset visible count & category when filters or search change
   const displayKey = selectedState + selectedDistrict + selectedMarket + (showSearchResults ? searchQuery : "");
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { setVisibleCount(12); }, [displayKey]);
+  useEffect(() => {
+    setVisibleCount(12);
+    setSelectedCropCategory("All");
+  }, [displayKey]);
 
   const barChartData = marketComparison.map((c) => ({
     ...c,
@@ -1484,14 +1641,59 @@ export default function MarketDashboard() {
           {/* ── Price Cards Grid (hidden when detail view is open) ──────────── */}
           {!detailCommodity && (
             <div>
-              <h2 className="text-xs font-black uppercase tracking-widest mb-3 text-theme-subtle">
-                {displayTitle} {!showSearchResults && `· ${selectedDistrict}, ${selectedState}`}
-              </h2>
+              {/* Stitch Horizontal Commodity Category Filter Strip */}
+              {displayPrices.length > 0 && !showSearchResults && (
+                <div className="overflow-x-auto no-scrollbar flex items-center gap-2 py-1 mb-4">
+                  <button
+                    onClick={() => setSelectedCropCategory("All")}
+                    className={`shrink-0 flex items-center gap-1.5 h-9 px-3.5 rounded-full font-bold text-xs transition-all active:scale-95 ${
+                      selectedCropCategory === "All"
+                        ? "bg-emerald-500 text-slate-950 shadow-[0_2px_12px_rgba(16,185,129,0.35)] font-black"
+                        : "card-surface border border-theme-card text-theme-muted hover:text-theme-main hover:border-emerald-500/40"
+                    }`}
+                  >
+                    <span>{isHindi ? "सभी फसलें" : "All Crops"}</span>
+                    <span className={`px-1.5 py-0.2 text-[10px] rounded-full font-black ${
+                      selectedCropCategory === "All" ? "bg-slate-950/20 text-slate-950" : "bg-emerald-500/15 text-emerald-400"
+                    }`}>
+                      {displayPrices.length}
+                    </span>
+                  </button>
+                  {cropCategories.map((crop) => {
+                    const hi = translateName(crop, true);
+                    const label = isHindi ? `${hi} (${crop})` : (hi !== crop ? `${crop} (${hi})` : crop);
+                    const isActive = selectedCropCategory.toLowerCase() === crop.toLowerCase();
+                    return (
+                      <button
+                        key={crop}
+                        onClick={() => setSelectedCropCategory(isActive ? "All" : crop)}
+                        className={`shrink-0 flex items-center gap-1 h-9 px-3 rounded-full font-bold text-xs transition-all active:scale-95 border ${
+                          isActive
+                            ? "bg-emerald-500 text-slate-950 border-emerald-500 shadow-[0_2px_12px_rgba(16,185,129,0.35)] font-black"
+                            : "card-surface border-theme-card text-theme-muted hover:text-theme-main hover:border-emerald-500/40"
+                        }`}
+                      >
+                        <span>{label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-xs font-black uppercase tracking-widest text-theme-subtle flex items-center gap-2">
+                  <span>{displayTitle} {!showSearchResults && `· ${selectedDistrict}, ${selectedState}`}</span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-mono border border-emerald-500/20">
+                    LIVE
+                  </span>
+                </h2>
+              </div>
+
               {loadingPrices && !showSearchResults ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {Array.from({ length: 6 }).map((_, i) => <SkeletonPriceCard key={i} />)}
                 </div>
-              ) : displayPrices.length === 0 ? (
+              ) : categoryFilteredPrices.length === 0 ? (
                 <div className="rounded-2xl p-12 text-center border card-surface">
                   <AlertCircle size={32} className="mx-auto mb-3 text-theme-muted" />
                   <p className="font-semibold text-theme-muted">
@@ -1500,41 +1702,62 @@ export default function MarketDashboard() {
                   <p className="text-sm mt-1 text-theme-subtle">
                     {showSearchResults
                       ? (isHindi ? "दूसरा नाम आज़माएं।" : "Try a different search term.")
-                      : (isHindi ? "दूसरा जिला आज़माएं।" : "Try another district.")}
+                      : (isHindi ? "दूसरा जिला या फसल फ़िल्टर आज़माएं।" : "Try another district or crop filter.")}
                   </p>
                 </div>
               ) : (
-                <div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    <AnimatePresence>
-                      {displayPrices.slice(0, visibleCount).map((item, idx) => (
-                        <motion.div
-                          key={item.commodity + item.market_name + idx}
-                          initial={{ opacity: 0, y: 16 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: Math.min(idx, 5) * 0.04 }}
-                        >
-                          <PriceCard
-                            item={item}
-                            selected={selectedCommodity === item.commodity}
-                            onClick={() => openCommodityDetail(item)}
-                          />
-                        </motion.div>
-                      ))}
-                    </AnimatePresence>
-                  </div>
+                <div className="space-y-3">
+                  {/* Featured Bento Card (Top Spot Volume) */}
+                  {categoryFilteredPrices.length > 0 && (
+                    <motion.div
+                      key={categoryFilteredPrices[0].commodity + categoryFilteredPrices[0].market_name + "featured"}
+                      initial={{ opacity: 0, y: 16 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <PriceCard
+                        item={categoryFilteredPrices[0]}
+                        selected={selectedCommodity === categoryFilteredPrices[0].commodity}
+                        onClick={() => openCommodityDetail(categoryFilteredPrices[0])}
+                        isFeatured={true}
+                      />
+                    </motion.div>
+                  )}
+
+                  {/* 2-Column Responsive Bento Grid for remaining commodities */}
+                  {categoryFilteredPrices.length > 1 && (
+                    <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-2.5 md:gap-3">
+                      <AnimatePresence>
+                        {categoryFilteredPrices.slice(1, visibleCount).map((item, idx) => (
+                          <motion.div
+                            key={item.commodity + item.market_name + (idx + 1)}
+                            initial={{ opacity: 0, y: 16 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: Math.min(idx, 6) * 0.03 }}
+                          >
+                            <PriceCard
+                              item={item}
+                              selected={selectedCommodity === item.commodity}
+                              onClick={() => openCommodityDetail(item)}
+                              isFeatured={false}
+                            />
+                          </motion.div>
+                        ))}
+                      </AnimatePresence>
+                    </div>
+                  )}
 
                   {/* Load More */}
-                  {visibleCount < displayPrices.length && (
+                  {visibleCount < categoryFilteredPrices.length && (
                     <motion.div
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
-                      className="flex flex-col items-center gap-2 mt-5"
+                      className="flex flex-col items-center gap-2 mt-5 pt-2"
                     >
                       <p className="text-[10px] font-semibold text-theme-subtle">
                         {isHindi
-                          ? `${visibleCount} / ${displayPrices.length} फसलें दिख रही हैं`
-                          : `Showing ${visibleCount} of ${displayPrices.length} commodities`}
+                          ? `${Math.min(visibleCount, categoryFilteredPrices.length)} / ${categoryFilteredPrices.length} फसलें दिख रही हैं`
+                          : `Showing ${Math.min(visibleCount, categoryFilteredPrices.length)} of ${categoryFilteredPrices.length} commodities`}
                       </p>
                       <button
                         onClick={() => setVisibleCount((c) => c + 12)}
