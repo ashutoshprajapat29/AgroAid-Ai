@@ -301,16 +301,16 @@ export const syncMandiToSupabase = functions
 
 const RSS_FEEDS = [
   { url: "https://www.thehindubusinessline.com/economy/agri-business/feeder/default.rss", defaultSource: "The Hindu BusinessLine", lang: "en" },
-  { url: "https://news.google.com/rss/search?q=agriculture+india+mandi+crop+prices&hl=en-IN&gl=IN&ceid=IN:en", defaultSource: "Google News", lang: "en" },
-  { url: "https://news.google.com/rss/search?q=%E0%A4%95%E0%A5%83%E0%A4%B7%E0%A4%BF+%E0%A4%AE%E0%A4%82%E0%A4%A1%E0%A5%80+%E0%A4%AB%E0%A4%B8%E0%A4%B2+%E0%A4%AD%E0%A4%BE%E0%A4%B5&hl=hi&gl=IN&ceid=IN:hi", defaultSource: "Google News Hindi", lang: "hi" },
+  { url: "https://news.google.com/rss/search?q=agriculture+india+mandi+crop+prices+when:7d&hl=en-IN&gl=IN&ceid=IN:en", defaultSource: "Google News", lang: "en" },
+  { url: "https://news.google.com/rss/search?q=%E0%A4%95%E0%A5%83%E0%A4%B7%E0%A4%BF+%E0%A4%AE%E0%A4%82%E0%A4%A1%E0%A5%80+%E0%A4%AB%E0%A4%B8%E0%A4%B2+%E0%A4%AD%E0%A4%BE%E0%A4%B5+when:7d&hl=hi&gl=IN&ceid=IN:hi", defaultSource: "Google News Hindi", lang: "hi" },
+  { url: "https://hindi.krishijagran.com/feeds/rss", defaultSource: "Krishi Jagran Hindi", lang: "hi" },
   { url: "https://krishijagran.com/feeds/rss", defaultSource: "Krishi Jagran", lang: "en" },
 ];
 
 function cleanXmlText(str: string): string {
   if (!str) return "";
-  return str
+  let text = str
     .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
-    .replace(/<[^>]+>/g, "")
     .replace(/&amp;/g, "&")
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
@@ -320,9 +320,14 @@ function cleanXmlText(str: string): string {
     .replace(/&nbsp;/g, " ")
     .replace(/&#8216;|&#8217;/g, "'")
     .replace(/&#8220;|&#8221;/g, '"')
-    .replace(/&#8230;/g, "...")
-    .replace(/\s+/g, " ")
-    .trim();
+    .replace(/&#8230;/g, "...");
+
+  // Strip all HTML tags completely after entity decoding
+  text = text.replace(/<[^>]*>/g, "");
+  // Strip any raw URLs
+  text = text.replace(/https?:\/\/\S+/g, "");
+
+  return text.replace(/\s+/g, " ").trim();
 }
 
 const COMMODITY_TAXONOMY = [
@@ -368,11 +373,25 @@ function classifySentiment(text: string): "Positive" | "Negative" | "Neutral" {
   return "Neutral";
 }
 
-function generateImpact(desc: string, _title: string, commodity: string, commodity_hi: string, sentiment: "Positive" | "Negative" | "Neutral", isHindi: boolean): string {
-  if (desc && desc.length > 25) {
-    const cleaned = desc.slice(0, 180);
-    return cleaned.endsWith(".") ? cleaned : cleaned + "...";
+function generateImpact(desc: string, title: string, commodity: string, commodity_hi: string, sentiment: "Positive" | "Negative" | "Neutral", isHindi: boolean): string {
+  const cleanedDesc = (desc || "")
+    .replace(/<[^>]*>/g, "")
+    .replace(/https?:\/\/\S+/g, "")
+    .trim();
+
+  // If desc is missing, too short, contains raw html leftovers, or basically just the headline repeating
+  const normTitle = (title || "").toLowerCase().replace(/[^a-z0-9\u0900-\u097F]/g, "").slice(0, 25);
+  const normDesc = cleanedDesc.toLowerCase().replace(/[^a-z0-9\u0900-\u097F]/g, "").slice(0, 25);
+  const isRedundant = !cleanedDesc ||
+    cleanedDesc.length < 30 ||
+    cleanedDesc.startsWith("<") ||
+    (normTitle && normDesc && (normTitle === normDesc || normDesc.includes(normTitle)));
+
+  if (!isRedundant) {
+    const trimmed = cleanedDesc.slice(0, 180);
+    return trimmed.endsWith(".") ? trimmed : trimmed + "...";
   }
+
   if (isHindi) {
     if (sentiment === "Positive") {
       return `इस घटनाक्रम से ${commodity_hi} के बाजार भाव व मांग में सकारात्मक रुझान देखने को मिल सकता है।`;
@@ -449,7 +468,14 @@ async function fetchRSSFeedServer(
       let publishedAt = new Date().toISOString();
       if (pubDate) {
         const parsed = Date.parse(pubDate);
-        if (!isNaN(parsed)) publishedAt = new Date(parsed).toISOString();
+        if (!isNaN(parsed)) {
+          // Discard articles older than 7 days (or future timestamps beyond 24 hours)
+          const ageMs = Date.now() - parsed;
+          if (ageMs > 7 * 24 * 60 * 60 * 1000 || ageMs < -24 * 60 * 60 * 1000) {
+            return articles;
+          }
+          publishedAt = new Date(parsed).toISOString();
+        }
       }
 
       articles.push({
@@ -517,21 +543,17 @@ export const fetchAgriNews = functions
       }
     }
 
-    // Sort by publication timestamp descending (freshest first)
+    // Sort: When in Hindi, prioritize Hindi articles at top while preserving recency; otherwise pure recency descending
     allArticles.sort((a, b) => {
       const timeA = a.publishedAt ? Date.parse(a.publishedAt) : 0;
       const timeB = b.publishedAt ? Date.parse(b.publishedAt) : 0;
-      return timeB - timeA;
-    });
-
-    // If language is Hindi, prioritize Hindi articles at top, then English articles
-    if (isHindi) {
-      allArticles.sort((a, b) => {
+      if (isHindi) {
         const isHindiA = /[\u0900-\u097F]/.test(a.title) ? 1 : 0;
         const isHindiB = /[\u0900-\u097F]/.test(b.title) ? 1 : 0;
-        return isHindiB - isHindiA;
-      });
-    }
+        if (isHindiA !== isHindiB) return isHindiB - isHindiA;
+      }
+      return timeB - timeA;
+    });
 
     // Fallback: in case all network feeds were unreachable
     if (allArticles.length === 0) {

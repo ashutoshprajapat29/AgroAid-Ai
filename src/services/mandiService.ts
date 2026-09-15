@@ -450,13 +450,19 @@ import dynamicTranslations from "../lib/mandi_translations.json";
 import { functions } from "../lib/firebase";
 
 export async function fetchMarketNews(language = "English", forceRefresh = false): Promise<NewsItem[]> {
-  const cacheKey = `news_rss_v2_${language}`.toLowerCase();
+  const cacheKey = `news_rss_v4_${language}`.toLowerCase();
 
-  // Clear any old stale caches if forcing refresh
+  // Invalidate legacy stale caches
+  try {
+    localStorage.removeItem(`apicache_news_rss_v3_${language.toLowerCase()}`);
+    localStorage.removeItem(`apicache_news_rss_v2_${language.toLowerCase()}`);
+    localStorage.removeItem(`apicache_news_rss_${language.toLowerCase()}`);
+  } catch {}
+
+  // Clear current cache if forcing refresh
   if (forceRefresh) {
     try {
       localStorage.removeItem(`apicache_${cacheKey}`);
-      localStorage.removeItem(`apicache_news_rss_${language.toLowerCase()}`);
     } catch {}
   }
 

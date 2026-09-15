@@ -202,7 +202,7 @@ function NewsCard({ item, index, isHindi = false }: { item: NewsItem; index: num
         {item.title}
       </h4>
       <p className="text-xs leading-relaxed text-theme-muted line-clamp-3">
-        {item.impact}
+        {item.impact ? item.impact.replace(/<[^>]*>/g, "").replace(/https?:\/\/\S+/g, "").trim() : ""}
       </p>
       <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-theme-card text-[9px]">
         <div className="flex items-center gap-2 text-theme-subtle font-medium">
@@ -1452,7 +1452,7 @@ export default function MarketDashboard() {
                         </div>
                         <div>
                           <h3 className="font-black text-sm text-theme-main">
-                            {isHindi ? `${translate(detailCommodity.commodity)} समाचार` : `${detailCommodity.commodity} News`}
+                            {isHindi ? `${translateName(detailCommodity.commodity, isHindi)} समाचार` : `${detailCommodity.commodity} News`}
                           </h3>
                           <p className="text-[10px] text-theme-subtle">
                             {isHindi ? `${detailNews.length} समाचार रिपोर्ट उपलब्ध` : `${detailNews.length} market reports found`}
